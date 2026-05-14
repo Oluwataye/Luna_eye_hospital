@@ -2327,7 +2327,7 @@ app.get('/api/reprints', (req, res) => {
   if (from_date) { query += ' AND reprint_date >= ?'; params.push(from_date); }
   if (to_date) { query += ' AND reprint_date <= ?'; params.push(to_date); }
   if (user_name) { query += ' AND reprinted_by_name LIKE ?'; params.push(`%${user_name}%`); }
-  if (flagged_only === 'true') { query += ' AND is_flagged = 1'; }
+  if (flagged_only === 'true' || flagged_only === true) { query += ' AND is_flagged = 1'; }
   if (search) {
     query += ' AND (receipt_number LIKE ? OR patient_name LIKE ?)';
     params.push(`%${search}%`, `%${search}%`);
@@ -2425,7 +2425,13 @@ app.get('/api/reprints/restrictions/:user_id', (req, res) => {
 });
 
 app.get('/api/reprints/restrictions', (req, res) => {
-  db.all('SELECT * FROM reprint_restrictions ORDER BY restricted_at DESC', [], (err, rows) => {
+  db.all(`
+    SELECT r.*, u.role, u.full_name as user_name
+    FROM reprint_restrictions r
+    JOIN users u ON r.user_id = u.id
+    WHERE r.is_active = 1
+    ORDER BY r.restricted_at DESC
+  `, [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
   });

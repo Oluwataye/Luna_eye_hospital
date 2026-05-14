@@ -189,16 +189,17 @@ const ReprintManagement: React.FC = () => {
     confirm({
       title: 'Remove Restriction',
       message: 'Are you sure you want to restore reprint access for this user?',
+      type: 'warning',
+      confirmText: 'RESTORE ACCESS',
       onConfirm: async () => {
         try {
           await api.setReprintRestriction({
             user_id: userId,
-            user_name: '', // Not strictly needed for disabling
-            admin_id: user?.id || 0,
             is_active: false
           });
           notify('success', 'Restriction removed successfully');
           fetchData();
+          fetchStats();
         } catch (error) {
           notify('error', 'Failed to remove restriction');
         }
@@ -298,8 +299,17 @@ const ReprintManagement: React.FC = () => {
                  value={filters.from_date} 
                  onChange={e => setFilters({...filters, from_date: e.target.value})} 
                />
-               <button onClick={() => setFilters({...filters, flagged_only: !filters.flagged_only})} className="leh-btn-outline" style={{ height: '42px', background: filters.flagged_only ? '#fef2f2' : 'white', borderColor: filters.flagged_only ? '#ef4444' : 'var(--leh-border-light)', color: filters.flagged_only ? '#ef4444' : 'var(--leh-text-grey)' }}>
-                  <Flag size={14} /> {filters.flagged_only ? 'FLAGGED ONLY' : 'ALL LOGS'}
+               <button 
+                 onClick={() => setFilters({...filters, flagged_only: !filters.flagged_only})} 
+                 className={`leh-btn-outline ${filters.flagged_only ? 'leh-btn-active' : ''}`}
+                 style={{ 
+                   height: '42px', 
+                   background: filters.flagged_only ? '#fef2f2' : 'white', 
+                   borderColor: filters.flagged_only ? '#ef4444' : 'var(--leh-border-light)', 
+                   color: filters.flagged_only ? '#ef4444' : 'var(--leh-text-grey)' 
+                 }}
+               >
+                  <Flag size={14} /> {filters.flagged_only ? 'VIEWING: FLAGGED ONLY' : 'VIEWING: ALL LOGS'}
                </button>
             </div>
           </div>
@@ -365,7 +375,11 @@ const ReprintManagement: React.FC = () => {
                 {restrictions.map(r => (
                   <tr key={r.user_id}>
                     <td style={{ paddingLeft: '32px' }} className="leh-table-bold">{r.user_name}</td>
-                    <td><span className="leh-badge-blue">{r.role?.toUpperCase()}</span></td>
+                    <td>
+                      <span className={`leh-badge-${r.role?.toLowerCase() === 'admin' ? 'purple' : 'blue'}`}>
+                        {r.role?.toUpperCase() || 'USER'}
+                      </span>
+                    </td>
                     <td className="leh-label">{r.reason}</td>
                     <td className="leh-label font-bold">{new Date(r.created_at).toLocaleString()}</td>
                     <td style={{ paddingRight: '32px', textAlign: 'right' }}>
