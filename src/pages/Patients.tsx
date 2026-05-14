@@ -252,8 +252,8 @@ export const Patients: React.FC<PatientsProps> = ({ view: initialView = 'list' }
     const actions = [
       {
         key: 'triage' as const,
-        label: 'Send to Triage',
-        description: 'Route patient to the triage queue for vitals and visual acuity recording',
+        label: 'Route to Triage',
+        description: 'Send patient to nursing for vitals, VA, and preliminary assessment',
         icon: Activity,
         color: 'var(--leh-primary)',
         bgColor: 'var(--leh-primary-light)',
@@ -261,8 +261,8 @@ export const Patients: React.FC<PatientsProps> = ({ view: initialView = 'list' }
       },
       {
         key: 'consultation' as const,
-        label: 'Send to Consultant',
-        description: 'Route patient directly to the consultation queue, bypassing triage',
+        label: 'Direct Consultation',
+        description: 'Bypass triage and send patient directly to the doctor\'s consultation queue',
         icon: Stethoscope,
         color: 'var(--leh-green)',
         bgColor: '#ecfdf5',
@@ -270,8 +270,8 @@ export const Patients: React.FC<PatientsProps> = ({ view: initialView = 'list' }
       },
       {
         key: 'billing' as const,
-        label: 'Bill Patient',
-        description: 'Open billing page for this patient to process payment first',
+        label: 'Bill First',
+        description: 'Direct patient to cash point for payment before clinical assessment',
         icon: CreditCard,
         color: '#8b5cf6',
         bgColor: '#f5f3ff',
@@ -456,10 +456,13 @@ export const Patients: React.FC<PatientsProps> = ({ view: initialView = 'list' }
                       const s = patient.current_status as PatientStatus;
                       if (!s) return 'gray';
                       if (s === PatientStatus.WAITING_FOR_TRIAGE) return 'blue';
+                      if (s === PatientStatus.IN_TRIAGE) return 'blue';
                       if (s === PatientStatus.WAITING_FOR_CONSULTATION) return 'amber';
                       if (s === PatientStatus.IN_CONSULTATION) return 'green';
-                      if (s === PatientStatus.PENDING_PAYMENT) return 'red';
+                      if (s === PatientStatus.CONSULTATION_COMPLETE) return 'green';
+                      if (s === PatientStatus.AWAITING_BILLING) return 'red';
                       if (s === PatientStatus.PAID) return 'green';
+                      if (s === PatientStatus.ADMITTED) return 'purple';
                       return 'green';
                     })()}`} style={{ fontSize: '10px', textTransform: 'uppercase' }}>
                       {patient.current_status ? (StatusLabels[patient.current_status as PatientStatus] || patient.current_status) : 'No Active Visit'}

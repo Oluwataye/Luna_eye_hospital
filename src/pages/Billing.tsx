@@ -651,16 +651,22 @@ export const Billing: React.FC = () => {
                          </div>
                        )}
 
-                       <button 
-                         className="btn-finalize" 
-                         disabled={isProcessing || cart.length === 0 || (paymentMethod === 'Mixed' && Math.abs((mixedBreakdown.cash + mixedBreakdown.bank) - totalPayable) > 0.01)} 
-                         onClick={handleProcessPayment} 
-                         style={{ marginTop: '24px' }}
-                         data-tooltip={paymentMethod === 'Mixed' && Math.abs((mixedBreakdown.cash + mixedBreakdown.bank) - totalPayable) > 0.01 ? "Mixed payment amounts must match total payable" : "Process this transaction"}
-                       >
-                          {isProcessing ? <RefreshCcw className="animate-spin" /> : <ShieldCheck size={18} />}
-                          <span>{balance > 0 ? 'RECORD PARTIAL PAYMENT' : 'PROCESS PAYMENT'}</span>
-                       </button>
+                        <button 
+                          className={`btn-finalize ${isProcessing ? 'processing' : ''}`} 
+                          disabled={isProcessing || cart.length === 0 || (paymentMethod === 'Mixed' && Math.abs((mixedBreakdown.cash + mixedBreakdown.bank) - totalPayable) > 0.01)} 
+                          onClick={handleProcessPayment} 
+                          data-tooltip={paymentMethod === 'Mixed' && Math.abs((mixedBreakdown.cash + mixedBreakdown.bank) - totalPayable) > 0.01 ? "Mixed payment amounts must match total payable" : "Process this transaction"}
+                        >
+                           <div className="btn-finalize-inner">
+                              {isProcessing ? <RefreshCcw className="animate-spin" size={20} /> : <ShieldCheck size={20} />}
+                              <span>{balance > 0 ? 'RECORD PARTIAL PAYMENT' : 'PROCESS PAYMENT'}</span>
+                           </div>
+                           {!isProcessing && (
+                             <div className="btn-finalize-amount">
+                                ₦{totalPayable.toLocaleString()}
+                             </div>
+                           )}
+                        </button>
                     </div>
                  </div>
               </div>

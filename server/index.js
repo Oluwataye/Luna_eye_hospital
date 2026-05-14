@@ -69,6 +69,21 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+const authorizeRoles = (allowedRoles) => {
+  return (req, res, next) => {
+    if (!req.user) return res.status(401).json({ error: 'Authentication required' });
+    
+    const userRole = (req.user.role || '').trim();
+    const hasRole = allowedRoles.some(role => role.toLowerCase() === userRole.toLowerCase());
+    
+    if (!hasRole) {
+      console.warn(`[RBAC] Access denied for user ${req.user.username} (${userRole}) on ${req.method} ${req.originalUrl}`);
+      return res.status(403).json({ error: 'Insufficient permissions for this action' });
+    }
+    next();
+  };
+};
+
 const apiRouter = express.Router();
 apiRouter.use(authenticateToken);
 app.use('/api', apiRouter);
@@ -186,11 +201,11 @@ app.get('/api/db-stats', (req, res) => {
 });
 
 // GET download database backup
-app.get('/api/backup', (req, res) => {
+app.get('/api/backup', authorizeRoles(['Admin']), (req, res) => {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupFilename = `luna_eye_hospital_backup_${timestamp}.db`;
   
-  logAudit(null, 'Admin', 'Admin', 'BACKUP', 'Database', 'Manual database backup downloaded', 'Standard');
+  logAudit(req.user?.id, req.user?.username, req.user?.role, 'BACKUP', 'Database', 'Manual database backup downloaded', 'Standard');
   
   res.download(dbPath, backupFilename, (err) => {
     if (err) {
@@ -206,7 +221,7 @@ app.get('/api/backup', (req, res) => {
 // --- USER MANAGEMENT API ---
 
 // GET all users
-app.get('/api/users', (req, res) => {
+app.get('/api/users', authorizeRoles(['Admin']), (req, res) => {
   db.all('SELECT id, username, full_name, role, IFNULL(department, \'General\') as department, status FROM users ORDER BY id ASC', [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
@@ -214,7 +229,7 @@ app.get('/api/users', (req, res) => {
 });
 
 // POST new user
-app.post('/api/users', (req, res) => {
+app.post('/api/users', authorizeRoles(['Admin']), (req, res) => {
   const { username, password, full_name, role, department } = req.body;
   if (!username || !password || !full_name || !role) {
     return res.status(400).json({ error: 'username, password, full_name, and role are required' });
@@ -239,7 +254,7 @@ app.post('/api/users', (req, res) => {
 });
 
 // PUT update user (role, status, password reset, department)
-app.put('/api/users/:id', (req, res) => {
+app.put('/api/users/:id', authorizeRoles(['Admin']), (req, res) => {
   const { id } = req.params;
   const { role, status, password, full_name, department } = req.body;
   
@@ -325,7 +340,7 @@ app.post('/api/change-password', (req, res) => {
 
 // --- AUDIT LOGS API ---
 
-app.get('/api/audit-logs', (req, res) => {
+app.get('/api/audit-logs', authorizeRoles(['Admin']), (req, res) => {
   const { user_id, action_type, start_date, end_date } = req.query;
   let query = 'SELECT * FROM audit_logs WHERE 1=1';
   let params = [];
@@ -413,7 +428,7 @@ app.get('/api/patients', (req, res) => {
 });
 
 // POST new patient
-app.post('/api/patients', (req, res) => {
+app.post('/api/patients', authorizeRoles(['Admin', 'Receptionist']), (req, res) => {
   console.log('REGISTRATION_ATTEMPT:', JSON.stringify(req.body));
   const { 
     full_name, gender, dob, phone, alternate_phone, address, 
@@ -432,9 +447,9 @@ app.post('/api/patients', (req, res) => {
       });
     }
 
-    // Generate ID: 0001/26/LEH
+    // Generate ID: 0001/26/LETH
     const currentYear = new Date().getFullYear().toString().slice(-2);
-    db.get("SELECT id FROM patients WHERE id LIKE ? ORDER BY id DESC LIMIT 1", [`%/${currentYear}/LEH`], (err, lastPatient) => {
+    db.get("SELECT id FROM patients WHERE id LIKE ? ORDER BY id DESC LIMIT 1", [`%/${currentYear}/LETH`], (err, lastPatient) => {
       if (err) return res.status(500).json({ error: err.message });
       
       let nextNumber = 1;
@@ -444,7 +459,7 @@ app.post('/api/patients', (req, res) => {
       }
       
       const paddedCount = String(nextNumber).padStart(4, '0');
-      const id = `${paddedCount}/${currentYear}/LEH`;
+      const id = `${paddedCount}/${currentYear}/LETH`;
       console.log(`Generating Patient ID: ${id} (Previous: ${lastPatient ? lastPatient.id : 'None'})`);
       
       db.serialize(() => {
@@ -476,7 +491,7 @@ app.post('/api/patients', (req, res) => {
             }
             
             db.run('COMMIT', () => {
-              logAudit(null, 'Receptionist', 'Receptionist', 'PATIENT_CREATE', 'Patients', `Registered new patient: ${full_name} (ID: ${id})`);
+              logAudit(req.user?.id, req.user?.username, req.user?.role, 'PATIENT_CREATE', 'Patients', `Registered new patient: ${full_name} (ID: ${id})`);
               notify('Admin', `New patient registered: ${full_name}`, 'Patients');
               notify('Receptionist', `New patient registered: ${full_name}`, 'Patients');
               res.status(201).json({ id, full_name, gender, dob, phone, created_at: new Date() });
@@ -519,14 +534,14 @@ app.put('/api/patients/:id', (req, res) => {
 });
 
 // POST check-in — routes existing today's visit to a target queue status
-app.post('/api/check-in', (req, res) => {
+app.post('/api/check-in', authorizeRoles(['Admin', 'Receptionist', 'Nurse']), (req, res) => {
   const { patient_id, target, user_name } = req.body;
   if (!patient_id) return res.status(400).json({ error: 'patient_id is required' });
 
   const statusMap = {
     triage: PatientStatus.WAITING_FOR_TRIAGE,
     consultation: PatientStatus.WAITING_FOR_CONSULTATION,
-    billing: PatientStatus.PENDING_PAYMENT
+    billing: PatientStatus.AWAITING_BILLING
   };
   const newStatus = statusMap[target] || PatientStatus.WAITING_FOR_TRIAGE;
   const receptionist = user_name || 'System Receptionist';
@@ -644,11 +659,11 @@ app.get('/api/queue', (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     
     const stats = {
-      awaiting_payment: rows.filter(r => r.status === 'Awaiting Payment' || r.status === 'PENDING_PAYMENT'),
-      waiting: rows.filter(r => r.status === 'Registered/Waiting' || r.status === 'Waiting' || r.status === 'Paid - Waiting for Triage' || r.status === 'WAITING_FOR_TRIAGE' || r.status === 'Waiting for Triage'),
-      consulting: rows.filter(r => r.status === 'In Consultation' || r.status === 'IN_CONSULTATION'),
-      waiting_for_consultation: rows.filter(r => r.status === 'Waiting for Consultation' || r.status === 'WAITING_FOR_CONSULTATION'),
-      admitted: rows.filter(r => r.status === 'Admitted' || r.status === 'ADMITTED'),
+      awaiting_payment: rows.filter(r => r.status === PatientStatus.AWAITING_BILLING),
+      waiting: rows.filter(r => r.status === PatientStatus.REGISTERED || r.status === PatientStatus.WAITING_FOR_TRIAGE || r.status === PatientStatus.PAID),
+      consulting: rows.filter(r => r.status === PatientStatus.IN_CONSULTATION),
+      waiting_for_consultation: rows.filter(r => r.status === PatientStatus.WAITING_FOR_CONSULTATION || r.status === PatientStatus.TRIAGE_COMPLETE),
+      admitted: rows.filter(r => r.status === PatientStatus.ADMITTED),
       total_today: rows.length
     };
     
@@ -698,9 +713,9 @@ apiRouter.get('/awaiting-payment', (req, res) => {
     FROM visits v
     JOIN patients p ON v.patient_id = p.id
     WHERE date(v.visit_date, 'localtime') = date('now', 'localtime')
-      AND (v.status = 'Awaiting Payment' OR v.status = 'Paid - Waiting for Triage')
+      AND (v.status = ? OR v.status = ?)
     ORDER BY v.visit_date ASC
-  `, [], (err, rows) => {
+  `, [PatientStatus.AWAITING_BILLING, PatientStatus.PAID], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     const mapped = rows.map(r => ({ ...r, has_paid: r.payment_count > 0 }));
     res.json(mapped);
@@ -738,7 +753,7 @@ app.get('/api/triage/history/:patientId', (req, res) => {
 });
 
 // POST save triage — saves vitals and advances patient status to 'Waiting for Consultation'
-app.post('/api/triage', (req, res) => {
+app.post('/api/triage', authorizeRoles(['Admin', 'Nurse']), (req, res) => {
   const {
     patient_id, visit_id,
     bp_systolic, bp_diastolic, pulse_rate, temperature, weight,
@@ -896,7 +911,7 @@ app.get('/api/transactions', (req, res) => {
 
 
 // POST new transaction
-app.post('/api/transactions', (req, res) => {
+app.post('/api/transactions', authorizeRoles(['Admin', 'Receptionist']), (req, res) => {
   const { 
     patient_id, visit_id, amount_paid, discount, 
     payment_method, payment_details, cashier, items 
@@ -984,21 +999,32 @@ app.post('/api/transactions', (req, res) => {
             return res.status(400).json({ error: 'Transaction failed. Check stock levels or item details.' });
           } else {
             // Update visit status if fully paid (Status is 'Paid')
+            // Update visit status if fully paid (Status is 'Paid')
             if (visit_id && status === 'Paid') {
               const vId = parseInt(visit_id);
-              db.run('UPDATE visits SET status = ? WHERE id = ?', ['Paid - Waiting for Triage', vId], (errVisit) => {
-                if (errVisit) {
-                  console.error('[Clinical Gate] Error updating visit status:', errVisit);
-                  db.run('ROLLBACK');
-                  return res.status(500).json({ error: 'Failed to update visit status' });
+              // Check current status to decide next step
+              db.get('SELECT status FROM visits WHERE id = ?', [vId], (errV, v) => {
+                let nextStatus = PatientStatus.WAITING_FOR_TRIAGE;
+                if (v && v.status === PatientStatus.CONSULTATION_COMPLETE) {
+                  nextStatus = PatientStatus.PAID;
+                } else if (v && v.status === PatientStatus.AWAITING_BILLING) {
+                  nextStatus = PatientStatus.PAID;
                 }
                 
-                logAudit(null, 'System', 'User', 'VISIT_STATUS_CHANGE', 'Consultations', `Visit ${vId} status changed to Paid - Waiting for Triage`);
-                
-                db.run('COMMIT', (err) => {
-                  if (err) return res.status(500).json({ error: err.message });
-                  logAudit(null, cashier, 'Staff', 'BILLING_CREATE', 'Billing', `New transaction ${receipt_no} for patient ID ${patient_id}. Total: ${total_amount}`);
-                  res.status(201).json({ receipt_no, transactionId, patient_id, total_amount, amount_paid: final_paid, balance, status });
+                db.run('UPDATE visits SET status = ? WHERE id = ?', [nextStatus, vId], (errVisit) => {
+                  if (errVisit) {
+                    console.error('[Clinical Gate] Error updating visit status:', errVisit);
+                    db.run('ROLLBACK');
+                    return res.status(500).json({ error: 'Failed to update visit status' });
+                  }
+                  
+                  logAudit(null, 'System', 'User', 'VISIT_STATUS_CHANGE', 'Consultations', `Visit ${vId} status changed to ${nextStatus}`);
+                  
+                  db.run('COMMIT', (err) => {
+                    if (err) return res.status(500).json({ error: err.message });
+                    logAudit(null, cashier, 'Staff', 'BILLING_CREATE', 'Billing', `New transaction ${receipt_no} for patient ID ${patient_id}. Total: ${total_amount}`);
+                    res.status(201).json({ receipt_no, transactionId, patient_id, total_amount, amount_paid: final_paid, balance, status });
+                  });
                 });
               });
             } else {
@@ -1041,7 +1067,7 @@ app.get('/api/inventory', (req, res) => {
 });
 
 // POST new inventory item
-app.post('/api/inventory', (req, res) => {
+app.post('/api/inventory', authorizeRoles(['Admin']), (req, res) => {
   const { name, category, stock, reorder_level, price, cost_price, expiry_date, supplier, batch_number } = req.body;
   const id = `INV-${Date.now()}`;
   
@@ -1076,7 +1102,7 @@ app.post('/api/inventory', (req, res) => {
 });
 
 // PUT update inventory stock (Deduct/Add/Adjust)
-app.put('/api/inventory/:id/stock', (req, res) => {
+app.put('/api/inventory/:id/stock', authorizeRoles(['Admin']), (req, res) => {
   const { id } = req.params;
   const { quantity_change, reason, type, performed_by, reference_id } = req.body; 
   
@@ -1201,7 +1227,7 @@ app.get('/api/consultations', (req, res) => {
 });
 
 // POST new consultation – accepts full clinical JSON
-app.post('/api/consultations', (req, res) => {
+app.post('/api/consultations', authorizeRoles(['Admin', 'Optometrist', 'Consultant']), (req, res) => {
   const data = req.body;
 
   // Only enforce strict validation if we are finalizing the visit
@@ -1244,8 +1270,17 @@ app.post('/api/consultations', (req, res) => {
       const clinicalData = data.clinical_data || {};
       const isFinalized = data.finalize || data.finalized;
       let newStatus = isFinalized ? PatientStatus.CONSULTATION_COMPLETE : PatientStatus.IN_CONSULTATION;
-      if (isFinalized && clinicalData.admission_advised) {
-        newStatus = PatientStatus.DISCHARGED; // User defined Discharged as final state
+      
+      // If surgery advised or admission, the state machine should handle routing
+      if (isFinalized) {
+        if (clinicalData.surgery_advised) {
+          newStatus = PatientStatus.AWAITING_SURGERY;
+        } else if (clinicalData.admission_advised) {
+          newStatus = PatientStatus.ADMITTED;
+        } else {
+          // Default move to billing after consultation
+          newStatus = PatientStatus.AWAITING_BILLING;
+        }
       }
       
       const updateSql = data.visit_id 

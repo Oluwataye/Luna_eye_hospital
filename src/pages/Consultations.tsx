@@ -101,7 +101,23 @@ export const Consultations: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
   const autoSaveTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  const menuItems = [
+    { id: 'History', label: 'History & Complaint', icon: User },
+    { id: 'Vitals', label: 'Vitals Review', icon: Activity },
+    { id: 'Vision', label: 'Visual Acuity', icon: Eye },
+    { id: 'IOP', label: 'Intraocular Pressure', icon: Target },
+    { id: 'Refraction', label: 'Refraction', icon: Glasses },
+    { id: 'AnteriorSeg', label: 'Anterior Segment', icon: Eye },
+    { id: 'Dilation', label: 'Dilation', icon: Droplets },
+    { id: 'Fundoscopy', label: 'Fundoscopy', icon: Eye },
+    { id: 'Diagnosis', label: 'Clinical Diagnosis', icon: Target },
+    { id: 'Plan', label: 'Treatment Plan', icon: Pill },
+    { id: 'Notes', label: 'Clinical Notes', icon: ClipboardList },
+    { id: 'Surgery', label: 'Surgery & Admission', icon: Scissors }
+  ];
   const [showTriageModal, setShowTriageModal] = useState(false);
   const [showSendBackModal, setShowSendBackModal] = useState(false);
   const [triageData, setTriageData] = useState<any>(null);
@@ -151,7 +167,8 @@ export const Consultations: React.FC = () => {
     plan_followup_date: '', plan_instructions: '',
     notes_internal: '', notes_reception: '', notes_nurse: '',
     surgery_advised: false, surgery_type: '', surgery_urgency: 'Elective', surgery_notes: '',
-    surgery_date: '', surgery_surgeon: '', surgery_preop: '', surgery_counselled: false, surgery_counsel_notes: ''
+    surgery_date: '', surgery_surgeon: '', surgery_preop: '', surgery_counselled: false, surgery_counsel_notes: '',
+    admission_advised: false, admission_reason: '', admission_urgency: 'Routine'
   });
 
   const [sectionStatus, setSectionStatus] = useState<any>({});
@@ -208,7 +225,11 @@ export const Consultations: React.FC = () => {
         if (savedData.surgery_advised) status['Surgery'] = true;
         setSectionStatus(status);
         
+        setIsLocked(currentConsultation.finalized === 1 || currentConsultation.finalize === 1);
+        
         notify('info', 'Previous clinical progress loaded');
+      } else {
+        setIsLocked(false);
       }
     } catch (err) {
       console.warn('Consultation fetch failed:', err);
@@ -248,6 +269,7 @@ export const Consultations: React.FC = () => {
       await fetchConsultation(p.patient_id || p.id, p.visit_id);
       
       setIsDirty(false); // Reset dirty state on new patient
+      setIsLocked(false); // Reset lock
       notify('info', `Consultation Started: ${p.full_name}`);
       loadQueue();
     } catch (err) {
@@ -256,6 +278,7 @@ export const Consultations: React.FC = () => {
   };
 
   const handleInputChange = (e: any) => {
+    if (isLocked) return;
     const { name, value } = e.target;
     setFormData((prev: any) => ({ ...prev, [name]: value }));
     setIsDirty(true);
@@ -415,7 +438,7 @@ export const Consultations: React.FC = () => {
             <SectionHeader title="Section A: History & Chief Complaint" icon={User} onSave={() => handleSave(false)} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
               <ClinicalField label="Chief Complaint" fullWidth>
-                <textarea className="clinical-textarea" name="complaint" value={formData.complaint} onChange={handleInputChange} placeholder="Reason for visit..." style={{ height: '120px' }} required />
+                <textarea className="clinical-textarea" name="complaint" value={formData.complaint} onChange={handleInputChange} placeholder="Reason for visit..." style={{ height: '120px' }} required disabled={isLocked} />
               </ClinicalField>
               <ClinicalField label="History of Present Illness (HPI)" fullWidth>
                 <textarea className="clinical-textarea" name="hpi" value={formData.hpi} onChange={handleInputChange} placeholder="Details of current symptoms..." style={{ height: '150px' }} />
@@ -788,27 +811,47 @@ export const Consultations: React.FC = () => {
             <SectionHeader title="Section L: Surgery Flag" icon={Scissors} onSave={() => handleSave(false)} />
             <div style={{ padding: '32px', background: formData.surgery_advised ? '#fff1f2' : 'white', borderRadius: '24px', border: formData.surgery_advised ? '2px solid #e11d48' : '1px solid var(--leh-border-light)' }}>
                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
-                  <input type="checkbox" checked={formData.surgery_advised} onChange={(e) => setFormData((prev: any) => ({ ...prev, surgery_advised: e.target.checked }))} style={{ width: '24px', height: '24px' }} />
+                  <input type="checkbox" checked={formData.surgery_advised} onChange={(e) => setFormData((prev: any) => ({ ...prev, surgery_advised: e.target.checked }))} style={{ width: '24px', height: '24px' }} disabled={isLocked} />
                   <span style={{ fontSize: '16px', fontWeight: '900', color: formData.surgery_advised ? '#e11d48' : 'var(--leh-text-dark)' }}>SURGERY ADVISED?</span>
                </div>
                
                {formData.surgery_advised && (
                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
                     <ClinicalField label="Surgery Type">
-                       <input className="clinical-input" name="surgery_type" value={formData.surgery_type} onChange={handleInputChange} placeholder="e.g. Phaco + IOL" />
+                       <input className="clinical-input" name="surgery_type" value={formData.surgery_type} onChange={handleInputChange} placeholder="e.g. Phaco + IOL" disabled={isLocked} />
                     </ClinicalField>
                     <ClinicalField label="Eye Side">
-                       <select className="clinical-input" name="surgery_side" value={formData.surgery_side} onChange={handleInputChange}>
+                       <select className="clinical-input" name="surgery_side" value={formData.surgery_side} onChange={handleInputChange} disabled={isLocked}>
                           <option>Right Eye (OD)</option><option>Left Eye (OS)</option><option>Both Eyes (OU)</option>
                        </select>
                     </ClinicalField>
                     <ClinicalField label="Urgency">
-                       <select className="clinical-input" name="surgery_urgency" value={formData.surgery_urgency} onChange={handleInputChange}>
+                       <select className="clinical-input" name="surgery_urgency" value={formData.surgery_urgency} onChange={handleInputChange} disabled={isLocked}>
                           <option>Elective</option><option>Urgent</option><option>Emergency</option>
                        </select>
                     </ClinicalField>
                     <ClinicalField label="Surgery Notes" fullWidth>
-                       <textarea className="clinical-textarea" name="surgery_notes" value={formData.surgery_notes} onChange={handleInputChange} placeholder="Pre-op requirements, risks discussed..." style={{ height: '100px' }} />
+                       <textarea className="clinical-textarea" name="surgery_notes" value={formData.surgery_notes} onChange={handleInputChange} placeholder="Pre-op requirements, risks discussed..." style={{ height: '100px' }} disabled={isLocked} />
+                    </ClinicalField>
+                 </div>
+               )}
+            </div>
+
+            <div style={{ marginTop: '32px', padding: '32px', background: formData.admission_advised ? '#eff6ff' : 'white', borderRadius: '24px', border: formData.admission_advised ? '2px solid var(--leh-primary)' : '1px solid var(--leh-border-light)' }}>
+               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+                  <input type="checkbox" checked={formData.admission_advised} onChange={(e) => setFormData((prev: any) => ({ ...prev, admission_advised: e.target.checked }))} style={{ width: '24px', height: '24px' }} disabled={isLocked} />
+                  <span style={{ fontSize: '16px', fontWeight: '900', color: formData.admission_advised ? 'var(--leh-primary)' : 'var(--leh-text-dark)' }}>ADMISSION ADVISED?</span>
+               </div>
+               
+               {formData.admission_advised && (
+                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                    <ClinicalField label="Reason for Admission" fullWidth>
+                       <textarea className="clinical-textarea" name="admission_reason" value={formData.admission_reason} onChange={handleInputChange} placeholder="Specific condition requiring inpatient care..." style={{ height: '100px' }} disabled={isLocked} />
+                    </ClinicalField>
+                    <ClinicalField label="Admission Urgency">
+                       <select className="clinical-input" name="admission_urgency" value={formData.admission_urgency} onChange={handleInputChange} disabled={isLocked}>
+                          <option>Routine</option><option>Urgent</option><option>Emergency</option>
+                       </select>
                     </ClinicalField>
                  </div>
                )}
