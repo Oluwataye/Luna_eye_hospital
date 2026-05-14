@@ -180,7 +180,7 @@ export const Consultations: React.FC = () => {
 
   useEffect(() => { 
     loadQueue();
-    const interval = setInterval(loadQueue, 10000);
+    const interval = setInterval(loadQueue, 5000);
     return () => clearInterval(interval);
   }, [loadQueue]);
 

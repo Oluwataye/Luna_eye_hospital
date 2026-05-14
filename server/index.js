@@ -688,11 +688,15 @@ apiRouter.get('/triage-queue', (req, res) => {
 // GET consultation queue — all patients ready for clinician review or currently being seen
 apiRouter.get('/consultation-queue', (req, res) => {
   db.all(`
-    SELECT q.*, p.gender, p.dob, p.phone, t.complaint
+    SELECT q.*, p.gender, p.dob, p.phone,
+           COALESCE(t.complaint, q.patient_name) as complaint
     FROM consultation_queue q
-    JOIN patients p ON q.patient_id = p.id
+    JOIN patients p ON CAST(q.patient_id AS TEXT) = CAST(p.id AS TEXT)
     LEFT JOIN triage t ON q.visit_id = t.visit_id
-    WHERE date(q.checkin_at, 'localtime') = date('now', 'localtime')
+    WHERE (
+      date(q.checkin_at, 'localtime') = date('now', 'localtime')
+      OR (strftime('%s','now') - strftime('%s', q.checkin_at)) < 86400
+    )
       AND q.status IN (?, ?)
     ORDER BY q.checkin_at ASC
   `, [PatientStatus.WAITING_FOR_CONSULTATION, PatientStatus.IN_CONSULTATION], (err, rows) => {
