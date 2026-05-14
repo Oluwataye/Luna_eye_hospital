@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  ClipboardList, Printer, FileSpreadsheet, Filter, Calendar, User, Shield, RefreshCw
+  Printer, FileSpreadsheet, Filter, Calendar, User, Shield, RefreshCw
 } from 'lucide-react';
 import { api } from '../api';
 import { useNotification } from '../context/NotificationContext';
-import { formatDateStandard, formatDateTimeStandard } from '../utils/date';
+import { formatDateStandard } from '../utils/date';
 
 export const AuditLogs: React.FC = () => {
   const { notify } = useNotification();

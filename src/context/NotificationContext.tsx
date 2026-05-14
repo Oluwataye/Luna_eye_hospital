@@ -8,7 +8,7 @@ import React, {
   useRef,
   type ReactNode,
 } from 'react';
-import { CheckCircle2, XCircle, AlertTriangle, Info, X, ShieldAlert, Check } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, Info, X, ShieldAlert } from 'lucide-react';
 import './NotificationContext.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────

@@ -1,17 +1,14 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { 
   Search, Trash2, ShoppingCart, 
   Plus, Minus,
   RefreshCcw,
-  Receipt,
   X,
   CreditCard,
   Banknote,
   Printer,
-  History,
   ShieldCheck,
-  ChevronDown,
   AlertTriangle,
   Layers
 } from 'lucide-react';
@@ -19,13 +16,11 @@ import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { buildReceiptHtml, printReceiptContent } from '../utils/printHelpers';
-import { formatDateStandard, formatDateTimeStandard } from '../utils/date';
-import { PatientStatus } from '../constants/workflow';
+import { formatDateStandard } from '../utils/date';
 import './Billing.css';
 
 export const Billing: React.FC = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const { notify } = useNotification();
   const [searchParams] = useSearchParams();
   
@@ -38,7 +33,6 @@ export const Billing: React.FC = () => {
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
   const [patientSearchQuery, setPatientSearchQuery] = useState('');
   const [patientResults, setPatientResults] = useState<any[]>([]);
-  const [patientDebt, setPatientDebt] = useState<number>(0);
   
   // Catalog State
   const [catalog, setCatalog] = useState<any[]>([]);
@@ -57,7 +51,6 @@ export const Billing: React.FC = () => {
   
   // History State
   const [transactions, setTransactions] = useState<any[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
   
   // Modal State
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -109,18 +102,6 @@ export const Billing: React.FC = () => {
     }
   };
 
-  const fetchPatientDebt = async (patientId: string) => {
-    try {
-      // Reusing the debtors details endpoint but filtering for the selected patient
-      const debtors = await api.getDebtorsReport();
-      const patientTotal = debtors
-        .filter((d: any) => String(d.file_no) === String(patientId))
-        .reduce((sum: number, d: any) => sum + d.balance_due, 0);
-      setPatientDebt(patientTotal);
-    } catch (err) {
-      console.error('Failed to fetch patient debt status');
-    }
-  };
 
   // Live Patient Search
   useEffect(() => {
@@ -151,10 +132,9 @@ export const Billing: React.FC = () => {
   // Load History
   useEffect(() => {
     if (activeTab === 'history') {
-      setHistoryLoading(true);
       api.getTransactions()
         .then(data => setTransactions(Array.isArray(data) ? data : []))
-        .finally(() => setHistoryLoading(false));
+        .finally(() => {});
     }
   }, [activeTab]);
 
@@ -163,7 +143,6 @@ export const Billing: React.FC = () => {
     setSelectedVisitId(visitId || p.current_visit_id || null);
     setPatientSearchQuery('');
     setPatientResults([]);
-    fetchPatientDebt(p.id);
     notify('success', `Billing Context: ${p.full_name}`);
   };
 
@@ -259,7 +238,6 @@ export const Billing: React.FC = () => {
       setIsManualDiscountUnlocked(false);
       setAmountTendred(0);
       setSelectedPatient(null);
-      setPatientDebt(0);
       setActiveTab('history');
     } catch (err: any) {
       notify('error', err.message);
@@ -268,12 +246,6 @@ export const Billing: React.FC = () => {
     }
   };
 
-  const calculateAge = (dob: string) => {
-    if (!dob) return '—';
-    const birthDate = new Date(dob);
-    const difference = Date.now() - birthDate.getTime();
-    return Math.floor(difference / (1000 * 60 * 60 * 24 * 365.25));
-  };
 
   return (
     <div className="billing-page-container animate-fade-in">
@@ -327,7 +299,7 @@ export const Billing: React.FC = () => {
                 className="leh-btn-primary"
                 style={{ flex: 1, height: '48px', background: 'var(--leh-red)' }}
                 onClick={() => {
-                  setCart([]); setDiscountPercent(0); setManualDiscount(0); setIsManualDiscountUnlocked(false); setAmountTendred(0); setSelectedPatient(null); setPatientDebt(0);
+                  setCart([]); setDiscountPercent(0); setManualDiscount(0); setIsManualDiscountUnlocked(false); setAmountTendred(0); setSelectedPatient(null);
                   setShowCancelModal(false);
                 }}
               >

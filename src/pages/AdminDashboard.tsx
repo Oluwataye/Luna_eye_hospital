@@ -1,12 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { 
-  TrendingUp, AlertTriangle, ArrowRight, Package, 
-  BarChart3, Users, Receipt, Printer, Settings as SettingsIcon,
-  Activity, RefreshCw, Clock, ArrowUpRight, ShieldAlert,
-  Wallet, LayoutDashboard, ChevronRight, LineChart, Search,
-  History, Shield, CheckCircle, ShoppingBag, Key, Database,
-  UserCheck, AlertCircle, Zap, ClipboardList,
-  ShieldCheck, UserPlus
+  AlertTriangle, Users, RefreshCw, ShieldAlert,
+  History, Shield, Database,
+  Zap, ClipboardList, ShieldCheck, UserPlus
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
@@ -21,7 +17,6 @@ export const AdminDashboard: React.FC = () => {
   const { notify } = useNotification();
   const [lastUpdated, setLastUpdated] = useState(new Date().toLocaleTimeString());
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [loading, setLoading] = useState(true);
 
   const [metrics, setMetrics] = useState({
     patientsToday: 0,
@@ -78,7 +73,6 @@ export const AdminDashboard: React.FC = () => {
       notify('error', 'Critical telemetry synchronization failure');
     } finally {
       setIsRefreshing(false);
-      setLoading(false);
     }
   };
 

@@ -1,14 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
-  BarChart3, TrendingUp, Users, Package, 
-  Truck, AlertCircle, Wallet, ClipboardList,
-  Search, RefreshCcw, Printer,
-  FileSpreadsheet, FileText, Eye,
-  CreditCard, Shield, User, ArrowUpDown,
-  ShoppingBag, Banknote, CheckCircle2,
-  ChevronLeft, ChevronRight, Filter, Calendar, Download,
-  LayoutDashboard, PieChart, Activity, ShieldCheck
+  Users, Package, AlertCircle, Search, RefreshCcw, Printer, 
+  Shield, PieChart, Activity, ChevronRight, Filter, Calendar, Download, Truck
 } from 'lucide-react';
 import { NairaIcon } from '../components/NairaIcon';
 import { formatDateStandard } from '../utils/date';
@@ -28,8 +22,6 @@ export const Reports: React.FC = () => {
   const [data, setData] = useState<any[]>([]);
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const rowsPerPage = 15;
 
   const [dateRange, setDateRange] = useState({
     start: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],

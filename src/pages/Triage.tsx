@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   Activity, 
   Eye, 
@@ -24,7 +24,6 @@ import {
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
-import { formatDateStandard } from '../utils/date';
 import { PatientStatus } from '../constants/workflow';
 import './Triage.css';
 
@@ -77,7 +76,6 @@ export const Triage: React.FC = () => {
   const { user } = useAuth();
   const { notify } = useNotification();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
 
   const [triageQueue, setTriageQueue] = useState<any[]>([]);
   const [selectedVisit, setSelectedVisit] = useState<any | null>(null);

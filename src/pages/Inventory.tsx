@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useSearchParams } from 'react-router-dom';
 import { 
-  Plus, Search, Printer, RefreshCcw, Package, ChevronDown
+  Plus, Search, RefreshCcw, Package, Edit3, X, Box, Clock, CreditCard
 } from 'lucide-react';
 import { NairaIcon } from '../components/NairaIcon';
 import { api } from '../api';
@@ -11,9 +10,7 @@ import { formatDateStandard } from '../utils/date';
 import { StatCard } from '../components/StatCard';
 
 export const Inventory: React.FC = () => {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
   const { notify } = useNotification();
   const [activeCategory, setActiveCategory] = useState(searchParams.get('category') || '');
   const [items, setItems] = useState<any[]>([]);
@@ -147,11 +144,11 @@ export const Inventory: React.FC = () => {
           <button 
             className="leh-btn-outline" 
             style={{ border: 'none', height: '48px', width: '48px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            onClick={fetchData}
+            onClick={loadInventory}
             data-tooltip="Sync inventory stock levels"
             aria-label="Refresh stock"
           >
-            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+            <RefreshCcw size={18} className={loading ? 'animate-spin' : ''} />
           </button>
           <button className="leh-btn-primary" onClick={() => handleOpenModal()} data-tooltip="Register new asset record">
             <Plus size={20} />

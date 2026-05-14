@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Save, CheckCircle, User, Activity, Eye, 
-  Thermometer, Pill, Glasses, Calendar, AlertCircle,
-  Clipboard, Stethoscope, Scissors, CheckCircle2, Printer, 
+  Pill, Glasses, Stethoscope, Scissors, CheckCircle2, Printer, 
   Search, Plus, Trash2, Clock, X, RefreshCcw, 
-  ChevronRight, ArrowLeft, Send, History as HistoryIcon,
-  Droplets, FileText, Layout, Info, UserCheck, 
-  Settings, Target, ClipboardList, PenTool, AlertTriangle, Lock, Microscope, Download
+  History as HistoryIcon, Droplets, Target, 
+  ClipboardList, AlertTriangle, Download, Info
 } from 'lucide-react';
 
 const SNELLEN_OPTIONS = ['6/6', '6/9', '6/12', '6/18', '6/24', '6/36', '6/60', '3/60', '1/60', 'CF', 'HM', 'PL', 'NPL'];
@@ -21,7 +19,6 @@ const DIAGNOSIS_OPTIONS = [
 ];
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useNotification } from '../context/NotificationContext';
 import { formatDateStandard, formatDateTimeStandard } from '../utils/date';
 import { PatientStatus } from '../constants/workflow';
@@ -90,8 +87,6 @@ const ODSideBySide = ({ label, childrenOD, childrenOS }: any) => (
 // --- MAIN PAGE COMPONENT ---
 
 export const Consultations: React.FC = () => {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { notify } = useNotification();
   
@@ -102,7 +97,7 @@ export const Consultations: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
-  const autoSaveTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const autoSaveTimerRef = React.useRef<any>(null);
 
   const menuItems = [
     { id: 'History', label: 'History & Complaint', icon: User },
@@ -206,23 +201,23 @@ export const Consultations: React.FC = () => {
         setFormData((prev: any) => ({
           ...prev,
           ...savedData,
-          complaint: currentConsultation.complaint || savedData.complaint || prev.complaint,
-          diag_summary: currentConsultation.primary_diagnosis || savedData.diag_summary || prev.diag_summary
+          complaint: currentConsultation.complaint || (savedData as any).complaint || prev.complaint,
+          diag_summary: currentConsultation.primary_diagnosis || (savedData as any).diag_summary || prev.diag_summary
         }));
         
         const status: any = {};
-        if (savedData.complaint) status['History'] = true;
-        if (savedData.vitals_bp_systolic) status['Vitals'] = true;
-        if (savedData.va_od_unaided_dv) status['VA'] = true;
-        if (savedData.iop_od) status['IOP'] = true;
-        if (savedData.ref_od_sph) status['Refraction'] = true;
-        if (savedData.as_lids_od) status['AnteriorSeg'] = true;
-        if (savedData.dil_adequate) status['Dilation'] = true;
-        if (savedData.fs_disc_cdr_od) status['Fundoscopy'] = true;
-        if (savedData.diag_od) status['Diagnosis'] = true;
-        if (savedData.plan_meds?.length > 0) status['Plan'] = true;
-        if (savedData.clinical_notes) status['Notes'] = true;
-        if (savedData.surgery_advised) status['Surgery'] = true;
+        if ((savedData as any).complaint) status['History'] = true;
+        if ((savedData as any).vitals_bp_systolic) status['Vitals'] = true;
+        if ((savedData as any).va_od_unaided_dv) status['VA'] = true;
+        if ((savedData as any).iop_od) status['IOP'] = true;
+        if ((savedData as any).ref_od_sph) status['Refraction'] = true;
+        if ((savedData as any).as_lids_od) status['AnteriorSeg'] = true;
+        if ((savedData as any).dil_adequate) status['Dilation'] = true;
+        if ((savedData as any).fs_disc_cdr_od) status['Fundoscopy'] = true;
+        if ((savedData as any).diag_od) status['Diagnosis'] = true;
+        if ((savedData as any).plan_meds?.length > 0) status['Plan'] = true;
+        if ((savedData as any).clinical_notes) status['Notes'] = true;
+        if ((savedData as any).surgery_advised) status['Surgery'] = true;
         setSectionStatus(status);
         
         setIsLocked(currentConsultation.finalized === 1 || currentConsultation.finalize === 1);
@@ -863,9 +858,6 @@ export const Consultations: React.FC = () => {
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
 
   return (
     <div className="leh-page-container" style={{ padding: 0, height: 'calc(100vh - 80px)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>

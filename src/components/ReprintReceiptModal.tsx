@@ -80,7 +80,7 @@ const ReprintReceiptModal: React.FC<ReprintReceiptModalProps> = ({ receipt_numbe
   if (isRestricted || !data) return null;
 
   const grandTotal = Math.max(0, data.total_amount - data.discount);
-  const change = data.amount_paid - grandTotal;
+
   const now = new Date();
 
   return (

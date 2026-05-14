@@ -40,7 +40,7 @@ export const UserManagement: React.FC = () => {
           notify('success', `Account ${name} has been deactivated.`);
           fetchUsers();
         })
-        .catch(err => notify('error', 'Deactivation failed: ' + err.message));
+        .catch((err: any) => notify('error', 'Deactivation failed: ' + err.message));
     }
   };
 

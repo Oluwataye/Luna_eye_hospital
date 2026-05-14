@@ -1,5 +1,4 @@
 // Luna Eye Hospital API Client
-import { PatientStatus } from './constants/workflow';
 export const API_BASE_URL = '/api';
 
 const request = async (endpoint: string, options: RequestInit = {}) => {
@@ -146,6 +145,13 @@ export const api = {
     });
   },
 
+  async dischargePatient(id: string, summary: string) {
+    return request(`/admissions/${id}/discharge`, {
+      method: 'PUT',
+      body: JSON.stringify({ summary })
+    });
+  },
+
   async getTransactions() {
     const data = await request('/transactions');
     return Array.isArray(data) ? data : [];
@@ -250,7 +256,7 @@ export const api = {
     return Array.isArray(data) ? data : [];
   },
 
-  async createPurchaseOrder(data: { supplier_id: number, items: any[] }) {
+  async createPurchaseOrder(data: any) {
     return request('/purchase-orders', {
       method: 'POST',
       body: JSON.stringify(data)
@@ -284,10 +290,6 @@ export const api = {
   },
   async getTransactionItems(transactionId: string | number) {
     const data = await request(`/transactions/${transactionId}/items`);
-    return Array.isArray(data) ? data : [];
-  },
-  async getDebtorsReport() {
-    const data = await request('/reports/debtors/details');
     return Array.isArray(data) ? data : [];
   },
   async getDebtorsSummary() {
@@ -368,6 +370,9 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(data)
     });
+  },
+  async deleteUser(id: number) {
+    return request(`/users/${id}`, { method: 'DELETE' });
   },
 
   // Audit Logs
@@ -578,26 +583,5 @@ export const api = {
     return request(`/billing/receipts/${encodeURIComponent(receiptNumber)}`);
   },
 
-  // PROCUREMENT MODULE
-  async getSuppliers() {
-    return request('/suppliers');
-  },
-  async createSupplier(data: any) {
-    return request('/suppliers', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-  },
-  async getPurchaseOrders() {
-    return request('/purchase-orders');
-  },
-  async createPurchaseOrder(data: any) {
-    return request('/purchase-orders', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-  },
-  async getProcurementStats() {
-    return request('/procurement-stats');
-  }
+
 };

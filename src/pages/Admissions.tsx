@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  BedDouble, Users, UserMinus, PlusCircle, Save, Calendar, Printer, Clock, RefreshCw, Search, Shield, X, CheckCircle
+  BedDouble, UserMinus, PlusCircle, Save, Calendar, Printer, Clock, RefreshCw, Search, Shield, X, CheckCircle
 } from 'lucide-react';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { formatDateStandard } from '../utils/date';
 import { LiveSearch } from '../components/LiveSearch';
-import { PrintDischarge } from '../components/PrintDischarge';
 import { useNotification } from '../context/NotificationContext';
 import { printElementId } from '../utils/printHelpers';
 
@@ -106,7 +105,7 @@ export const Admissions: React.FC = () => {
   const handleUpdateNotes = async () => {
     if (!selectedAdmission) return;
     try {
-      await api.updateAdmissionNotes(selectedAdmission.id, selectedAdmission.notes);
+      await api.updateAdmission(selectedAdmission.id, { notes: selectedAdmission.notes });
       notify('success', 'Clinical progress notes synchronized');
     } catch (err: any) {
       notify('error', 'Failed to update notes');

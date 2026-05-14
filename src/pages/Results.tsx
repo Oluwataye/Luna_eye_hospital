@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FlaskConical, CheckCircle, FileText, Upload, Printer, Search, Clock, Shield, RefreshCw } from 'lucide-react';
+import { FlaskConical, CheckCircle, FileText, Upload, Printer, Search, RefreshCw } from 'lucide-react';
 import { api } from '../api';
 import { PrintInvestigation } from '../components/PrintInvestigation';
 import { useNotification } from '../context/NotificationContext';

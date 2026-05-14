@@ -3,51 +3,32 @@ import {
   RefreshCcw, 
   Printer, 
   Settings,
-  ChevronLeft, 
-  ChevronRight, 
   Search, 
   AlertTriangle, 
-  UserCheck, 
   ShieldCheck, 
   Calendar, 
-  User,
-  UserPlus,
-  Shield,
-  Save,
-  Flag,
-  Eye,
-  FileText,
-  FileSpreadsheet,
-  Activity,
-  History,
   Lock,
-  Unlock,
-  Filter,
-  ArrowUpRight,
   X,
-  Plus
+  History,
+  Flag,
+  Eye
 } from 'lucide-react';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { formatDateStandard } from '../utils/date';
-import { Tooltip } from '../components/Tooltip';
 import { useNavigate } from 'react-router-dom';
-import { Modal } from '../components/Modal';
 import ReprintReceiptModal from '../components/ReprintReceiptModal';
-
 const ReprintManagement: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { notify, confirm } = useNotification();
+
   const [activeTab, setActiveTab] = useState<'all' | 'restricted'>('all');
-  const [stats, setStats] = useState<any>(null);
   const [logs, setLogs] = useState<any[]>([]);
   const [restrictions, setRestrictions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [stats, setStats] = useState<any>(null);
   const [page, setPage] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
   
   // Filters
   const [filters, setFilters] = useState({
@@ -86,20 +67,15 @@ const ReprintManagement: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      setRefreshing(true);
       if (activeTab === 'all') {
         const data = await api.getReprintLogs({ ...filters, page, limit: 10 });
         setLogs(data || []);
-        setTotalCount(data?.length || 0); 
       } else {
         const data = await api.getAllReprintRestrictions();
         setRestrictions(data || []);
       }
     } catch (error) {
       notify('error', 'Failed to fetch reprint data');
-    } finally {
-      setRefreshing(false);
-      setLoading(false);
     }
   };
 
@@ -195,6 +171,8 @@ const ReprintManagement: React.FC = () => {
         try {
           await api.setReprintRestriction({
             user_id: userId,
+            user_name: 'Staff', // Placeholder as it's not needed for disabling but required by type
+            admin_id: user?.id || 0,
             is_active: false
           });
           notify('success', 'Restriction removed successfully');

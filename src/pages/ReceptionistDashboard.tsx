@@ -1,12 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { 
   UserPlus, ClipboardList, CreditCard, Printer, 
-  Activity, ArrowRight, UserCheck, Receipt,
-  LayoutDashboard, Users, Search, Filter,
-  ArrowUpRight, TrendingUp, Clock, ShieldCheck,
-  Zap, RefreshCcw, Banknote, History, ChevronRight,
-  FileText, TrendingDown
+  UserCheck, Receipt, Users, ShieldCheck,
+  RefreshCcw, History
 } from 'lucide-react';
 import { api } from '../api';
 import { useNotification } from '../context/NotificationContext';

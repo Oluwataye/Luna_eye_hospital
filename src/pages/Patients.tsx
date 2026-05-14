@@ -489,11 +489,10 @@ export const Patients: React.FC<PatientsProps> = ({ view: initialView = 'list' }
                         // 2. Already in clinical workflow -> Disabled Grey
                         const isInQueue = [
                           PatientStatus.WAITING_FOR_TRIAGE,
-                          PatientStatus.TRIAGE_COMPLETE,
                           PatientStatus.WAITING_FOR_CONSULTATION,
                           PatientStatus.IN_CONSULTATION,
                           PatientStatus.CONSULTATION_COMPLETE
-                        ].includes(s);
+                        ].includes(s as any);
 
                         if (isInQueue) {
                           return (
@@ -513,7 +512,7 @@ export const Patients: React.FC<PatientsProps> = ({ view: initialView = 'list' }
                         }
 
                         // 3. Post-Billing -> Send to Triage (Amber)
-                        const isPostBilling = s === PatientStatus.PENDING_PAYMENT || s === PatientStatus.PAID;
+                        const isPostBilling = s === PatientStatus.AWAITING_BILLING || s === PatientStatus.PAID;
                         if (isPostBilling) {
                           return (
                             <Link

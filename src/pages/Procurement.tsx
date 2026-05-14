@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Truck, ShoppingBag, Plus, FileText, 
-  CheckCircle, User, Users, MapPin, Loader2, AlertTriangle, Clock, Printer, TrendingUp, Search, RefreshCw, ChevronRight, Package, LayoutDashboard, ShieldCheck, X, Filter, ChevronLeft, Download, CreditCard, Box, Calendar, MessageSquare, Briefcase, Save
+  Users, Loader2, Printer, Search, RefreshCw, ChevronRight, Package, ShieldCheck, X, Filter, ChevronLeft, CreditCard, Box, MessageSquare, Briefcase, Save
 } from 'lucide-react';
 import { NairaIcon } from '../components/NairaIcon';
 import { api } from '../api';
@@ -9,7 +9,7 @@ import { useNotification } from '../context/NotificationContext';
 import { formatDateStandard } from '../utils/date';
 
 export const Procurement: React.FC = () => {
-  const { notify, confirm } = useNotification();
+  const { notify } = useNotification();
   const [loading, setLoading] = useState(true);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [procurements, setProcurements] = useState<any[]>([]);

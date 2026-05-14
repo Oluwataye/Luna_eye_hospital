@@ -1,17 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  Database, HardDriveDownload, Users, ClipboardList, Building2, 
-  RotateCcw, Save, History, Upload, Calendar, Download,
-  Trash2, Edit3, Plus, Tags, Folders, RefreshCw, Shield, AlertTriangle, X
-} from 'lucide-react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Database, HardDriveDownload, Users, Building2, Save, History, Upload, Download, Trash2, Edit3, Plus, Tags, Folders, RefreshCw, Shield } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { api, API_BASE_URL } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
-import { Tooltip } from '../components/Tooltip';
 
 export const Settings: React.FC = () => {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { notify, confirm } = useNotification();
@@ -104,10 +98,8 @@ export const Settings: React.FC = () => {
       title: 'Critical: Restore Database',
       message: 'This will overwrite the CURRENT database with the backup file. This action is IRREVERSIBLE. Proceed?',
       onConfirm: async () => {
-        const formData = new FormData();
-        formData.append('backup', file);
         try {
-          await api.restoreBackup(formData);
+          await api.restoreBackup(file);
           notify('success', 'Database restored. Application will reload.');
           setTimeout(() => window.location.reload(), 2000);
         } catch (error: any) {

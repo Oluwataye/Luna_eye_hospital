@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Users, Activity, ClipboardList, Clock, 
   CheckCircle, RefreshCcw, Thermometer, Zap,
-  ArrowRight, History, FileText
+  History
 } from 'lucide-react';
 import { api } from '../api';
 import { useNotification } from '../context/NotificationContext';

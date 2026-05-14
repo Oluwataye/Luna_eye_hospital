@@ -2,10 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, Stethoscope, FlaskConical, BedDouble, 
-  Clock, ArrowRight, PlayCircle, RefreshCcw, 
-  PlusCircle, ShieldCheck, ChevronRight, LineChart, 
-  LayoutDashboard, Zap, Activity, History, ClipboardList,
-  AlertCircle, FileText
+  Clock, ArrowRight, RefreshCcw, Activity, ClipboardList, Zap
 } from 'lucide-react';
 import { api } from '../api';
 import { useNotification } from '../context/NotificationContext';
