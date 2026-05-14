@@ -1,0 +1,45 @@
+.procurement-page-container {
+  padding: 2.5rem;
+  max-width: 1800px;
+  margin: 0 auto;
+}
+
+/* Procurement Table Refinement */
+.procurement-table-container {
+  background: white;
+  border-radius: 2.5rem;
+  border: 1px solid #f1f5f9;
+}
+
+/* PO Modal Specifics */
+.po-item-row {
+  transition: all 0.2s ease;
+}
+
+.po-item-row:hover {
+  background: #f8fafc;
+}
+
+.po-input-minimal {
+  background: transparent;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  padding: 0.5rem;
+  font-weight: 700;
+  text-align: center;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.po-input-minimal:focus {
+  border-color: #3b82f6;
+  background: white;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+}
+
+/* Responsive Handling */
+@media (max-width: 1024px) {
+  .procurement-page-container {
+    padding: 1.5rem;
+  }
+}

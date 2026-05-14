@@ -1,0 +1,240 @@
+.print-consultation-container {
+  padding: 40px;
+  max-width: 800px;
+  margin: 0 auto;
+  background: white;
+  color: #000;
+  font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.5;
+}
+
+.hospital-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.header-left h1 {
+  margin: 0;
+  color: #1e40af;
+  font-size: 24px;
+  letter-spacing: 1px;
+}
+
+.hospital-address, .hospital-contact, .hospital-email {
+  margin: 2px 0;
+  font-size: 11px;
+  color: #4b5563;
+}
+
+.header-right {
+  text-align: right;
+}
+
+.report-title {
+  font-weight: 800;
+  font-size: 14px;
+  color: #111827;
+  margin-bottom: 4px;
+}
+
+.report-date {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.divider {
+  height: 2px;
+  background: #1e40af;
+  margin: 15px 0;
+}
+
+.patient-bio-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+
+.report-section {
+  margin-bottom: 20px;
+}
+
+.report-section h3 {
+  font-size: 14px;
+  text-transform: uppercase;
+  color: #1e40af;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 4px;
+  margin-bottom: 8px;
+}
+
+.report-section h4 {
+  font-size: 12px;
+  margin: 10px 0 5px;
+  color: #374151;
+}
+
+.report-section p {
+  font-size: 13px;
+  margin: 5px 0;
+}
+
+.vitals-row {
+  display: flex;
+  gap: 20px;
+  font-size: 13px;
+}
+
+.va-print-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.va-print-table th, .va-print-table td {
+  border: 1px solid #d1d5db;
+  padding: 6px;
+  text-align: center;
+}
+
+.va-print-table th {
+  background: #f9fafb;
+  font-weight: 600;
+}
+
+.exam-print-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.surgery-box {
+  margin-top: 10px;
+  padding: 10px;
+  background: #fef2f2;
+  border: 1px solid #fee2e2;
+  color: #b91c1c;
+  font-size: 13px;
+  border-radius: 4px;
+}
+
+.signature-area {
+  margin-top: 50px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.sig-line, .sig-date {
+  width: 200px;
+  border-top: 1px solid #000;
+  text-align: center;
+  padding-top: 5px;
+}
+
+.sig-line p, .sig-date p {
+  font-size: 10px;
+  margin: 0;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.sig-name, .sig-val {
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 5px;
+}
+
+.footer {
+  margin-top: 40px;
+  font-size: 9px;
+  text-align: center;
+  color: #9ca3af;
+  border-top: 1px solid #f3f4f6;
+  padding-top: 10px;
+}
+
+@media screen {
+  .print-consultation-container {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    width: 800px;
+    height: 0;
+    overflow: hidden;
+  }
+}
+
+@media print {
+  /* Hide the app chrome and other UI elements */
+  .sidebar, 
+  .topbar, 
+  .workspace-tabs, 
+  .consult-patient-bar, 
+  .clinical-workspace,
+  .app-footer:not(.print-consultation-container .app-footer) {
+    display: none !important;
+  }
+
+  /* Reset layout containers for print */
+  .app-container, 
+  .main-content, 
+  .content-area, 
+  .page-content {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+    width: 100% !important;
+    background: white !important;
+  }
+
+  .print-consultation-container {
+    display: block !important;
+    visibility: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    background: white !important;
+  }
+
+  /* Ensure complex layouts inside the report preserve their structure */
+  .hospital-header {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+  }
+
+  .patient-bio-grid, .exam-print-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 15px !important;
+  }
+
+  /* Ensure tables look correct */
+  .va-print-table {
+    display: table !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+  .va-print-table tr { display: table-row !important; }
+  .va-print-table th, .va-print-table td { 
+    display: table-cell !important;
+    border: 1px solid #000 !important;
+  }
+
+  /* Force background colors for print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Prevent page breaks inside sections */
+  .report-section {
+    page-break-inside: avoid;
+  }
+}

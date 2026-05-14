@@ -1,0 +1,254 @@
+/* ═══════════════════════════════════════════════════════════
+   Luna Eye Hospital — Global Toast Notification System
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Container ─────────────────────────────────────────────── */
+.luna-toast-container {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.25rem;
+  z-index: 10002;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  pointer-events: none;
+  width: 360px;
+  max-width: calc(100vw - 2rem);
+}
+
+/* ── Toast Card ─────────────────────────────────────────────── */
+.luna-toast {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.875rem 0.875rem 1.5rem 0.875rem; /* extra bottom for progress bar */
+  border-radius: 0.875rem;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.08),
+    0 10px 25px -5px rgba(0, 0, 0, 0.12),
+    0 0 0 1px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  pointer-events: auto;
+  min-width: 0;
+  width: 100%;
+  /* default border-left set inline per type */
+}
+
+/* ── Enter Animation ─────────────────────────────────────────── */
+.luna-toast--enter {
+  animation: luna-toast-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes luna-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(110%) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* ── Exit Animation ──────────────────────────────────────────── */
+.luna-toast--exit {
+  animation: luna-toast-out 0.3s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@keyframes luna-toast-out {
+  from {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    max-height: 120px;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(110%) scale(0.92);
+    max-height: 0;
+    margin-bottom: 0;
+    padding: 0;
+  }
+}
+
+/* ── Icon ────────────────────────────────────────────────────── */
+.luna-toast__icon {
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.625rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.1rem;
+}
+
+/* ── Content ─────────────────────────────────────────────────── */
+.luna-toast__content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.luna-toast__title {
+  font-size: 0.775rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  line-height: 1;
+}
+
+.luna-toast__message {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+/* ── Close Button ────────────────────────────────────────────── */
+.luna-toast__close {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  margin-top: 0.1rem;
+  padding: 0;
+}
+
+.luna-toast__close:hover {
+  background: rgba(0, 0, 0, 0.07);
+  color: #374151;
+}
+
+/* ── Progress Track ──────────────────────────────────────────── */
+.luna-toast__progress-track {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 0 0 0.875rem 0.875rem;
+  overflow: hidden;
+}
+
+.luna-toast__progress-bar {
+  height: 100%;
+  border-radius: 0 0 0.875rem 0.875rem;
+  transition: width 30ms linear;
+  opacity: 0.75;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Confirm Dialog Styles
+   ═══════════════════════════════════════════════════════════ */
+
+.luna-confirm__body {
+  padding: 2rem 2rem 1rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.luna-confirm__icon-wrap {
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+
+.luna-confirm__icon-wrap--danger {
+  background: #fee2e2;
+  color: #dc2626;
+}
+.luna-confirm__icon-wrap--warning {
+  background: #fef3c7;
+  color: #d97706;
+}
+.luna-confirm__icon-wrap--primary {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.luna-confirm__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.luna-confirm__message {
+  font-size: 0.9rem;
+  color: #64748b;
+  line-height: 1.6;
+  margin: 0;
+  max-width: 24rem;
+}
+
+.luna-confirm__action {
+  font-weight: 700;
+  color: #ffffff;
+  border: none;
+}
+
+.luna-confirm__action--danger {
+  background: #dc2626;
+}
+.luna-confirm__action--danger:hover {
+  background: #b91c1c;
+}
+.luna-confirm__action--warning {
+  background: #d97706;
+}
+.luna-confirm__action--warning:hover {
+  background: #b45309;
+}
+.luna-confirm__action--primary {
+  background: var(--color-primary, #3b82f6);
+}
+.luna-confirm__action--primary:hover {
+  background: #2563eb;
+}
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .luna-toast-container {
+    top: auto;
+    bottom: 1rem;
+    right: 0.75rem;
+    left: 0.75rem;
+    width: auto;
+  }
+
+  .luna-toast--enter {
+    animation: luna-toast-in-mobile 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes luna-toast-in-mobile {
+    from {
+      opacity: 0;
+      transform: translateY(30px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+}

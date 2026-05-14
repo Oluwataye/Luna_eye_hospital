@@ -1,0 +1,130 @@
+.triage-page-container {
+  padding: 2.5rem;
+  max-width: 1800px;
+  margin: 0 auto;
+}
+
+/* Vital Field Redesign - High Fidelity High Density */
+.vital-field-redesign {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.vital-label-redesign {
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--leh-text-muted);
+  padding-left: 0.25rem;
+  display: flex;
+  align-items: center;
+}
+
+.vital-input-wrap-redesign {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.vital-input-redesign {
+  width: 100%;
+  height: 52px;
+  background: #f8fafc;
+  border: 1.5px solid var(--leh-border-light);
+  border-radius: 14px;
+  padding: 0 1.25rem;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--leh-text-dark);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.vital-input-redesign:focus {
+  background: white;
+  border-color: var(--leh-primary);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08), inset 0 2px 4px rgba(0, 0, 0, 0.01);
+  outline: none;
+}
+
+.vital-unit-redesign {
+  position: absolute;
+  right: 1.25rem;
+  font-size: 11px;
+  font-weight: 900;
+  color: var(--leh-text-light);
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+/* VA Input Redesign */
+.va-field-redesign {
+  width: 100%;
+}
+
+.va-input-redesign {
+  width: 100%;
+  height: 48px;
+  background: white;
+  border: 1.5px solid var(--leh-border-light);
+  border-radius: 12px;
+  padding: 0 0.75rem;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--leh-text-dark);
+  text-align: center;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+}
+
+.va-input-redesign:focus {
+  border-color: var(--leh-primary);
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.va-input-redesign::placeholder {
+  color: var(--leh-text-light);
+  font-weight: 500;
+}
+
+/* Custom Scrollbar for Queue */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+
+/* Animation */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Hover effects for queue items */
+.leh-table-row:hover {
+  background: rgba(248, 250, 252, 0.8) !important;
+}
+
+.leh-table-row.active:hover {
+  background: var(--leh-primary-light) !important;
+}

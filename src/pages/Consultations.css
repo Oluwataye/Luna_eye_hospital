@@ -1,0 +1,119 @@
+.consultations-page-container {
+  padding: 2.5rem;
+  max-width: 1800px;
+  margin: 0 auto;
+}
+
+/* Form Controls Clinical Style */
+.clinical-input {
+  width: 100%;
+  height: 3.5rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 0 1.25rem;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.clinical-input:focus {
+  background: white;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+  outline: none;
+}
+
+.clinical-input::placeholder {
+  color: #cbd5e1;
+  font-weight: 500;
+}
+
+.clinical-textarea {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1.5rem;
+  padding: 1.25rem;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  resize: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.clinical-textarea:focus {
+  background: white;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+  outline: none;
+}
+
+/* Animation utilities for the clinical workspace */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Custom Scrollbar for Workspace */
+.consultations-page-container ::-webkit-scrollbar {
+  width: 6px;
+}
+
+.consultations-page-container ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.consultations-page-container ::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 10px;
+}
+
+.consultations-page-container ::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+
+/* Tab Navigation Adjustments */
+.sticky-nav-active {
+  position: sticky;
+  top: 100px;
+}
+
+/* Clinical Med Row refined hover */
+.medication-terminal-row:hover {
+  border-color: #2563eb !important;
+  background-color: #ffffff !important;
+  transform: scale(1.01);
+}
+/* Print Optimization for Clinical Reports */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #print-area, #print-area * {
+    visibility: visible;
+  }
+  #print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 20px;
+    background: white;
+  }
+  .no-print {
+    display: none !important;
+  }
+  @page {
+    size: auto;
+    margin: 15mm;
+  }
+}

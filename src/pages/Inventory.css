@@ -1,0 +1,75 @@
+.inventory-page-container {
+  padding: 2.5rem;
+  max-width: 1800px;
+  margin: 0 auto;
+}
+
+/* Inventory Specific Table Overrides */
+.inventory-table-container {
+  background: white;
+  border-radius: 2.5rem;
+  border: 1px solid #f1f5f9;
+}
+
+/* Custom Badges for Inventory */
+.sku-badge {
+  font-family: 'Inter', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: #64748b;
+  background: #f8fafc;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid #e2e8f0;
+}
+
+/* Category Sidebar Refinement */
+.category-sidebar-redesign {
+  background: white;
+  border-radius: 2rem;
+  padding: 1.5rem;
+  border: 1px solid #f1f5f9;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+}
+
+.category-item-redesign {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-radius: 1.25rem;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-bottom: 0.5rem;
+  border: 1px solid transparent;
+}
+
+.category-item-redesign:hover {
+  background: #f8fafc;
+  transform: translateX(4px);
+}
+
+.category-item-redesign.active {
+  background: #0f172a;
+  color: white;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.category-item-redesign .count-badge {
+  font-size: 10px;
+  font-weight: 900;
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.75rem;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.category-item-redesign.active .count-badge {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Responsive Grid Adjustments */
+@media (max-width: 1024px) {
+  .inventory-page-container {
+    padding: 1.5rem;
+  }
+}

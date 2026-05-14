@@ -1,0 +1,66 @@
+.leh-content-area {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.leh-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 24px;
+}
+
+/* Strategic Shortcuts Hover Effects */
+.leh-strategic-btn {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.leh-strategic-btn:hover {
+  transform: translateY(-4px);
+  background: white !important;
+  border-color: var(--leh-primary) !important;
+  box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.1);
+}
+
+.leh-strategic-btn:hover svg {
+  transform: scale(1.1);
+}
+
+/* Audit Trail Table Polish */
+.leh-table-card .leh-table th {
+  background: #f8fafc;
+  border-top: 1px solid var(--leh-border-light);
+}
+
+.leh-table-card .leh-table td {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+/* System Integrity Pulse */
+.integrity-healthy {
+  background: #f0fdf4;
+  border: 1px solid #dcfce7;
+}
+
+.integrity-warning {
+  background: #fffbeb;
+  border: 1px solid #fef3c7;
+}
+
+.integrity-danger {
+  background: #fef2f2;
+  border: 1px solid #fee2e2;
+}
+
+/* Responsive Overrides */
+@media (max-width: 1024px) {
+  .leh-stat-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .leh-stat-grid {
+    grid-template-columns: 1fr;
+  }
+}

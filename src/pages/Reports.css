@@ -1,0 +1,92 @@
+.reports-page-container {
+  padding: 2.5rem;
+  max-width: 1800px;
+  margin: 0 auto;
+}
+
+/* Stat Cards for Reports */
+.stat-card {
+  background: white;
+  border-radius: 2rem;
+  padding: 2rem;
+  border: 1px solid #f1f5f9;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stat-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05);
+  border-color: #e2e8f0;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  border-radius: 5px 0 0 5px;
+}
+
+.stat-card.accent-blue::before { background: #3b82f6; }
+.stat-card.accent-amber::before { background: #f59e0b; }
+.stat-card.accent-green::before { background: #10b981; }
+.stat-card.accent-purple::before { background: #8b5cf6; }
+
+.stat-card-label {
+  font-size: 10px;
+  font-weight: 900;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+}
+
+.stat-card-value {
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: #0f172a;
+  letter-spacing: -0.04em;
+  font-family: 'Outfit', sans-serif;
+}
+
+/* Table Refinement */
+.report-table-container {
+  background: white;
+  border-radius: 2.5rem;
+}
+
+/* Print Specific Rules */
+@media print {
+  .reports-page-container {
+    padding: 0;
+    max-width: 100%;
+  }
+  
+  .no-print, header, aside, .report-filters-bar, .report-stats-grid, button {
+    display: none !important;
+  }
+  
+  .lg:col-span-9 {
+    grid-column: span 12 / span 12 !important;
+  }
+  
+  .report-table-container {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+  }
+  
+  table th {
+    background: #f8fafc !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact;
+  }
+  
+  table td {
+    border-bottom: 1px solid #eee !important;
+  }
+}

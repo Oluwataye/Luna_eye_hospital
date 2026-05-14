@@ -1,0 +1,55 @@
+.audit-logs-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.audit-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.audit-table th {
+  text-align: left;
+  padding: 1rem 1.5rem;
+  background: #f8fafc;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.audit-table td {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+  font-size: 14px;
+}
+
+.audit-table tr:hover td {
+  background: #f8fafc;
+}
+
+.log-type-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 0.25rem 0.625rem;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.log-type-badge.login { background: #ecfdf5; color: #059669; }
+.log-type-badge.login_failed { background: #fef2f2; color: #dc2626; }
+.log-type-badge.patient_edit { background: #eff6ff; color: #2563eb; }
+.log-type-badge.clinical_edit { background: #fffbeb; color: #d97706; }
+.log-type-badge.billing_create { background: #f5f3ff; color: #7c3aed; }
+.log-type-badge.stock_adjust { background: #fff7ed; color: #ea580c; }
+.log-type-badge.backup { background: #f1f5f9; color: #475569; }
+
+@media print {
+  .no-print { display: none !important; }
+  .audit-logs-container { padding: 0 !important; }
+  .card { border: 1px solid #e2e8f0 !important; box-shadow: none !important; }
+}
