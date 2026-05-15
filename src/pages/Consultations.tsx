@@ -262,9 +262,10 @@ export const Consultations: React.FC = () => {
     }
   }, [notify]);
 
-  const fetchTriage = useCallback(async (patientId: string) => {
+  const fetchTriage = useCallback(async (patientId: string, visitId?: string | number) => {
     try {
-      const data = await api.getPatientTriage(patientId);
+      // Priority: fetch triage for THIS visit first
+      const data = visitId ? await api.getVisitTriage(visitId) : await api.getTriageHistory(patientId).then(h => h[0]);
       setTriageData(data);
       if (data) {
         setFormData((prev: any) => ({ 
@@ -289,7 +290,7 @@ export const Consultations: React.FC = () => {
       setSelectedPatient(p);
       
       // Load triage first (baseline)
-      await fetchTriage(p.patient_id || p.id);
+      await fetchTriage(p.patient_id || p.id, p.visit_id);
       
       // Load existing consultation (takes precedence if exists)
       await fetchConsultation(p.patient_id || p.id, p.visit_id);
