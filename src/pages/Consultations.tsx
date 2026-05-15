@@ -2,21 +2,54 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Save, CheckCircle, User, Activity, Eye, 
   Pill, Glasses, Stethoscope, Scissors, CheckCircle2, Printer, 
-  Search, Plus, Trash2, Clock, X, RefreshCcw, 
+  Search, Plus, Trash2, Clock, X, RefreshCcw, Loader2,
   History as HistoryIcon, Droplets, Target, 
-  ClipboardList, AlertTriangle, Download, Info
+  ClipboardList, AlertTriangle, Download, Info, AlertCircle
 } from 'lucide-react';
 
 const SNELLEN_OPTIONS = ['6/6', '6/9', '6/12', '6/18', '6/24', '6/36', '6/60', '3/60', '1/60', 'CF', 'HM', 'PL', 'NPL'];
 
 const DIAGNOSIS_OPTIONS = [
-  'Myopia', 'Hyperopia', 'Astigmatism', 'Presbyopia', 
-  'Glaucoma Suspect', 'Primary Open Angle Glaucoma', 'Angle Closure Glaucoma',
-  'Cataract', 'Diabetic Retinopathy', 'Hypertensive Retinopathy', 
-  'Age-Related Macular Degeneration', 'Pterygium', 'Conjunctivitis', 
-  'Dry Eye Syndrome', 'Retinal Detachment', 'Optic Neuritis', 
-  'Amblyopia', 'Strabismus', 'Normal Eye Examination', 'Other'
+  'Immature Senile Cataract',
+  'Mature Senile Cataract',
+  'Hypermature Cataract',
+  'Primary Open Angle Glaucoma',
+  'Primary Angle Closure Glaucoma',
+  'Glaucoma Suspect',
+  'Allergic Conjunctivitis',
+  'Bacterial Conjunctivitis',
+  'Viral Conjunctivitis',
+  'Dry Eye Syndrome',
+  'Pterygium',
+  'Pinguecula',
+  'Corneal Ulcer',
+  'Corneal Abrasion',
+  'Uveitis (Anterior)',
+  'Diabetic Retinopathy',
+  'Hypertensive Retinopathy',
+  'Age-Related Macular Degeneration',
+  'Retinal Detachment',
+  'Vitreous Hemorrhage',
+  'Refractive Error (Myopia)',
+  'Refractive Error (Hyperopia)',
+  'Refractive Error (Astigmatism)',
+  'Presbyopia',
+  'Amblyopia',
+  'Strabismus',
+  'Chalazion / Stye',
+  'Normal Findings'
 ];
+
+const LIDS_OPTIONS = ['Normal', 'Ptosis', 'Entropion', 'Ectropion', 'Lid Edema', 'Chalazion', 'Hordeolum', 'Trichiasis', 'Distichiasis', 'Blepharitis', 'Other'];
+const CONJ_OPTIONS = ['Normal', 'Congestion', 'Chemosis', 'Pterygium', 'Pinguecula', 'Subconjunctival Hemorrhage', 'Follicles', 'Papillae', 'Other'];
+const CORNEA_OPTIONS = ['Clear', 'Hazy', 'Edema', 'Ulcer', 'Scar', 'Keratic Precipitates', 'Pannus', 'Infiltrates', 'Other'];
+const AC_DEPTH_OPTIONS = ['Normal', 'Shallow', 'Deep', 'Flat'];
+const AC_CELLS_OPTIONS = ['None', '1+', '2+', '3+', '4+'];
+const IRIS_OPTIONS = ['Normal', 'Rubeosis', 'Synechiae', 'Coloboma', 'Atrophy', 'Other'];
+const LENS_OPTIONS = ['Clear', 'NS 1+', 'NS 2+', 'NS 3+', 'NS 4+', 'Cortical', 'PSC', 'Aphakia', 'Pseudophakia (PCIOL)', 'Pseudophakia (ACIOL)', 'Other'];
+const DISC_MARGIN_OPTIONS = ['Distinct', 'Blurred', 'Swollen', 'Cupped'];
+const DISC_COLOR_OPTIONS = ['Pink', 'Pale', 'Hyperemic', 'Waxy Pale'];
+const MACULA_OPTIONS = ['Normal Reflex', 'Edema', 'Exudates', 'Drusen', 'Hemorrhage', 'Scar', 'ERM', 'Hole', 'Other'];
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
@@ -36,51 +69,47 @@ interface Medication {
 
 // --- HELPER COMPONENTS ---
 
-const SectionHeader = ({ title, icon: Icon, onMarkNormal, onSave }: any) => (
-  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px', borderBottom: '1px solid var(--leh-border-light)', paddingBottom: '20px' }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-       <div style={{ width: '48px', height: '48px', background: 'var(--leh-primary-light)', color: 'var(--leh-primary)', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Icon size={24} />
-       </div>
-       <div>
-          <h2 style={{ fontSize: '18px', fontWeight: '900', color: 'var(--leh-text-dark)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.02em' }}>{title}</h2>
-          <p style={{ fontSize: '12px', color: 'var(--leh-text-muted)', fontWeight: '600', margin: 0 }}>Clinical Documentation Module</p>
-       </div>
+const SectionHeader = ({ title, icon: Icon, onMarkNormal, onSave, isSaving }: { title: string; icon?: any; onMarkNormal?: () => void; onSave?: () => void; isSaving?: boolean }) => (
+    <div className="section-header-sticky">
+      <h2>
+        {Icon && <Icon size={20} />}
+        {title}
+      </h2>
+      <div style={{ display: 'flex', gap: '12px' }}>
+        {onMarkNormal && (
+          <button className="leh-btn-outline" onClick={onMarkNormal} style={{ height: '36px', padding: '0 16px', fontSize: '11px' }}>
+            MARK ALL NORMAL
+          </button>
+        )}
+        {onSave && (
+          <button className="leh-btn-primary" onClick={onSave} disabled={isSaving} style={{ height: '36px', padding: '0 20px', fontSize: '11px' }}>
+            {isSaving ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
+            SAVE SECTION
+          </button>
+        )}
+      </div>
     </div>
-    <div style={{ display: 'flex', gap: '12px' }}>
-      {onMarkNormal && (
-        <button className="leh-btn-outline" onClick={onMarkNormal} style={{ background: 'white', color: 'var(--leh-primary)', border: '1px solid var(--leh-primary)', padding: '0 16px' }}>
-          <CheckCircle2 size={16} />
-          <span style={{ fontSize: '11px', fontWeight: '800' }}>MARK AS NORMAL</span>
-        </button>
-      )}
-      {onSave && (
-        <button className="leh-btn-primary" onClick={onSave} style={{ padding: '0 16px', background: 'var(--leh-green)', height: '40px' }}>
-          <Save size={16} />
-          <span style={{ fontSize: '11px', fontWeight: '800' }}>SAVE SECTION</span>
-        </button>
-      )}
-    </div>
-  </div>
-);
+  );
 
 const ClinicalField = ({ label, children, fullWidth = false }: any) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', gridColumn: fullWidth ? '1 / -1' : 'auto' }}>
-    <label style={{ fontSize: '11px', fontWeight: '900', color: 'var(--leh-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</label>
+    <label className="clinical-label-premium">{label}</label>
     {children}
   </div>
 );
 
 const ODSideBySide = ({ label, childrenOD, childrenOS }: any) => (
-  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', borderBottom: '1px solid #f1f5f9', paddingBottom: '24px' }}>
-     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <div style={{ fontSize: '10px', fontWeight: '900', color: 'var(--leh-primary)', background: 'var(--leh-primary-light)', padding: '4px 8px', borderRadius: '6px', width: 'fit-content' }}>{label} OD</div>
-        {childrenOD}
-     </div>
-     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <div style={{ fontSize: '10px', fontWeight: '900', color: 'var(--leh-green)', background: '#f0fdf4', padding: '4px 8px', borderRadius: '6px', width: 'fit-content' }}>{label} OS</div>
-        {childrenOS}
-     </div>
+  <div className="eye-comparison-container">
+    <div className="eye-card">
+       <div className="eye-badge badge-od">RIGHT EYE (OD)</div>
+       {label && <label className="clinical-label-premium" style={{ opacity: 0.5 }}>{label}</label>}
+       {childrenOD}
+    </div>
+    <div className="eye-card">
+       <div className="eye-badge badge-os">LEFT EYE (OS)</div>
+       {label && <label className="clinical-label-premium" style={{ opacity: 0.5 }}>{label}</label>}
+       {childrenOS}
+    </div>
   </div>
 );
 
@@ -154,6 +183,7 @@ export const Consultations: React.FC = () => {
     fs_method: 'Slit Lamp with 90D Lens', fs_summary: '',
     fs_abnormal: {},
     diag_od: '', diag_os: '', diag_secondary: '', diag_differential: '', diag_summary: '', diag_severity: 'Mild', diag_confirmed: false,
+    diagnosis_primary: '', diagnosis_secondary: '', diagnosis_notes: '',
     plan_glasses_od: { sph: '', cyl: '', axis: '', add: '', prism: '' },
     plan_glasses_os: { sph: '', cyl: '', axis: '', add: '', prism: '' },
     plan_glasses_pd: '', plan_frame: '', plan_lens_type: '', plan_lens_material: '', plan_special_instructions: '',
@@ -201,6 +231,7 @@ export const Consultations: React.FC = () => {
         setFormData((prev: any) => ({
           ...prev,
           ...savedData,
+          plan_meds: Array.isArray((savedData as any).plan_meds) ? (savedData as any).plan_meds : [],
           complaint: currentConsultation.complaint || (savedData as any).complaint || prev.complaint,
           diag_summary: currentConsultation.primary_diagnosis || (savedData as any).diag_summary || prev.diag_summary
         }));
@@ -267,15 +298,37 @@ export const Consultations: React.FC = () => {
       setIsLocked(false); // Reset lock
       notify('info', `Consultation Started: ${p.full_name}`);
       loadQueue();
-    } catch (err) {
+    } catch (err: any) {
+      console.error('Patient Selection Error:', err);
       notify('error', 'Failed to initialize clinical session');
     }
   };
 
-  const handleInputChange = (e: any) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     if (isLocked) return;
     const { name, value } = e.target;
     setFormData((prev: any) => ({ ...prev, [name]: value }));
+    setIsDirty(true);
+  };
+
+  const markSectionNormal = (section: string) => {
+    const normalValues: any = {};
+    if (section === 'AnteriorSeg') {
+      normalValues.as_lids_od = 'Normal'; normalValues.as_lids_os = 'Normal';
+      normalValues.as_conj_od = 'Normal'; normalValues.as_conj_os = 'Normal';
+      normalValues.as_cornea_od = 'Clear'; normalValues.as_cornea_os = 'Clear';
+      normalValues.as_ac_depth_od = 'Normal'; normalValues.as_ac_depth_os = 'Normal';
+      normalValues.as_ac_cells_od = 'None'; normalValues.as_ac_cells_os = 'None';
+      normalValues.as_iris_od = 'Normal'; normalValues.as_iris_os = 'Normal';
+      normalValues.as_lens_od = 'Clear'; normalValues.as_lens_os = 'Clear';
+    } else if (section === 'Fundoscopy') {
+      normalValues.fs_disc_margins_od = 'Distinct'; normalValues.fs_disc_margins_os = 'Distinct';
+      normalValues.fs_disc_color_od = 'Pink'; normalValues.fs_disc_color_os = 'Pink';
+      normalValues.fs_macula_od = 'Normal Reflex'; normalValues.fs_macula_os = 'Normal Reflex';
+      normalValues.fs_vessels_nipping_od = 'Absent'; normalValues.fs_vessels_nipping_os = 'Absent';
+      normalValues.fs_periph_od = 'Normal'; normalValues.fs_periph_os = 'Normal';
+    }
+    setFormData((prev: any) => ({ ...prev, ...normalValues }));
     setIsDirty(true);
   };
 
@@ -299,41 +352,6 @@ export const Consultations: React.FC = () => {
     return Math.floor(difference / (1000 * 60 * 60 * 24 * 365.25));
   };
 
-  const markSectionNormal = (section: string) => {
-    setIsDirty(true);
-    let normalValues: any = {};
-    if (section === 'AnteriorSeg') {
-      normalValues = {
-        as_lids_od: 'Normal', as_lids_os: 'Normal',
-        as_conj_od: 'Normal', as_conj_os: 'Normal',
-        as_cornea_od: 'Clear', as_cornea_os: 'Clear',
-        as_ac_depth_od: 'Normal', as_ac_depth_os: 'Normal',
-        as_iris_od: 'Normal', as_iris_os: 'Normal',
-        as_lens_od: 'Clear', as_lens_os: 'Clear'
-      };
-    } else if (section === 'Fundoscopy') {
-      normalValues = {
-        fs_disc_cdr_od: '0.3', fs_disc_cdr_os: '0.3',
-        fs_disc_color_od: 'Normal', fs_disc_color_os: 'Normal',
-        fs_disc_margins_od: 'Distinct', fs_disc_margins_os: 'Distinct',
-        fs_macula_od: 'Normal', fs_macula_os: 'Normal',
-        fs_vessels_nipping_od: 'None', fs_vessels_nipping_os: 'None',
-        fs_periph_od: 'Normal', fs_periph_os: 'Normal'
-      };
-    } else if (section === 'Dilation') {
-      normalValues = {
-        dil_adequate: 'Adequate',
-        dil_od: 'Yes', dil_os: 'Yes'
-      };
-    }
-    
-    setFormData((prev: any) => ({
-      ...prev,
-      ...normalValues
-    }));
-    notify('success', `${section} marked as normal`);
-  };
-
   const handleSave = async (finalize: boolean = false) => {
      if (!selectedPatient) return;
      
@@ -343,9 +361,9 @@ export const Consultations: React.FC = () => {
        if (!formData.complaint || formData.complaint.trim().length < 5) {
          missing.push('Section A: Chief Complaint (min 5 chars)');
        }
-       if (!formData.diag_od?.trim() && !formData.diag_os?.trim()) {
-         missing.push('Section I: Primary Diagnosis (OD or OS)');
-       }
+        if (!formData.diagnosis_primary?.trim()) {
+          missing.push('Section I: Primary Diagnosis');
+        }
 
        if (missing.length > 0) {
          notify('error', `Cannot finalize: ${missing.join(', ')} missing.`);
@@ -364,7 +382,7 @@ export const Consultations: React.FC = () => {
           bp: formData.vitals_bp_systolic ? `${formData.vitals_bp_systolic}/${formData.vitals_bp_diastolic}` : '',
           va_od_unaided: formData.va_od_unaided_dv,
           va_os_unaided: formData.va_os_unaided_dv,
-          primary_diagnosis: formData.diag_summary || formData.diag_od || (finalize ? '' : 'Pending Diagnosis'),
+          primary_diagnosis: formData.diagnosis_primary || 'Pending Diagnosis',
           clinical_data: formData,
           finalized: finalize,
           finalize: finalize,
@@ -403,23 +421,26 @@ export const Consultations: React.FC = () => {
   };
 
   const addMedication = () => {
+    if (isLocked) return;
     setFormData((prev: any) => ({
       ...prev,
-      plan_meds: [...prev.plan_meds, { drug_name: '', strength: '', route: 'Topical', dose: '', frequency: '', duration: '', instructions: '' }]
+      plan_meds: [...(prev.plan_meds || []), { drug_name: '', strength: '', route: 'Topical', dose: '', frequency: '', duration: '', instructions: '' }]
     }));
     setIsDirty(true);
   };
 
   const removeMedication = (index: number) => {
+    if (isLocked) return;
     setFormData((prev: any) => ({
       ...prev,
-      plan_meds: prev.plan_meds.filter((_: any, i: number) => i !== index)
+      plan_meds: (prev.plan_meds || []).filter((_: any, i: number) => i !== index)
     }));
     setIsDirty(true);
   };
 
   const updateMedication = (index: number, field: keyof Medication, value: string) => {
-    const newMeds = [...formData.plan_meds];
+    if (isLocked) return;
+    const newMeds = [...(formData.plan_meds || [])];
     newMeds[index] = { ...newMeds[index], [field]: value };
     setFormData((prev: any) => ({ ...prev, plan_meds: newMeds }));
     setIsDirty(true);
@@ -430,162 +451,205 @@ export const Consultations: React.FC = () => {
       case 'History':
         return (
           <div className="animate-slide-up">
-            <SectionHeader title="Section A: History & Chief Complaint" icon={User} onSave={() => handleSave(false)} />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
-              <ClinicalField label="Chief Complaint" fullWidth>
-                <textarea className="clinical-textarea" name="complaint" value={formData.complaint} onChange={handleInputChange} placeholder="Reason for visit..." style={{ height: '120px' }} required disabled={isLocked} />
-              </ClinicalField>
-              <ClinicalField label="History of Present Illness (HPI)" fullWidth>
-                <textarea className="clinical-textarea" name="hpi" value={formData.hpi} onChange={handleInputChange} placeholder="Details of current symptoms..." style={{ height: '150px' }} />
-              </ClinicalField>
-              <ClinicalField label="Ocular History">
-                <textarea className="clinical-textarea" name="ocular_history" value={formData.ocular_history} onChange={handleInputChange} placeholder="Previous conditions, surgeries..." style={{ height: '100px' }} />
-              </ClinicalField>
-              <ClinicalField label="Medical/Systemic History">
-                <textarea className="clinical-textarea" name="medical_history" value={formData.medical_history} onChange={handleInputChange} placeholder="DM, Hypertension, etc..." style={{ height: '100px' }} />
-              </ClinicalField>
-              <ClinicalField label="Drug History">
-                <textarea className="clinical-textarea" name="drug_history" value={formData.drug_history} onChange={handleInputChange} placeholder="Current medications..." style={{ height: '100px' }} />
-              </ClinicalField>
-              <ClinicalField label="Allergies">
-                <textarea className="clinical-textarea" name="allergies" value={formData.allergies} onChange={handleInputChange} placeholder="Allergic reactions..." style={{ height: '100px', border: formData.allergies ? '2px solid var(--leh-red)' : '' }} />
-              </ClinicalField>
-              <ClinicalField label="Family History" fullWidth>
-                <textarea className="clinical-textarea" name="family_history" value={formData.family_history} onChange={handleInputChange} placeholder="Hereditary conditions..." style={{ height: '80px' }} />
-              </ClinicalField>
+            <SectionHeader title="Section A: History & Chief Complaint" icon={User} onSave={() => handleSave(false)} isSaving={isSaving} />
+            <div className="clinical-section-card">
+              <div className="clinical-group-header">
+                <div className="clinical-group-title">Chief Complaint & History</div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: '32px' }}>
+                <ClinicalField label="Chief Complaint" fullWidth>
+                  <textarea className="clinical-textarea" name="complaint" value={formData.complaint} onChange={handleInputChange} placeholder="Reason for visit..." style={{ height: '120px' }} required disabled={isLocked} />
+                </ClinicalField>
+                <ClinicalField label="History of Present Illness (HPI)" fullWidth>
+                  <textarea className="clinical-textarea" name="hpi" value={formData.hpi} onChange={handleInputChange} placeholder="Details of current symptoms..." style={{ height: '120px' }} disabled={isLocked} />
+                </ClinicalField>
+                <ClinicalField label="Ocular History">
+                  <textarea className="clinical-textarea" name="ocular_history" value={formData.ocular_history} onChange={handleInputChange} placeholder="Previous conditions, surgeries..." style={{ height: '100px' }} disabled={isLocked} />
+                </ClinicalField>
+                <ClinicalField label="Medical/Systemic History">
+                  <textarea className="clinical-textarea" name="medical_history" value={formData.medical_history} onChange={handleInputChange} placeholder="DM, Hypertension, etc..." style={{ height: '100px' }} disabled={isLocked} />
+                </ClinicalField>
+                <ClinicalField label="Drug History">
+                  <textarea className="clinical-textarea" name="drug_history" value={formData.drug_history} onChange={handleInputChange} placeholder="Current medications..." style={{ height: '100px' }} disabled={isLocked} />
+                </ClinicalField>
+                <ClinicalField label="Allergies">
+                  <textarea className="clinical-textarea" name="allergies" value={formData.allergies} onChange={handleInputChange} placeholder="Allergic reactions..." style={{ height: '100px', border: formData.allergies ? '2px solid #ef4444' : '' }} disabled={isLocked} />
+                </ClinicalField>
+                <ClinicalField label="Family History" fullWidth>
+                  <textarea className="clinical-textarea" name="family_history" value={formData.family_history} onChange={handleInputChange} placeholder="Hereditary conditions..." style={{ height: '80px' }} disabled={isLocked} />
+                </ClinicalField>
+              </div>
             </div>
           </div>
         );
       case 'Vitals':
         return (
           <div className="animate-slide-up">
-            <SectionHeader title="Section B: Vital Signs Review" icon={Activity} onSave={() => handleSave(false)} />
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px' }}>
-              <ClinicalField label="BP Systolic (mmHg)">
-                <input className="clinical-input" name="vitals_bp_systolic" value={formData.vitals_bp_systolic} onChange={handleInputChange} />
-              </ClinicalField>
-              <ClinicalField label="BP Diastolic (mmHg)">
-                <input className="clinical-input" name="vitals_bp_diastolic" value={formData.vitals_bp_diastolic} onChange={handleInputChange} />
-              </ClinicalField>
-              <ClinicalField label="Pulse Rate (bpm)">
-                <input className="clinical-input" name="vitals_pulse" value={formData.vitals_pulse} onChange={handleInputChange} />
-              </ClinicalField>
-              <ClinicalField label="Temperature (°C)">
-                <input className="clinical-input" name="vitals_temp" value={formData.vitals_temp} onChange={handleInputChange} />
-              </ClinicalField>
-              <ClinicalField label="Weight (kg)">
-                <input className="clinical-input" name="vitals_weight" value={formData.vitals_weight} onChange={handleInputChange} />
-              </ClinicalField>
+            <SectionHeader title="Section B: Vital Signs Review" icon={Activity} onSave={() => handleSave(false)} isSaving={isSaving} />
+            <div className="clinical-section-card">
+              <div className="clinical-group-header">
+                <div className="clinical-group-title">Patient Physiological Summary</div>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '32px' }}>
+                <div className="eye-card" style={{ padding: '16px' }}>
+                  <span className="clinical-label-premium" style={{ fontSize: '10px' }}>Blood Pressure</span>
+                  <div style={{ fontSize: '18px', fontWeight: '800' }}>{triageData?.bp_systolic || '--'}/{triageData?.bp_diastolic || '--'} <small style={{ color: '#94a3b8', fontSize: '11px' }}>mmHg</small></div>
+                </div>
+                <div className="eye-card" style={{ padding: '16px' }}>
+                  <span className="clinical-label-premium" style={{ fontSize: '10px' }}>Pulse Rate</span>
+                  <div style={{ fontSize: '18px', fontWeight: '800' }}>{triageData?.pulse_rate || '--'} <small style={{ color: '#94a3b8', fontSize: '11px' }}>bpm</small></div>
+                </div>
+                <div className="eye-card" style={{ padding: '16px' }}>
+                  <span className="clinical-label-premium" style={{ fontSize: '10px' }}>Body Temp</span>
+                  <div style={{ fontSize: '18px', fontWeight: '800' }}>{triageData?.temperature || '--'} <small style={{ color: '#94a3b8', fontSize: '11px' }}>°C</small></div>
+                </div>
+                <div className="eye-card" style={{ padding: '16px' }}>
+                  <span className="clinical-label-premium" style={{ fontSize: '10px' }}>Body Weight</span>
+                  <div style={{ fontSize: '18px', fontWeight: '800' }}>{triageData?.weight || '--'} <small style={{ color: '#94a3b8', fontSize: '11px' }}>kg</small></div>
+                </div>
+              </div>
+
+              <div className="leh-form-group">
+                <label className="clinical-label-premium">Consultant's Observation Notes</label>
+                <textarea 
+                  className="clinical-textarea" 
+                  name="vitals_notes" 
+                  value={formData.vitals_notes} 
+                  onChange={handleInputChange} 
+                  placeholder="Enter any specific observations regarding patient vitals..."
+                />
+              </div>
             </div>
           </div>
         );
       case 'Vision':
         return (
           <div className="animate-slide-up">
-            <SectionHeader title="Section C: Visual Acuity" icon={Eye} onSave={() => handleSave(false)} />
-            <div style={{ marginBottom: '24px' }}>
-               <ClinicalField label="Acuity Measurement Method">
-                  <select className="clinical-input" name="va_method" value={formData.va_method} onChange={handleInputChange}>
-                     <option>Snellen Chart</option>
-                     <option>LogMAR</option>
-                     <option>Allen Pictures</option>
-                     <option>LEA Symbols</option>
-                  </select>
-               </ClinicalField>
+            <SectionHeader title="Section C: Visual Acuity" icon={Eye} onSave={() => handleSave(false)} isSaving={isSaving} />
+            <div className="clinical-section-card">
+              <div className="clinical-group-header" style={{ marginBottom: '32px' }}>
+                <div className="clinical-group-title">Acuity Measurements</div>
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                   <span style={{ fontSize: '12px', fontWeight: '800', color: '#64748b' }}>METHOD:</span>
+                   <select className="clinical-input" name="va_method" value={formData.va_method} onChange={handleInputChange} style={{ height: '40px', width: '180px' }}>
+                      <option>Snellen Chart</option>
+                      <option>LogMAR</option>
+                      <option>Allen Pictures</option>
+                      <option>LEA Symbols</option>
+                   </select>
+                </div>
+              </div>
+              
+              <div style={{ display: 'grid', gap: '40px' }}>
+                <ODSideBySide label="DISTANCE VISION (Unaided)" 
+                  childrenOD={<ClinicalField><select className="clinical-input" name="va_od_unaided_dv" value={formData.va_od_unaided_dv} onChange={handleInputChange}><option value="">Select Result</option>{SNELLEN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>}
+                  childrenOS={<ClinicalField><select className="clinical-input" name="va_os_unaided_dv" value={formData.va_os_unaided_dv} onChange={handleInputChange}><option value="">Select Result</option>{SNELLEN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>}
+                />
+                <ODSideBySide label="NEAR VISION (Unaided)" 
+                  childrenOD={<ClinicalField><select className="clinical-input" name="va_od_unaided_nv" value={formData.va_od_unaided_nv} onChange={handleInputChange}><option value="">Select Result</option>{['N5', 'N6', 'N8', 'N10', 'N12', 'N14', 'N18', 'N24', 'N36', 'N48'].map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>}
+                  childrenOS={<ClinicalField><select className="clinical-input" name="va_os_unaided_nv" value={formData.va_os_unaided_nv} onChange={handleInputChange}><option value="">Select Result</option>{['N5', 'N6', 'N8', 'N10', 'N12', 'N14', 'N18', 'N24', 'N36', 'N48'].map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>}
+                />
+                <ODSideBySide label="PINHOLE (PH)" 
+                  childrenOD={<ClinicalField><select className="clinical-input" name="va_od_ph" value={formData.va_od_ph} onChange={handleInputChange}><option value="">Select Result</option>{SNELLEN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>}
+                  childrenOS={<ClinicalField><select className="clinical-input" name="va_os_ph" value={formData.va_os_ph} onChange={handleInputChange}><option value="">Select Result</option>{SNELLEN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>}
+                />
+              </div>
             </div>
-            <ODSideBySide label="DV UNAIDED" 
-              childrenOD={<select className="clinical-input" name="va_od_unaided_dv" value={formData.va_od_unaided_dv} onChange={handleInputChange}><option value="">Select</option>{SNELLEN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select>}
-              childrenOS={<select className="clinical-input" name="va_os_unaided_dv" value={formData.va_os_unaided_dv} onChange={handleInputChange}><option value="">Select</option>{SNELLEN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select>}
-            />
-            <ODSideBySide label="NV UNAIDED" 
-              childrenOD={<select className="clinical-input" name="va_od_unaided_nv" value={formData.va_od_unaided_nv} onChange={handleInputChange}><option value="">Select</option>{['N5', 'N6', 'N8', 'N10', 'N12', 'N14', 'N18', 'N24', 'N36', 'N48'].map(o => <option key={o} value={o}>{o}</option>)}</select>}
-              childrenOS={<select className="clinical-input" name="va_os_unaided_nv" value={formData.va_os_unaided_nv} onChange={handleInputChange}><option value="">Select</option>{['N5', 'N6', 'N8', 'N10', 'N12', 'N14', 'N18', 'N24', 'N36', 'N48'].map(o => <option key={o} value={o}>{o}</option>)}</select>}
-            />
-            <ODSideBySide label="PINHOLE" 
-              childrenOD={<select className="clinical-input" name="va_od_ph" value={formData.va_od_ph} onChange={handleInputChange}><option value="">Select</option>{SNELLEN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select>}
-              childrenOS={<select className="clinical-input" name="va_os_ph" value={formData.va_os_ph} onChange={handleInputChange}><option value="">Select</option>{SNELLEN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select>}
-            />
-            <ODSideBySide label="DV AIDED (Current Glasses)" 
-              childrenOD={<select className="clinical-input" name="va_od_aided_dv" value={formData.va_od_aided_dv} onChange={handleInputChange}><option value="">Select</option>{SNELLEN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select>}
-              childrenOS={<select className="clinical-input" name="va_os_aided_dv" value={formData.va_os_aided_dv} onChange={handleInputChange}><option value="">Select</option>{SNELLEN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select>}
-            />
           </div>
         );
       case 'IOP':
         return (
           <div className="animate-slide-up">
-            <SectionHeader title="Section D: Intraocular Pressure" icon={Target} onSave={() => handleSave(false)} />
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
-              <ClinicalField label="IOP OD (mmHg)">
-                <input 
-                  className="clinical-input" 
-                  type="number" 
-                  name="iop_od" 
-                  value={formData.iop_od} 
-                  onChange={handleInputChange} 
-                  style={{ border: formData.iop_od > 21 ? '2px solid #dc2626' : '', background: formData.iop_od > 21 ? '#fef2f2' : '' }}
+            <SectionHeader title="Section D: Intraocular Pressure" icon={Target} onSave={() => handleSave(false)} isSaving={isSaving} />
+            <div className="clinical-section-card">
+              <div className="clinical-group-header" style={{ marginBottom: '32px' }}>
+                <div className="clinical-group-title">Tonometry Results</div>
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                   <span style={{ fontSize: '12px', fontWeight: '800', color: '#64748b' }}>METHOD:</span>
+                   <select className="clinical-input" name="iop_method" value={formData.iop_method} onChange={handleInputChange} style={{ height: '40px', width: '220px' }}>
+                      <option>Non-contact Tonometer</option>
+                      <option>Goldmann Applanation</option>
+                      <option>Tono-Pen</option>
+                      <option>iCare</option>
+                   </select>
+                </div>
+              </div>
+              
+              <div style={{ display: 'grid', gap: '40px' }}>
+                <ODSideBySide label="IOP (mmHg)" 
+                  childrenOD={
+                    <div style={{ position: 'relative' }}>
+                      <input type="number" className="clinical-input" name="iop_od" value={formData.iop_od} onChange={handleInputChange} placeholder="0" style={{ border: formData.iop_od > 21 ? '2px solid #ef4444' : '', background: formData.iop_od > 21 ? '#fff1f2' : '', paddingRight: '60px' }} disabled={isLocked} />
+                      <span style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', fontWeight: '800', color: '#94a3b8' }}>mmHg</span>
+                      {formData.iop_od > 21 && <div className="clinical-indicator-dot dot-elevated" style={{ position: 'absolute', right: '4px', top: '4px' }}></div>}
+                    </div>
+                  }
+                  childrenOS={
+                    <div style={{ position: 'relative' }}>
+                      <input type="number" className="clinical-input" name="iop_os" value={formData.iop_os} onChange={handleInputChange} placeholder="0" style={{ border: formData.iop_os > 21 ? '2px solid #ef4444' : '', background: formData.iop_os > 21 ? '#fff1f2' : '', paddingRight: '60px' }} />
+                      <span style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', fontWeight: '800', color: '#94a3b8' }}>mmHg</span>
+                      {formData.iop_os > 21 && <div className="clinical-indicator-dot dot-elevated" style={{ position: 'absolute', right: '4px', top: '4px' }}></div>}
+                    </div>
+                  }
                 />
-                {formData.iop_od > 21 && <span style={{ color: '#dc2626', fontSize: '10px', fontWeight: '800' }}>⚠️ ELEVATED IOP</span>}
-              </ClinicalField>
-              <ClinicalField label="IOP OS (mmHg)">
-                <input 
-                  className="clinical-input" 
-                  type="number" 
-                  name="iop_os" 
-                  value={formData.iop_os} 
-                  onChange={handleInputChange} 
-                  style={{ border: formData.iop_os > 21 ? '2px solid #dc2626' : '', background: formData.iop_os > 21 ? '#fef2f2' : '' }}
-                />
-                {formData.iop_os > 21 && <span style={{ color: '#dc2626', fontSize: '10px', fontWeight: '800' }}>⚠️ ELEVATED IOP</span>}
-              </ClinicalField>
-              <ClinicalField label="Method">
-                <select className="clinical-input" name="iop_method" value={formData.iop_method} onChange={handleInputChange}>
-                  <option>Non-contact Tonometer</option>
-                  <option>Goldmann Applanation</option>
-                  <option>Icare Tonometer</option>
-                  <option>Digital Palpation</option>
-                  <option>Schiotz Tonometer</option>
-                </select>
-              </ClinicalField>
-              <ClinicalField label="Time of Measurement">
-                <input className="clinical-input" type="time" name="iop_time" value={formData.iop_time} onChange={handleInputChange} />
-              </ClinicalField>
-              <ClinicalField label="IOP Notes" fullWidth>
-                <textarea className="clinical-textarea" name="iop_notes" value={formData.iop_notes} onChange={handleInputChange} placeholder="Asymmetry, corneal thickness corrections..." style={{ height: '80px' }} />
-              </ClinicalField>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2.5fr', gap: '32px' }}>
+                   <div className="leh-form-group">
+                      <label className="clinical-label-premium">Time of Measurement</label>
+                      <input type="time" className="clinical-input" name="iop_time" value={formData.iop_time} onChange={handleInputChange} />
+                   </div>
+                   <div className="leh-form-group">
+                      <label className="clinical-label-premium">Tonometry Observations</label>
+                      <input type="text" className="clinical-input" name="iop_notes" value={formData.iop_notes} onChange={handleInputChange} placeholder="Asymmetry, corneal thickness corrections..." />
+                   </div>
+                </div>
+              </div>
             </div>
           </div>
         );
       case 'Refraction':
         return (
           <div className="animate-slide-up">
-            <SectionHeader title="Section E: Refraction (Objective/Subjective)" icon={Glasses} onSave={() => handleSave(false)} />
-            <div style={{ display: 'grid', gap: '24px' }}>
-              <ODSideBySide label="REFRACTION" 
-                childrenOD={
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-                    <ClinicalField label="SPH"><input className="clinical-input" name="ref_od_sph" value={formData.ref_od_sph} onChange={handleInputChange} /></ClinicalField>
-                    <ClinicalField label="CYL"><input className="clinical-input" name="ref_od_cyl" value={formData.ref_od_cyl} onChange={handleInputChange} /></ClinicalField>
-                    <ClinicalField label="AXIS"><input className="clinical-input" name="ref_od_axis" value={formData.ref_od_axis} onChange={handleInputChange} /></ClinicalField>
-                    <ClinicalField label="VA"><select className="clinical-input" name="ref_od_va" value={formData.ref_od_va} onChange={handleInputChange}><option value="">Select</option>{SNELLEN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
-                    <ClinicalField label="ADD"><input className="clinical-input" name="ref_od_near_add" value={formData.ref_od_near_add} onChange={handleInputChange} /></ClinicalField>
-                  </div>
-                }
-                childrenOS={
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-                    <ClinicalField label="SPH"><input className="clinical-input" name="ref_os_sph" value={formData.ref_os_sph} onChange={handleInputChange} /></ClinicalField>
-                    <ClinicalField label="CYL"><input className="clinical-input" name="ref_os_cyl" value={formData.ref_os_cyl} onChange={handleInputChange} /></ClinicalField>
-                    <ClinicalField label="AXIS"><input className="clinical-input" name="ref_os_axis" value={formData.ref_os_axis} onChange={handleInputChange} /></ClinicalField>
-                    <ClinicalField label="VA"><select className="clinical-input" name="ref_os_va" value={formData.ref_os_va} onChange={handleInputChange}><option value="">Select</option>{SNELLEN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
-                    <ClinicalField label="ADD"><input className="clinical-input" name="ref_os_near_add" value={formData.ref_os_near_add} onChange={handleInputChange} /></ClinicalField>
-                  </div>
-                }
-              />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '24px' }}>
-                <ClinicalField label="PD (mm)"><input className="clinical-input" name="ref_pd" value={formData.ref_pd} onChange={handleInputChange} /></ClinicalField>
-                <ClinicalField label="Refraction Notes" fullWidth>
-                  <textarea className="clinical-textarea" name="ref_notes" value={formData.ref_notes} onChange={handleInputChange} placeholder="Cycloplegic refraction details..." style={{ height: '80px' }} />
-                </ClinicalField>
+            <SectionHeader title="Section E: Refraction (Objective/Subjective)" icon={Glasses} onSave={() => handleSave(false)} isSaving={isSaving} />
+            
+            <div style={{ display: 'grid', gap: '32px' }}>
+              <div className="clinical-section-card">
+                <div className="clinical-group-header" style={{ marginBottom: '24px' }}>
+                   <div className="clinical-group-title">Objective Refraction (AR/K)</div>
+                </div>
+                <ODSideBySide label="REFRACTION (Sph / Cyl x Axis)" 
+                   childrenOD={
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                      <input className="clinical-input" name="ref_od_sph" value={formData.ref_od_sph} onChange={handleInputChange} placeholder="SPH" />
+                      <input className="clinical-input" name="ref_od_cyl" value={formData.ref_od_cyl} onChange={handleInputChange} placeholder="CYL" />
+                      <input className="clinical-input" name="ref_od_axis" value={formData.ref_od_axis} onChange={handleInputChange} placeholder="AXIS" />
+                    </div>
+                   }
+                   childrenOS={
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                      <input className="clinical-input" name="ref_os_sph" value={formData.ref_os_sph} onChange={handleInputChange} placeholder="SPH" />
+                      <input className="clinical-input" name="ref_os_cyl" value={formData.ref_os_cyl} onChange={handleInputChange} placeholder="CYL" />
+                      <input className="clinical-input" name="ref_os_axis" value={formData.ref_os_axis} onChange={handleInputChange} placeholder="AXIS" />
+                    </div>
+                   }
+                />
+              </div>
+
+              <div className="clinical-section-card" style={{ borderLeft: '4px solid var(--leh-primary)' }}>
+                <div className="clinical-group-header" style={{ marginBottom: '24px' }}>
+                   <div className="clinical-group-title">Subjective Refraction (Best Corrected)</div>
+                </div>
+                <div style={{ display: 'grid', gap: '32px' }}>
+                   <ODSideBySide label="DISTANCE REFRACTION" 
+                      childrenOD={<div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '8px' }}><input className="clinical-input" name="ref_od_subjective_dv" value={formData.ref_od_subjective_dv} onChange={handleInputChange} placeholder="OD RX" /><input className="clinical-input" name="ref_od_va" value={formData.ref_od_va} onChange={handleInputChange} placeholder="VA" /></div>}
+                      childrenOS={<div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '8px' }}><input className="clinical-input" name="ref_os_subjective_dv" value={formData.ref_os_subjective_dv} onChange={handleInputChange} placeholder="OS RX" /><input className="clinical-input" name="ref_os_va" value={formData.ref_os_va} onChange={handleInputChange} placeholder="VA" /></div>}
+                   />
+                   <ODSideBySide label="NEAR ADDITION" 
+                      childrenOD={<input className="clinical-input" name="ref_od_near_add" value={formData.ref_od_near_add} onChange={handleInputChange} placeholder="OD Add" />}
+                      childrenOS={<input className="clinical-input" name="ref_os_near_add" value={formData.ref_os_near_add} onChange={handleInputChange} placeholder="OS Add" />}
+                   />
+                </div>
               </div>
             </div>
           </div>
@@ -593,263 +657,340 @@ export const Consultations: React.FC = () => {
       case 'AnteriorSeg':
         return (
           <div className="animate-slide-up">
-            <SectionHeader title="Section F: Anterior Segment / Slit Lamp" icon={Eye} onMarkNormal={() => markSectionNormal('AnteriorSeg')} onSave={() => handleSave(false)} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-               <ODSideBySide label="LIDS/LASHES" 
-                 childrenOD={<input className="clinical-input" name="as_lids_od" value={formData.as_lids_od} onChange={handleInputChange} />}
-                 childrenOS={<input className="clinical-input" name="as_lids_os" value={formData.as_lids_os} onChange={handleInputChange} />}
-               />
-               <ODSideBySide label="CONJUNCTIVA/SCLERA" 
-                 childrenOD={<input className="clinical-input" name="as_conj_od" value={formData.as_conj_od} onChange={handleInputChange} />}
-                 childrenOS={<input className="clinical-input" name="as_conj_os" value={formData.as_conj_os} onChange={handleInputChange} />}
-               />
-               <ODSideBySide label="CORNEA" 
-                 childrenOD={<input className="clinical-input" name="as_cornea_od" value={formData.as_cornea_od} onChange={handleInputChange} />}
-                 childrenOS={<input className="clinical-input" name="as_cornea_os" value={formData.as_cornea_os} onChange={handleInputChange} />}
-               />
-               <ODSideBySide label="AC DEPTH" 
-                 childrenOD={<select className="clinical-input" name="as_ac_depth_od" value={formData.as_ac_depth_od} onChange={handleInputChange}><option>Normal</option><option>Shallow</option><option>Deep</option></select>}
-                 childrenOS={<select className="clinical-input" name="as_ac_depth_os" value={formData.as_ac_depth_os} onChange={handleInputChange}><option>Normal</option><option>Shallow</option><option>Deep</option></select>}
-               />
-               <ODSideBySide label="IRIS/PUPIL" 
-                 childrenOD={<input className="clinical-input" name="as_iris_od" value={formData.as_iris_od} onChange={handleInputChange} />}
-                 childrenOS={<input className="clinical-input" name="as_iris_os" value={formData.as_iris_os} onChange={handleInputChange} />}
-               />
-               <ODSideBySide label="LENS" 
-                 childrenOD={<input className="clinical-input" name="as_lens_od" value={formData.as_lens_od} onChange={handleInputChange} />}
-                 childrenOS={<input className="clinical-input" name="as_lens_os" value={formData.as_lens_os} onChange={handleInputChange} />}
-               />
-               <ClinicalField label="Additional Anterior Segment Notes" fullWidth>
-                  <textarea className="clinical-textarea" name="as_comments" value={formData.as_comments} onChange={handleInputChange} placeholder="Vitreous face, pigments, etc..." style={{ height: '100px' }} />
-               </ClinicalField>
+            <SectionHeader title="Section F: Anterior Segment / Slit Lamp" icon={Eye} onMarkNormal={() => markSectionNormal('AnteriorSeg')} onSave={() => handleSave(false)} isSaving={isSaving} />
+            <div className="clinical-section-card">
+              <div className="clinical-group-header" style={{ marginBottom: '32px' }}>
+                <div className="clinical-group-title">Slit Lamp Biomicroscopy</div>
+              </div>
+              
+              <div style={{ display: 'grid', gap: '32px' }}>
+                <ODSideBySide label="LIDS & ADNEXA" 
+                  childrenOD={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_lids_od" value={formData.as_lids_od} onChange={handleInputChange}>{LIDS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_lids_notes_od" value={formData.as_lids_notes_od} onChange={handleInputChange} placeholder="Lid notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
+                  childrenOS={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_lids_os" value={formData.as_lids_os} onChange={handleInputChange}>{LIDS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_lids_notes_os" value={formData.as_lids_notes_os} onChange={handleInputChange} placeholder="Lid notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
+                />
+                <ODSideBySide label="CONJUNCTIVA / SCLERA" 
+                  childrenOD={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_conj_od" value={formData.as_conj_od} onChange={handleInputChange}>{CONJ_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_conj_notes_od" value={formData.as_conj_notes_od} onChange={handleInputChange} placeholder="Conj notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
+                  childrenOS={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_conj_os" value={formData.as_conj_os} onChange={handleInputChange}>{CONJ_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_conj_notes_os" value={formData.as_conj_notes_os} onChange={handleInputChange} placeholder="Conj notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
+                />
+                <ODSideBySide label="CORNEA / TEAR FILM" 
+                  childrenOD={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_cornea_od" value={formData.as_cornea_od} onChange={handleInputChange}>{CORNEA_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_cornea_notes_od" value={formData.as_cornea_notes_od} onChange={handleInputChange} placeholder="Cornea notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
+                  childrenOS={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_cornea_os" value={formData.as_cornea_os} onChange={handleInputChange}>{CORNEA_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_cornea_notes_os" value={formData.as_cornea_notes_os} onChange={handleInputChange} placeholder="Cornea notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
+                />
+                <ODSideBySide label="ANTERIOR CHAMBER" 
+                  childrenOD={
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <ClinicalField label="Depth"><select className="clinical-input" name="as_ac_depth_od" value={formData.as_ac_depth_od} onChange={handleInputChange}>{AC_DEPTH_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
+                      <ClinicalField label="Cells"><select className="clinical-input" name="as_ac_cells_od" value={formData.as_ac_cells_od} onChange={handleInputChange}>{AC_CELLS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
+                    </div>
+                  }
+                  childrenOS={
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <ClinicalField label="Depth"><select className="clinical-input" name="as_ac_depth_os" value={formData.as_ac_depth_os} onChange={handleInputChange}>{AC_DEPTH_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
+                      <ClinicalField label="Cells"><select className="clinical-input" name="as_ac_cells_os" value={formData.as_ac_cells_os} onChange={handleInputChange}>{AC_CELLS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
+                    </div>
+                  }
+                />
+                <ODSideBySide label="IRIS / PUPIL" 
+                  childrenOD={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_iris_od" value={formData.as_iris_od} onChange={handleInputChange}>{IRIS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_iris_notes_od" value={formData.as_iris_notes_od} onChange={handleInputChange} placeholder="Iris notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
+                  childrenOS={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_iris_os" value={formData.as_iris_os} onChange={handleInputChange}>{IRIS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_iris_notes_os" value={formData.as_iris_notes_os} onChange={handleInputChange} placeholder="Iris notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
+                />
+                <ODSideBySide label="LENS (Cataract Grading)" 
+                  childrenOD={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_lens_od" value={formData.as_lens_od} onChange={handleInputChange}>{LENS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_lens_notes_od" value={formData.as_lens_notes_od} onChange={handleInputChange} placeholder="Lens notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
+                  childrenOS={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_lens_os" value={formData.as_lens_os} onChange={handleInputChange}>{LENS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_lens_notes_os" value={formData.as_lens_notes_os} onChange={handleInputChange} placeholder="Lens notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
+                />
+              </div>
             </div>
           </div>
         );
       case 'Dilation':
         return (
           <div className="animate-slide-up">
-            <SectionHeader title="Section G: Dilation" icon={Droplets} onMarkNormal={() => markSectionNormal('Dilation')} onSave={() => handleSave(false)} />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
-               <ODSideBySide label="DILATED?" 
-                 childrenOD={<select className="clinical-input" name="dil_od" value={formData.dil_od} onChange={handleInputChange}><option value="No">No</option><option value="Yes">Yes</option></select>}
-                 childrenOS={<select className="clinical-input" name="dil_os" value={formData.dil_os} onChange={handleInputChange}><option value="No">No</option><option value="Yes">Yes</option></select>}
-               />
-               
-               {(formData.dil_od === 'Yes' || formData.dil_os === 'Yes') && (
-                 <>
-                   <ClinicalField label="Dilating Agent">
-                      <select className="clinical-input" name="dil_agent" value={formData.dil_agent} onChange={handleInputChange}>
-                         <option>Tropicamide 1%</option>
-                         <option>Phenylephrine 2.5%</option>
-                         <option>Cyclopentolate 1%</option>
-                         <option>Atropine 1%</option>
-                      </select>
-                   </ClinicalField>
-                   <ClinicalField label="Adequacy">
-                      <select className="clinical-input" name="dil_adequate" value={formData.dil_adequate} onChange={handleInputChange}>
-                         <option>Adequate</option>
-                         <option>Inadequate</option>
-                      </select>
-                   </ClinicalField>
-                   <ODSideBySide label="TIME" 
-                     childrenOD={<input className="clinical-input" type="time" name="dil_time_od" value={formData.dil_time_od} onChange={handleInputChange} disabled={formData.dil_od !== 'Yes'} />}
-                     childrenOS={<input className="clinical-input" type="time" name="dil_time_os" value={formData.dil_time_os} onChange={handleInputChange} disabled={formData.dil_os !== 'Yes'} />}
-                   />
-                 </>
-               )}
-               
-               <ClinicalField label="Post-Dilation Notes" fullWidth>
-                  <textarea className="clinical-textarea" name="dil_notes" value={formData.dil_notes} onChange={handleInputChange} placeholder="Adverse reactions, poor response..." style={{ height: '80px' }} />
-               </ClinicalField>
+            <SectionHeader title="Section G: Dilation" icon={Droplets} onMarkNormal={() => markSectionNormal('Dilation')} onSave={() => handleSave(false)} isSaving={isSaving} />
+            <div className="clinical-section-card">
+              <div className="clinical-group-header" style={{ marginBottom: '32px' }}>
+                <div className="clinical-group-title">Mydriatic Administration</div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '32px' }}>
+                <div className="leh-form-group">
+                   <label className="clinical-label-premium">Dilation Drops Used</label>
+                   <select className="clinical-input" name="dil_agent" value={formData.dil_agent} onChange={handleInputChange}>
+                      <option value="">Select Agent</option>
+                      <option>Tropicamide 1%</option>
+                      <option>Tropicamide 0.5%</option>
+                      <option>Cyclopentolate 1%</option>
+                      <option>Phenylephrine 2.5%</option>
+                      <option>Tropicamide + Phenylephrine</option>
+                   </select>
+                </div>
+                <div className="leh-form-group">
+                   <label className="clinical-label-premium">Time Administered</label>
+                   <input type="time" className="clinical-input" name="dil_time_od" value={formData.dil_time_od} onChange={handleInputChange} />
+                </div>
+              </div>
+              <div style={{ marginTop: '32px' }}>
+                <ODSideBySide label="DILATED?" 
+                   childrenOD={
+                    <select className="clinical-input" name="dil_od" value={formData.dil_od} onChange={handleInputChange}>
+                       <option value="No">No</option><option value="Yes">Yes</option>
+                    </select>
+                   }
+                   childrenOS={
+                    <select className="clinical-input" name="dil_os" value={formData.dil_os} onChange={handleInputChange}>
+                       <option value="No">No</option><option value="Yes">Yes</option>
+                    </select>
+                   }
+                />
+              </div>
             </div>
           </div>
         );
       case 'Fundoscopy':
         return (
           <div className="animate-slide-up">
-            <SectionHeader title="Section H: Fundoscopy" icon={Eye} onMarkNormal={() => markSectionNormal('Fundoscopy')} onSave={() => handleSave(false)} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-               <ODSideBySide label="OPTIC DISC (CDR)" 
-                 childrenOD={<input className="clinical-input" name="fs_disc_cdr_od" value={formData.fs_disc_cdr_od} onChange={handleInputChange} />}
-                 childrenOS={<input className="clinical-input" name="fs_disc_cdr_os" value={formData.fs_disc_cdr_os} onChange={handleInputChange} />}
-               />
-               <ODSideBySide label="MACULA" 
-                 childrenOD={<input className="clinical-input" name="fs_macula_od" value={formData.fs_macula_od} onChange={handleInputChange} />}
-                 childrenOS={<input className="clinical-input" name="fs_macula_os" value={formData.fs_macula_os} onChange={handleInputChange} />}
-               />
-               <ODSideBySide label="VESSELS (A/V Ratio)" 
-                 childrenOD={<input className="clinical-input" name="fs_vessels_av_od" value={formData.fs_vessels_av_od} onChange={handleInputChange} />}
-                 childrenOS={<input className="clinical-input" name="fs_vessels_av_os" value={formData.fs_vessels_av_os} onChange={handleInputChange} />}
-               />
-               <ODSideBySide label="PERIPHERY" 
-                 childrenOD={<input className="clinical-input" name="fs_periph_od" value={formData.fs_periph_od} onChange={handleInputChange} />}
-                 childrenOS={<input className="clinical-input" name="fs_periph_os" value={formData.fs_periph_os} onChange={handleInputChange} />}
-               />
-               <ClinicalField label="Fundoscopy Summary" fullWidth>
-                  <textarea className="clinical-textarea" name="fs_summary" value={formData.fs_summary} onChange={handleInputChange} placeholder="Overall posterior pole assessment..." style={{ height: '100px' }} />
-               </ClinicalField>
+            <SectionHeader title="Section H: Fundoscopy" icon={Search} onMarkNormal={() => markSectionNormal('Fundoscopy')} onSave={() => handleSave(false)} isSaving={isSaving} />
+            <div className="clinical-section-card">
+              <div className="clinical-group-header" style={{ marginBottom: '32px' }}>
+                <div className="clinical-group-title">Posterior Segment Evaluation</div>
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                   <span style={{ fontSize: '12px', fontWeight: '800', color: '#64748b' }}>METHOD:</span>
+                   <select className="clinical-input" name="fs_method" value={formData.fs_method} onChange={handleInputChange} style={{ height: '40px', width: '220px' }}>
+                      <option>Slit Lamp with 90D Lens</option>
+                      <option>Indirect Ophthalmoscopy</option>
+                      <option>Direct Ophthalmoscopy</option>
+                   </select>
+                </div>
+              </div>
+              
+              <div style={{ display: 'grid', gap: '40px' }}>
+                <ODSideBySide label="OPTIC DISC (CDR, Margin, Color)" 
+                  childrenOD={
+                    <div style={{ display: 'grid', gap: '8px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        <ClinicalField label="CDR"><input className="clinical-input" name="fs_disc_cdr_od" value={formData.fs_disc_cdr_od} onChange={handleInputChange} placeholder="0.3" /></ClinicalField>
+                        <ClinicalField label="Margin"><select className="clinical-input" name="fs_disc_margins_od" value={formData.fs_disc_margins_od} onChange={handleInputChange}>{DISC_MARGIN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
+                      </div>
+                      <ClinicalField label="Color"><select className="clinical-input" name="fs_disc_color_od" value={formData.fs_disc_color_od} onChange={handleInputChange}>{DISC_COLOR_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
+                    </div>
+                  }
+                  childrenOS={
+                    <div style={{ display: 'grid', gap: '8px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        <ClinicalField label="CDR"><input className="clinical-input" name="fs_disc_cdr_os" value={formData.fs_disc_cdr_os} onChange={handleInputChange} placeholder="0.3" /></ClinicalField>
+                        <ClinicalField label="Margin"><select className="clinical-input" name="fs_disc_margins_os" value={formData.fs_disc_margins_os} onChange={handleInputChange}>{DISC_MARGIN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
+                      </div>
+                      <ClinicalField label="Color"><select className="clinical-input" name="fs_disc_color_os" value={formData.fs_disc_color_os} onChange={handleInputChange}>{DISC_COLOR_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
+                    </div>
+                  }
+                />
+                <ODSideBySide label="MACULA / FOVEA" 
+                  childrenOD={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="fs_macula_od" value={formData.fs_macula_od} onChange={handleInputChange}>{MACULA_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="fs_macula_notes_od" value={formData.fs_macula_notes_od} onChange={handleInputChange} placeholder="Macula notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
+                  childrenOS={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="fs_macula_os" value={formData.fs_macula_os} onChange={handleInputChange}>{MACULA_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="fs_macula_notes_os" value={formData.fs_macula_notes_os} onChange={handleInputChange} placeholder="Macula notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
+                />
+                <ODSideBySide label="RETINAL VESSELS" 
+                  childrenOD={<div style={{ display: 'grid', gap: '8px' }}><input className="clinical-input" name="fs_vessels_av_od" value={formData.fs_vessels_av_od} onChange={handleInputChange} placeholder="A/V 2:3" /><select className="clinical-input" name="fs_vessels_nipping_od" value={formData.fs_vessels_nipping_od} onChange={handleInputChange}><option value="Absent">AV Nipping: Absent</option><option value="Present">AV Nipping: Present</option></select></div>}
+                  childrenOS={<div style={{ display: 'grid', gap: '8px' }}><input className="clinical-input" name="fs_vessels_av_os" value={formData.fs_vessels_av_os} onChange={handleInputChange} placeholder="A/V 2:3" /><select className="clinical-input" name="fs_vessels_nipping_os" value={formData.fs_vessels_nipping_os} onChange={handleInputChange}><option value="Absent">AV Nipping: Absent</option><option value="Present">AV Nipping: Present</option></select></div>}
+                />
+                <ODSideBySide label="PERIPHERY" 
+                  childrenOD={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="fs_periph_od" value={formData.fs_periph_od} onChange={handleInputChange}><option value="Normal">Normal</option><option value="Break/Tear">Break/Tear</option><option value="Detachment">Detachment</option><option value="Lattice">Lattice</option><option value="Other">Other</option></select><input className="clinical-input" name="fs_periph_notes_od" value={formData.fs_periph_notes_od} onChange={handleInputChange} placeholder="Periph notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
+                  childrenOS={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="fs_periph_os" value={formData.fs_periph_os} onChange={handleInputChange}><option value="Normal">Normal</option><option value="Break/Tear">Break/Tear</option><option value="Detachment">Detachment</option><option value="Lattice">Lattice</option><option value="Other">Other</option></select><input className="clinical-input" name="fs_periph_notes_os" value={formData.fs_periph_notes_os} onChange={handleInputChange} placeholder="Periph notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
+                />
+                <div className="leh-form-group">
+                   <label className="clinical-label-premium">Posterior Segment Summary</label>
+                   <textarea className="clinical-textarea" name="fs_summary" value={formData.fs_summary} onChange={handleInputChange} placeholder="Overall posterior pole assessment..." style={{ height: '80px' }} />
+                </div>
+              </div>
             </div>
           </div>
         );
       case 'Diagnosis':
         return (
           <div className="animate-slide-up">
-            <SectionHeader title="Section I: Clinical Diagnosis" icon={Target} onSave={() => handleSave(false)} />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
-               <ClinicalField label="Primary Diagnosis OD">
-                  <select className="clinical-input" name="diag_od" value={formData.diag_od} onChange={handleInputChange}>
-                     <option value="">Select Diagnosis</option>
-                     {DIAGNOSIS_OPTIONS.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
-               </ClinicalField>
-               <ClinicalField label="Primary Diagnosis OS">
-                  <select className="clinical-input" name="diag_os" value={formData.diag_os} onChange={handleInputChange}>
-                     <option value="">Select Diagnosis</option>
-                     {DIAGNOSIS_OPTIONS.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
-               </ClinicalField>
-               <ClinicalField label="Secondary Diagnoses" fullWidth>
-                  <textarea className="clinical-textarea" name="diag_secondary" value={formData.diag_secondary} onChange={handleInputChange} placeholder="List co-morbidities..." style={{ height: '80px' }} />
-               </ClinicalField>
-               <ClinicalField label="Diagnostic Summary / Impression" fullWidth>
-                  <textarea className="clinical-textarea" name="diag_summary" value={formData.diag_summary} onChange={handleInputChange} placeholder="Clinical conclusion..." style={{ height: '120px' }} />
-               </ClinicalField>
+            <SectionHeader title="Section I: Assessment & Diagnosis" icon={Activity} onSave={() => handleSave(false)} isSaving={isSaving} />
+            <div className="clinical-section-card">
+              <div className="clinical-group-header" style={{ marginBottom: '32px' }}>
+                <div className="clinical-group-title">Clinical Impression</div>
+              </div>
+              
+              <div style={{ display: 'grid', gap: '32px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '32px' }}>
+                  <div className="leh-form-group">
+                    <label className="clinical-label-premium">Primary Diagnosis</label>
+                    <select className="clinical-input" name="diagnosis_primary" value={formData.diagnosis_primary} onChange={handleInputChange} disabled={isLocked}>
+                      <option value="">Select Primary Condition</option>
+                      {DIAGNOSIS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                  </div>
+                  <div className="leh-form-group">
+                    <label className="clinical-label-premium">Secondary Diagnosis</label>
+                    <select className="clinical-input" name="diagnosis_secondary" value={formData.diagnosis_secondary} onChange={handleInputChange} disabled={isLocked}>
+                      <option value="">Select Secondary Condition</option>
+                      {DIAGNOSIS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="leh-form-group">
+                   <label className="clinical-label-premium">Other/Specific Findings (ICD-10 Notes)</label>
+                   <textarea className="clinical-textarea" name="diagnosis_notes" value={formData.diagnosis_notes} onChange={handleInputChange} placeholder="Additional diagnostic details, staging, or specific ICD codes..." style={{ height: '120px' }} disabled={isLocked} />
+                </div>
+              </div>
             </div>
           </div>
         );
       case 'Plan':
         return (
           <div className="animate-slide-up">
-            <SectionHeader title="Section J: Treatment Plan" icon={Pill} onSave={() => handleSave(false)} />
+            <SectionHeader title="Section J: Management Plan" icon={ClipboardList} onSave={() => handleSave(false)} isSaving={isSaving} />
             
-            {/* Medications */}
-            <div style={{ marginBottom: '40px' }}>
-               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                  <h3 style={{ fontSize: '13px', fontWeight: '900', color: 'var(--leh-primary)' }}>MEDICATION PRESCRIPTION</h3>
-                  <button className="leh-btn-outline" onClick={addMedication} style={{ height: '32px', padding: '0 12px' }}>
-                    <Plus size={14} /> ADD DRUG
-                  </button>
-               </div>
-               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {formData.plan_meds.length === 0 && <p style={{ textAlign: 'center', padding: '24px', background: 'var(--leh-bg-light)', borderRadius: '12px', fontSize: '13px', color: 'var(--leh-text-muted)' }}>No medications prescribed.</p>}
-                  {formData.plan_meds.map((med: Medication, idx: number) => (
-                     <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr auto', gap: '12px', padding: '16px', background: 'white', border: '1px solid var(--leh-border-light)', borderRadius: '12px' }} className="medication-terminal-row">
-                        <ClinicalField label="Drug Name"><input className="clinical-input" value={med.drug_name} onChange={(e) => updateMedication(idx, 'drug_name', e.target.value)} placeholder="e.g. G. Timolol" /></ClinicalField>
-                        <ClinicalField label="Dose/Freq"><input className="clinical-input" value={med.dose} onChange={(e) => updateMedication(idx, 'dose', e.target.value)} placeholder="e.g. 1 drop BD" /></ClinicalField>
-                        <ClinicalField label="Duration"><input className="clinical-input" value={med.duration} onChange={(e) => updateMedication(idx, 'duration', e.target.value)} placeholder="e.g. 1 month" /></ClinicalField>
-                        <ClinicalField label="Route">
-                           <select className="clinical-input" value={med.route} onChange={(e) => updateMedication(idx, 'route', e.target.value)}>
-                              <option>Topical</option><option>Oral</option><option>Injection</option>
-                           </select>
-                        </ClinicalField>
-                        <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                           <button onClick={() => removeMedication(idx)} style={{ height: '40px', width: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff1f2', color: '#e11d48', border: 'none', borderRadius: '10px' }}>
-                              <Trash2 size={18} />
-                           </button>
-                        </div>
+            <div style={{ display: 'grid', gap: '32px' }}>
+              <div className="clinical-section-card">
+                <div className="clinical-group-header" style={{ marginBottom: '24px' }}>
+                   <div className="clinical-group-title">Medication & Therapeutics</div>
+                   <button className="leh-btn-primary" onClick={addMedication} style={{ marginLeft: 'auto', padding: '8px 16px', borderRadius: '12px' }} disabled={isLocked}>
+                      <Plus size={16} style={{ marginRight: '8px' }} /> Add Drug
+                   </button>
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                   {formData.plan_meds.length === 0 && (
+                     <div style={{ textAlign: 'center', padding: '48px', background: '#f8fafc', borderRadius: '1.5rem', border: '2px dashed #e2e8f0' }}>
+                        <Pill size={32} style={{ color: '#cbd5e1', marginBottom: '12px' }} />
+                        <p style={{ fontSize: '14px', color: '#64748b', fontWeight: '600' }}>No medications prescribed yet.</p>
                      </div>
-                  ))}
-               </div>
-            </div>
+                   )}
+                   {(formData.plan_meds || []).map((med: Medication, idx: number) => (
+                      <div key={idx} className="medication-terminal-row">
+                         <ClinicalField label="Drug Name"><input className="clinical-input" value={med.drug_name} onChange={(e) => updateMedication(idx, 'drug_name', e.target.value)} placeholder="e.g. G. Timolol" /></ClinicalField>
+                         <ClinicalField label="Dose/Freq"><input className="clinical-input" value={med.dose} onChange={(e) => updateMedication(idx, 'dose', e.target.value)} placeholder="e.g. 1 drop BD" /></ClinicalField>
+                         <ClinicalField label="Duration"><input className="clinical-input" value={med.duration} onChange={(e) => updateMedication(idx, 'duration', e.target.value)} placeholder="e.g. 1 month" /></ClinicalField>
+                         <ClinicalField label="Route">
+                            <select className="clinical-input" value={med.route} onChange={(e) => updateMedication(idx, 'route', e.target.value)}>
+                               <option>Topical</option><option>Oral</option><option>Injection</option>
+                            </select>
+                         </ClinicalField>
+                         <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                            <button onClick={() => removeMedication(idx)} style={{ height: '56px', width: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fef2f2', color: '#ef4444', border: '1px solid #fee2e2', borderRadius: '1rem', cursor: 'pointer' }}>
+                               <Trash2 size={20} />
+                            </button>
+                         </div>
+                      </div>
+                   ))}
+                </div>
+              </div>
 
-            {/* Glasses Prescription */}
-            <div style={{ padding: '24px', background: 'var(--leh-bg-light)', borderRadius: '16px', border: '1px solid var(--leh-border-light)' }}>
-               <h3 style={{ fontSize: '13px', fontWeight: '900', color: 'var(--leh-primary)', marginBottom: '16px' }}>GLASSES PRESCRIPTION</h3>
-               <ODSideBySide label="FINAL PRESCRIPTION" 
-                 childrenOD={
-                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                      <input className="clinical-input" placeholder="SPH" value={formData.plan_glasses_od.sph} onChange={(e) => setFormData((prev: any) => ({ ...prev, plan_glasses_od: { ...prev.plan_glasses_od, sph: e.target.value } }))} />
-                      <input className="clinical-input" placeholder="CYL" value={formData.plan_glasses_od.cyl} onChange={(e) => setFormData((prev: any) => ({ ...prev, plan_glasses_od: { ...prev.plan_glasses_od, cyl: e.target.value } }))} />
-                      <input className="clinical-input" placeholder="AXIS" value={formData.plan_glasses_od.axis} onChange={(e) => setFormData((prev: any) => ({ ...prev, plan_glasses_od: { ...prev.plan_glasses_od, axis: e.target.value } }))} />
-                   </div>
-                 }
-                 childrenOS={
-                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                      <input className="clinical-input" placeholder="SPH" value={formData.plan_glasses_os.sph} onChange={(e) => setFormData((prev: any) => ({ ...prev, plan_glasses_os: { ...prev.plan_glasses_os, sph: e.target.value } }))} />
-                      <input className="clinical-input" placeholder="CYL" value={formData.plan_glasses_os.cyl} onChange={(e) => setFormData((prev: any) => ({ ...prev, plan_glasses_os: { ...prev.plan_glasses_os, cyl: e.target.value } }))} />
-                      <input className="clinical-input" placeholder="AXIS" value={formData.plan_glasses_os.axis} onChange={(e) => setFormData((prev: any) => ({ ...prev, plan_glasses_os: { ...prev.plan_glasses_os, axis: e.target.value } }))} />
-                   </div>
-                 }
-               />
-               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '24px', marginTop: '16px' }}>
-                  <ClinicalField label="Near Add"><input className="clinical-input" value={formData.plan_glasses_od.add} onChange={(e) => setFormData((prev: any) => ({ ...prev, plan_glasses_od: { ...prev.plan_glasses_od, add: e.target.value }, plan_glasses_os: { ...prev.plan_glasses_os, add: e.target.value } }))} /></ClinicalField>
-                  <ClinicalField label="PD (mm)"><input className="clinical-input" value={formData.plan_glasses_pd} onChange={(e) => setFormData((prev: any) => ({ ...prev, plan_glasses_pd: e.target.value }))} /></ClinicalField>
-                  <ClinicalField label="Lens Type"><input className="clinical-input" value={formData.plan_lens_type} onChange={(e) => setFormData((prev: any) => ({ ...prev, plan_lens_type: e.target.value }))} placeholder="e.g. Bifocal, Photochromic" /></ClinicalField>
-               </div>
+              <div className="clinical-section-card">
+                <div className="clinical-group-header">
+                   <div className="clinical-group-title">Glasses Prescription</div>
+                </div>
+                <ODSideBySide 
+                  childrenOD={
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                       <ClinicalField label="SPH"><input className="clinical-input" placeholder="SPH" value={formData.plan_glasses_od.sph} onChange={(e) => setFormData((prev: any) => ({ ...prev, plan_glasses_od: { ...prev.plan_glasses_od, sph: e.target.value } }))} /></ClinicalField>
+                       <ClinicalField label="CYL"><input className="clinical-input" placeholder="CYL" value={formData.plan_glasses_od.cyl} onChange={(e) => setFormData((prev: any) => ({ ...prev, plan_glasses_od: { ...prev.plan_glasses_od, cyl: e.target.value } }))} /></ClinicalField>
+                       <ClinicalField label="AXIS"><input className="clinical-input" placeholder="AXIS" value={formData.plan_glasses_od.axis} onChange={(e) => setFormData((prev: any) => ({ ...prev, plan_glasses_od: { ...prev.plan_glasses_od, axis: e.target.value } }))} /></ClinicalField>
+                    </div>
+                  }
+                  childrenOS={
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                       <ClinicalField label="SPH"><input className="clinical-input" placeholder="SPH" value={formData.plan_glasses_os.sph} onChange={(e) => setFormData((prev: any) => ({ ...prev, plan_glasses_os: { ...prev.plan_glasses_os, sph: e.target.value } }))} /></ClinicalField>
+                       <ClinicalField label="CYL"><input className="clinical-input" placeholder="CYL" value={formData.plan_glasses_os.cyl} onChange={(e) => setFormData((prev: any) => ({ ...prev, plan_glasses_os: { ...prev.plan_glasses_os, cyl: e.target.value } }))} /></ClinicalField>
+                       <ClinicalField label="AXIS"><input className="clinical-input" placeholder="AXIS" value={formData.plan_glasses_os.axis} onChange={(e) => setFormData((prev: any) => ({ ...prev, plan_glasses_os: { ...prev.plan_glasses_os, axis: e.target.value } }))} /></ClinicalField>
+                    </div>
+                  }
+                />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '24px', marginTop: '24px' }}>
+                   <ClinicalField label="Near Add"><input className="clinical-input" value={formData.plan_glasses_od.add} onChange={(e) => setFormData((prev: any) => ({ ...prev, plan_glasses_od: { ...prev.plan_glasses_od, add: e.target.value }, plan_glasses_os: { ...prev.plan_glasses_os, add: e.target.value } }))} /></ClinicalField>
+                   <ClinicalField label="PD (mm)"><input className="clinical-input" value={formData.plan_glasses_pd} onChange={(e) => setFormData((prev: any) => ({ ...prev, plan_glasses_pd: e.target.value }))} /></ClinicalField>
+                   <ClinicalField label="Lens Type"><input className="clinical-input" value={formData.plan_lens_type} onChange={(e) => setFormData((prev: any) => ({ ...prev, plan_lens_type: e.target.value }))} placeholder="e.g. Bifocal, Photochromic" /></ClinicalField>
+                </div>
+              </div>
             </div>
           </div>
         );
       case 'Notes':
         return (
           <div className="animate-slide-up">
-            <SectionHeader title="Section K: Clinical Notes & Follow-up" icon={ClipboardList} onSave={() => handleSave(false)} />
-            <div style={{ display: 'grid', gap: '32px' }}>
-               <ClinicalField label="Detailed Clinical Notes" fullWidth>
-                  <textarea className="clinical-textarea" name="notes_clinical" value={formData.notes_clinical} onChange={handleInputChange} placeholder="Internal observations, advice given..." style={{ height: '200px' }} />
-               </ClinicalField>
-               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                  <ClinicalField label="Follow-up Date">
-                    <input className="leh-date-input" type="date" name="plan_followup_date" value={formData.plan_followup_date} onChange={handleInputChange} />
-                  </ClinicalField>
-                  <ClinicalField label="Clinic / Specialty">
-                     <select className="clinical-input" name="notes_followup_clinic" value={formData.notes_followup_clinic} onChange={handleInputChange}>
-                        <option>General Eye Clinic</option><option>Glaucoma Clinic</option><option>Retina Clinic</option><option>Pediatric Clinic</option><option>Cornea Clinic</option>
-                     </select>
-                  </ClinicalField>
-               </div>
+            <SectionHeader title="Section K: Clinical Notes & Follow-up" icon={ClipboardList} onSave={() => handleSave(false)} isSaving={isSaving} />
+            <div className="clinical-section-card">
+              <div className="clinical-group-header">
+                <div className="clinical-group-title">Detailed Observations</div>
+              </div>
+              <div style={{ display: 'grid', gap: '32px' }}>
+                 <ClinicalField label="Internal Clinical Notes" fullWidth>
+                    <textarea className="clinical-textarea" name="notes_clinical" value={formData.notes_clinical} onChange={handleInputChange} placeholder="Internal observations, advice given, specialized test results..." style={{ height: '240px' }} />
+                 </ClinicalField>
+                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', padding: '24px', background: '#f8fafc', borderRadius: '1.5rem', border: '1px solid #e2e8f0' }}>
+                    <ClinicalField label="Follow-up Date">
+                      <input className="clinical-input" type="date" name="plan_followup_date" value={formData.plan_followup_date} onChange={handleInputChange} />
+                    </ClinicalField>
+                    <ClinicalField label="Clinic / Specialty">
+                       <select className="clinical-input" name="notes_followup_clinic" value={formData.notes_followup_clinic} onChange={handleInputChange}>
+                          <option>General Eye Clinic</option><option>Glaucoma Clinic</option><option>Retina Clinic</option><option>Pediatric Clinic</option><option>Cornea Clinic</option>
+                       </select>
+                    </ClinicalField>
+                 </div>
+              </div>
             </div>
           </div>
         );
-      case 'Surgery':
+      case 'Admission':
         return (
           <div className="animate-slide-up">
-            <SectionHeader title="Section L: Surgery Flag" icon={Scissors} onSave={() => handleSave(false)} />
-            <div style={{ padding: '32px', background: formData.surgery_advised ? '#fff1f2' : 'white', borderRadius: '24px', border: formData.surgery_advised ? '2px solid #e11d48' : '1px solid var(--leh-border-light)' }}>
-               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
-                  <input type="checkbox" checked={formData.surgery_advised} onChange={(e) => setFormData((prev: any) => ({ ...prev, surgery_advised: e.target.checked }))} style={{ width: '24px', height: '24px' }} disabled={isLocked} />
-                  <span style={{ fontSize: '16px', fontWeight: '900', color: formData.surgery_advised ? '#e11d48' : 'var(--leh-text-dark)' }}>SURGERY ADVISED?</span>
-               </div>
-               
-               {formData.surgery_advised && (
-                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                    <ClinicalField label="Surgery Type">
-                       <input className="clinical-input" name="surgery_type" value={formData.surgery_type} onChange={handleInputChange} placeholder="e.g. Phaco + IOL" disabled={isLocked} />
-                    </ClinicalField>
-                    <ClinicalField label="Eye Side">
-                       <select className="clinical-input" name="surgery_side" value={formData.surgery_side} onChange={handleInputChange} disabled={isLocked}>
-                          <option>Right Eye (OD)</option><option>Left Eye (OS)</option><option>Both Eyes (OU)</option>
-                       </select>
-                    </ClinicalField>
-                    <ClinicalField label="Urgency">
-                       <select className="clinical-input" name="surgery_urgency" value={formData.surgery_urgency} onChange={handleInputChange} disabled={isLocked}>
-                          <option>Elective</option><option>Urgent</option><option>Emergency</option>
-                       </select>
-                    </ClinicalField>
-                    <ClinicalField label="Surgery Notes" fullWidth>
-                       <textarea className="clinical-textarea" name="surgery_notes" value={formData.surgery_notes} onChange={handleInputChange} placeholder="Pre-op requirements, risks discussed..." style={{ height: '100px' }} disabled={isLocked} />
-                    </ClinicalField>
+            <SectionHeader title="Section L: Specialized Management" icon={Activity} onSave={() => handleSave(false)} isSaving={isSaving} />
+            
+            <div style={{ display: 'grid', gap: '32px' }}>
+              <div className="clinical-section-card" style={{ border: formData.surgery_advised ? '2px solid #ef4444' : '' }}>
+                 <div className="clinical-group-header">
+                    <div className="clinical-group-title">Surgical Planning</div>
+                    <label className="checkbox-clinical-container" style={{ marginLeft: 'auto' }}>
+                      <span style={{ fontSize: '12px', fontWeight: '800', color: formData.surgery_advised ? '#ef4444' : '#64748b' }}>ADVISE SURGERY?</span>
+                      <input type="checkbox" className="clinical-checkbox" checked={formData.surgery_advised} onChange={(e) => setFormData((prev: any) => ({ ...prev, surgery_advised: e.target.checked }))} disabled={isLocked} />
+                    </label>
                  </div>
-               )}
-            </div>
+                 
+                 {formData.surgery_advised && (
+                   <div className="animate-slide-up" style={{ marginTop: '24px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                     <div className="leh-form-group">
+                       <label className="clinical-label-premium">Surgical Procedure</label>
+                       <select className="clinical-input" name="surgery_procedure" value={formData.surgery_procedure} onChange={handleInputChange}>
+                         <option value="">Select Procedure</option>
+                         <option>Phacoemulsification + IOL</option>
+                         <option>SICS + IOL</option>
+                         <option>Trabeculectomy</option>
+                         <option>Pterygium Excision</option>
+                       </select>
+                     </div>
+                     <div className="leh-form-group">
+                       <label className="clinical-label-premium">Eye for Surgery</label>
+                       <select className="clinical-input" name="surgery_eye" value={formData.surgery_eye} onChange={handleInputChange}>
+                         <option value="">Select Eye</option>
+                         <option value="OD">Right Eye (OD)</option>
+                         <option value="OS">Left Eye (OS)</option>
+                         <option value="Bilateral">Bilateral (OU)</option>
+                       </select>
+                     </div>
+                   </div>
+                 )}
+              </div>
 
-            <div style={{ marginTop: '32px', padding: '32px', background: formData.admission_advised ? '#eff6ff' : 'white', borderRadius: '24px', border: formData.admission_advised ? '2px solid var(--leh-primary)' : '1px solid var(--leh-border-light)' }}>
-               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
-                  <input type="checkbox" checked={formData.admission_advised} onChange={(e) => setFormData((prev: any) => ({ ...prev, admission_advised: e.target.checked }))} style={{ width: '24px', height: '24px' }} disabled={isLocked} />
-                  <span style={{ fontSize: '16px', fontWeight: '900', color: formData.admission_advised ? 'var(--leh-primary)' : 'var(--leh-text-dark)' }}>ADMISSION ADVISED?</span>
-               </div>
-               
-               {formData.admission_advised && (
-                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                    <ClinicalField label="Reason for Admission" fullWidth>
-                       <textarea className="clinical-textarea" name="admission_reason" value={formData.admission_reason} onChange={handleInputChange} placeholder="Specific condition requiring inpatient care..." style={{ height: '100px' }} disabled={isLocked} />
-                    </ClinicalField>
-                    <ClinicalField label="Admission Urgency">
-                       <select className="clinical-input" name="admission_urgency" value={formData.admission_urgency} onChange={handleInputChange} disabled={isLocked}>
-                          <option>Routine</option><option>Urgent</option><option>Emergency</option>
-                       </select>
-                    </ClinicalField>
+              <div className="clinical-section-card" style={{ border: formData.admission_advised ? '2px solid #2563eb' : '' }}>
+                 <div className="clinical-group-header">
+                    <div className="clinical-group-title">Admission Plan</div>
+                    <label className="checkbox-clinical-container" style={{ marginLeft: 'auto' }}>
+                      <span style={{ fontSize: '12px', fontWeight: '800', color: formData.admission_advised ? '#2563eb' : '#64748b' }}>ADVISE ADMISSION?</span>
+                      <input type="checkbox" className="clinical-checkbox" checked={formData.admission_advised} onChange={(e) => setFormData((prev: any) => ({ ...prev, admission_advised: e.target.checked }))} disabled={isLocked} />
+                    </label>
                  </div>
-               )}
+                 
+                 {formData.admission_advised && (
+                   <div className="animate-slide-up" style={{ marginTop: '24px' }}>
+                     <div className="leh-form-group">
+                       <label className="clinical-label-premium">Reason for Admission</label>
+                       <textarea className="clinical-textarea" name="admission_reason" value={formData.admission_reason} onChange={handleInputChange} placeholder="e.g. Post-op monitoring, intensive topical therapy..." />
+                     </div>
+                   </div>
+                 )}
+              </div>
             </div>
           </div>
         );
@@ -859,8 +1000,8 @@ export const Consultations: React.FC = () => {
   };
 
 
-  return (
-    <div className="leh-page-container" style={{ padding: 0, height: 'calc(100vh - 80px)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+   return (
+    <div className="consultations-page-container no-print">
       
       {/* ZONE 1: PATIENT CONTEXT BAR */}
       {selectedPatient && (
@@ -946,7 +1087,7 @@ export const Consultations: React.FC = () => {
       )}
 
       {/* ZONE 3: TWO-PANEL WORKSPACE */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 25%) 1fr', flex: 1, overflow: 'hidden' }} className="no-print">
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 20%) 1fr', flex: 1, overflow: 'hidden' }} className="no-print">
         
         {/* LEFT PANEL: NAVIGATION */}
         <div style={{ background: 'white', borderRight: '1px solid var(--leh-border-light)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -970,17 +1111,17 @@ export const Consultations: React.FC = () => {
                  </div>
                  <div className="custom-scrollbar" style={{ flex: 1, overflowY: 'auto' }}>
                     {patients
-                      .filter(p => p.full_name?.toLowerCase().includes(searchQuery.toLowerCase()))
-                      .sort((a, b) => new Date(a.visit_date || 0).getTime() - new Date(b.visit_date || 0).getTime())
+                      .filter(p => (p.full_name || p.patient_name)?.toLowerCase().includes(searchQuery.toLowerCase()))
+                      .sort((a, b) => new Date(a.checkin_at || 0).getTime() - new Date(b.checkin_at || 0).getTime())
                       .map(p => (
                        <div key={p.id} className="leh-table-row" style={{ padding: '20px 24px', borderBottom: '1px solid var(--leh-border-light)', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                          <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'var(--leh-bg-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', color: 'var(--leh-primary)' }}>{p.full_name?.[0]}</div>
+                          <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'var(--leh-bg-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', color: 'var(--leh-primary)' }}>{(p.full_name || p.patient_name)?.[0]}</div>
                           <div style={{ flex: 1 }}>
                              <div style={{ fontWeight: '800', fontSize: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                               {p.full_name}
+                               {p.full_name || p.patient_name}
                                <span style={{ fontSize: '9px', fontWeight: '800', color: 'var(--leh-text-muted)', background: 'var(--leh-bg-light)', padding: '2px 6px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                  <Clock size={10} /> 
-                                 {formatDateStandard(p.visit_date)} • {new Date(p.visit_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                 {formatDateStandard(p.checkin_at)} • {new Date(p.checkin_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                </span>
                              </div>
                              <div style={{ fontSize: '10px', color: 'var(--leh-text-muted)', fontWeight: '700', marginTop: '2px' }}>#{p.file_number || p.patient_id || p.id} • {calculateAge(p.dob)}Y • {p.gender}</div>
@@ -998,7 +1139,7 @@ export const Consultations: React.FC = () => {
            ) : (
               <div className="custom-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
                  <h3 style={{ fontSize: '10px', fontWeight: '900', color: 'var(--leh-text-muted)', margin: '0 12px 16px', letterSpacing: '0.1em' }}>CLINICAL SECTIONS (PRD 6.5)</h3>
-                 {menuItems.map(item => (
+                     {menuItems.map(item => (
                     <button
                       key={item.id}
                       onClick={() => {
@@ -1045,7 +1186,14 @@ export const Consultations: React.FC = () => {
         </div>
 
         {/* RIGHT PANEL: WORKSPACE */}
-          <div className="custom-scrollbar" style={{ flex: 1, overflowY: 'auto', background: '#f1f5f9', padding: '32px' }}>
+          <div className="custom-scrollbar" style={{ 
+            flex: 1, 
+            overflow: 'auto', 
+            background: '#f1f5f9', 
+            padding: '48px', 
+            display: 'block', 
+            position: 'relative' 
+          }}>
             {!selectedPatient ? (
               <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
                 <Stethoscope size={64} style={{ color: 'var(--leh-border)', marginBottom: '24px' }} />
@@ -1053,7 +1201,7 @@ export const Consultations: React.FC = () => {
                 <p style={{ color: 'var(--leh-text-muted)', maxWidth: '400px', marginTop: '12px' }}>Choose a patient from the queue on the left to start their clinical consultation.</p>
               </div>
             ) : (
-               <div className="leh-table-card animate-slide-up" style={{ padding: '40px', maxWidth: '1000px', margin: '0 auto', minHeight: '100%', boxShadow: '0 10px 40px rgba(0,0,0,0.05)', borderRadius: '24px', border: '1px solid white' }}>
+               <div className="leh-table-card animate-slide-up" style={{ padding: '48px', maxWidth: '1800px', minWidth: '1400px', width: 'fit-content', margin: '0', minHeight: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.08)', borderRadius: '32px', border: '1px solid white', overflow: 'visible' }}>
                 {isDirty && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '12px', marginBottom: '24px', color: '#92400e', fontSize: '12px', fontWeight: '700' }} className="animate-fade-in">
                     <AlertTriangle size={16} />
@@ -1291,61 +1439,73 @@ export const Consultations: React.FC = () => {
       {/* MODALS */}
       {showTriageModal && (
         <div className="leh-modal-overlay">
-           <div className="leh-modal-content" style={{ maxWidth: '520px' }}>
+           <div className="leh-modal-content" style={{ maxWidth: '600px' }}>
               <div className="leh-modal-header">
                  <div className="leh-modal-title">
-                    <Activity style={{ color: 'var(--leh-primary)' }} />
+                    <Activity size={28} />
                     <span>Baseline Triage Reference</span>
                  </div>
+                 <div className="leh-modal-subtitle">Patient Vital Signs & Critical Alerts History</div>
                  <button className="leh-modal-close" onClick={() => setShowTriageModal(false)}><X size={20} /></button>
               </div>
-              <div className="leh-modal-body" style={{ padding: '32px' }}>
+              <div className="leh-modal-body" style={{ padding: '40px' }}>
                  {triageData ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                       <div className="leh-form-section" style={{ border: 'none', padding: 0, margin: 0 }}>
-                          <h4 className="leh-form-section-title">Physiological Vitals</h4>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-                             <div style={{ padding: '16px', background: 'var(--leh-bg-light)', borderRadius: '16px', border: '1px solid var(--leh-border-light)' }}>
-                                <p className="leh-label" style={{ fontSize: '10px', marginBottom: '4px' }}>BLOOD PRESSURE</p>
-                                <p className="leh-table-bold" style={{ fontSize: '18px', margin: 0 }}>{triageData.bp_systolic}/{triageData.bp_diastolic} <small style={{ fontSize: '11px', color: 'var(--leh-text-muted)' }}>mmHg</small></p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                       <div>
+                          <div className="leh-form-section-title" style={{ marginBottom: '24px' }}>Physiological Vitals</div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
+                             <div className="eye-card" style={{ padding: '20px' }}>
+                                <p style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>Blood Pressure</p>
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                                   <span style={{ fontSize: '24px', fontWeight: '900', color: '#1e293b' }}>{triageData.bp_systolic}/{triageData.bp_diastolic}</span>
+                                   <span style={{ fontSize: '13px', fontWeight: '700', color: '#94a3b8' }}>mmHg</span>
+                                </div>
                              </div>
-                             <div style={{ padding: '16px', background: 'var(--leh-bg-light)', borderRadius: '16px', border: '1px solid var(--leh-border-light)' }}>
-                                <p className="leh-label" style={{ fontSize: '10px', marginBottom: '4px' }}>PULSE RATE</p>
-                                <p className="leh-table-bold" style={{ fontSize: '18px', margin: 0 }}>{triageData.pulse_rate} <small style={{ fontSize: '11px', color: 'var(--leh-text-muted)' }}>bpm</small></p>
+                             <div className="eye-card" style={{ padding: '20px' }}>
+                                <p style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>Pulse Rate</p>
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                                   <span style={{ fontSize: '24px', fontWeight: '900', color: '#1e293b' }}>{triageData.pulse_rate}</span>
+                                   <span style={{ fontSize: '13px', fontWeight: '700', color: '#94a3b8' }}>bpm</span>
+                                </div>
                              </div>
-                             <div style={{ padding: '16px', background: 'var(--leh-bg-light)', borderRadius: '16px', border: '1px solid var(--leh-border-light)' }}>
-                                <p className="leh-label" style={{ fontSize: '10px', marginBottom: '4px' }}>BODY TEMP</p>
-                                <p className="leh-table-bold" style={{ fontSize: '18px', margin: 0 }}>{triageData.temperature} <small style={{ fontSize: '11px', color: 'var(--leh-text-muted)' }}>°C</small></p>
+                             <div className="eye-card" style={{ padding: '20px' }}>
+                                <p style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>Body Temp</p>
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                                   <span style={{ fontSize: '24px', fontWeight: '900', color: '#1e293b' }}>{triageData.temperature}</span>
+                                   <span style={{ fontSize: '13px', fontWeight: '700', color: '#94a3b8' }}>°C</span>
+                                </div>
                              </div>
-                             <div style={{ padding: '16px', background: 'var(--leh-bg-light)', borderRadius: '16px', border: '1px solid var(--leh-border-light)' }}>
-                                <p className="leh-label" style={{ fontSize: '10px', marginBottom: '4px' }}>WEIGHT</p>
-                                <p className="leh-table-bold" style={{ fontSize: '18px', margin: 0 }}>{triageData.weight} <small style={{ fontSize: '11px', color: 'var(--leh-text-muted)' }}>kg</small></p>
+                             <div className="eye-card" style={{ padding: '20px' }}>
+                                <p style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>Body Weight</p>
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                                   <span style={{ fontSize: '24px', fontWeight: '900', color: '#1e293b' }}>{triageData.weight}</span>
+                                   <span style={{ fontSize: '13px', fontWeight: '700', color: '#94a3b8' }}>kg</span>
+                                </div>
                              </div>
                           </div>
                        </div>
 
-                       <div className="leh-form-section" style={{ border: 'none', padding: 0, margin: 0 }}>
-                          <h4 className="leh-form-section-title">Critical Alerts</h4>
-                          <div style={{ padding: '20px', background: triageData.allergies ? '#fff1f2' : 'var(--leh-bg-light)', borderRadius: '16px', border: triageData.allergies ? '1px solid #fda4af' : '1px solid var(--leh-border-light)' }}>
-                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                                <AlertTriangle size={18} color={triageData.allergies ? '#e11d48' : 'var(--leh-text-muted)'} />
-                                <span className="leh-table-bold" style={{ color: triageData.allergies ? '#e11d48' : 'var(--leh-text-dark)' }}>DRUG & ENVIRONMENTAL ALLERGIES</span>
-                             </div>
-                             <p className="leh-label" style={{ color: triageData.allergies ? '#be123c' : 'var(--leh-text-muted)', fontSize: '14px', fontWeight: triageData.allergies ? '800' : '600' }}>
-                                {triageData.allergies || 'NO KNOWN ALLERGIES REPORTED BY PATIENT'}
-                             </p>
+                       <div style={{ padding: '24px', background: triageData.allergies ? '#fff1f2' : '#f8fafc', borderRadius: '20px', border: triageData.allergies ? '2px solid #fda4af' : '1px solid #e2e8f0' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                             <AlertTriangle size={20} color={triageData.allergies ? '#e11d48' : '#64748b'} />
+                             <span style={{ fontSize: '12px', fontWeight: '900', color: triageData.allergies ? '#e11d48' : '#1e293b', textTransform: 'uppercase' }}>Clinical Alerts & Allergies</span>
                           </div>
+                          <p style={{ color: triageData.allergies ? '#be123c' : '#475569', fontSize: '15px', fontWeight: triageData.allergies ? '700' : '500', lineHeight: '1.6', margin: 0 }}>
+                             {triageData.allergies || 'Patient reports no known drug or environmental allergies.'}
+                          </p>
                        </div>
                     </div>
                  ) : (
-                    <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                       <Info size={48} color="var(--leh-border)" style={{ marginBottom: '16px' }} />
-                       <p className="leh-label">No baseline triage data available for this visit.</p>
+                    <div style={{ textAlign: 'center', padding: '60px 0' }}>
+                       <div style={{ width: '80px', height: '80px', background: '#f8fafc', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                          <Info size={40} color="#cbd5e1" />
+                       </div>
+                       <p style={{ fontSize: '16px', fontWeight: '600', color: '#64748b' }}>No triage data available for this visit.</p>
                     </div>
                  )}
               </div>
               <div className="leh-modal-footer">
-                 <button className="leh-btn-primary" style={{ width: '100%', height: '48px' }} onClick={() => setShowTriageModal(false)}>CLOSE REFERENCE</button>
+                 <button className="leh-btn-primary" style={{ width: '100%', height: '54px', borderRadius: '16px' }} onClick={() => setShowTriageModal(false)}>Acknowledge & Close</button>
               </div>
            </div>
         </div>
@@ -1353,33 +1513,37 @@ export const Consultations: React.FC = () => {
 
       {showSendBackModal && (
         <div className="leh-modal-overlay">
-           <div className="leh-modal-content" style={{ maxWidth: '480px' }}>
+           <div className="leh-modal-content" style={{ maxWidth: '500px' }}>
               <div className="leh-modal-header">
                  <div className="leh-modal-title">
-                    <RefreshCcw style={{ color: 'var(--leh-red)' }} />
-                    <span>Revert to Triage Registry</span>
+                    <RefreshCcw size={28} style={{ color: '#ef4444' }} />
+                    <span>Revert to Triage</span>
                  </div>
+                 <div className="leh-modal-subtitle">Patient Queue Reversion Protocol</div>
                  <button className="leh-modal-close" onClick={() => setShowSendBackModal(false)}><X size={20} /></button>
               </div>
-              <div className="leh-modal-body" style={{ padding: '32px' }}>
-                 <p className="leh-label" style={{ marginBottom: '20px', fontSize: '14px' }}>
-                    Are you sure you want to send <strong style={{ color: 'var(--leh-text-dark)' }}>{selectedPatient?.full_name}</strong> back to the Triage queue?
-                 </p>
+              <div className="leh-modal-body" style={{ padding: '40px' }}>
+                 <div style={{ display: 'flex', gap: '16px', padding: '20px', background: '#fef2f2', borderRadius: '16px', border: '1px solid #fee2e2', marginBottom: '32px' }}>
+                    <AlertCircle size={24} color="#ef4444" style={{ flexShrink: 0 }} />
+                    <p style={{ fontSize: '14px', fontWeight: '600', color: '#991b1b', lineHeight: '1.5', margin: 0 }}>
+                       You are about to revert <strong style={{ color: '#000' }}>{selectedPatient?.full_name}</strong> to the Triage Registry. This will reset their consultation status.
+                    </p>
+                 </div>
                  <div className="leh-form-group">
-                    <label className="leh-label">REASON FOR REVERSION</label>
+                    <label className="clinical-label-premium">Reason for Reversion</label>
                     <textarea 
-                      className="leh-textarea" 
+                      className="clinical-textarea" 
                       value={sendBackNote} 
                       onChange={(e) => setSendBackNote(e.target.value)} 
-                      placeholder="e.g. Vitals need re-checking, patient requested break..." 
-                      style={{ height: '120px', paddingTop: '16px' }} 
+                      placeholder="Specify clinical or administrative reason for reversion..." 
+                      style={{ height: '140px' }} 
                     />
                  </div>
               </div>
               <div className="leh-modal-footer">
-                 <button className="leh-btn-outline" style={{ flex: 1, height: '48px' }} onClick={() => setShowSendBackModal(false)}>CANCEL</button>
-                 <button className="leh-btn-primary" style={{ flex: 1, height: '48px', background: 'var(--leh-red)' }} onClick={handleSendBack}>
-                    <RefreshCcw size={16} /> CONFIRM REVERSION
+                 <button className="leh-btn-outline" style={{ flex: 1, height: '54px', borderRadius: '16px', border: '1px solid #e2e8f0' }} onClick={() => setShowSendBackModal(false)}>Cancel</button>
+                 <button className="leh-btn-primary" style={{ flex: 1, height: '54px', borderRadius: '16px', background: '#ef4444', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)' }} onClick={handleSendBack}>
+                    Confirm Reversion
                  </button>
               </div>
            </div>

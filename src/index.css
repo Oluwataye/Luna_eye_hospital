@@ -586,6 +586,7 @@ button:disabled {
 .leh-modal-body {
   padding: 40px;
   overflow-y: auto;
+  overflow-x: auto;
   flex-grow: 1;
   background: #ffffff;
 }

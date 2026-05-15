@@ -97,7 +97,7 @@ export const Triage: React.FC = () => {
 
   useEffect(() => { 
     loadQueue(); 
-    const interval = setInterval(loadQueue, 10000);
+    const interval = setInterval(loadQueue, 5000);
     return () => clearInterval(interval);
   }, [loadQueue]);
 
@@ -121,9 +121,6 @@ export const Triage: React.FC = () => {
         ...formData,
         triaged_by: user?.full_name || user?.username
       });
-      
-      // Explicitly move patient to consultation queue to ensure visibility in matrix
-      await api.updateVisitStatus(selectedVisit.id, PatientStatus.WAITING_FOR_CONSULTATION, user?.full_name || user?.username);
       
       notify('success', `${selectedVisit.full_name} triage completed. Patient sent to consultation queue.`);
       setSelectedVisit(null);
@@ -285,10 +282,10 @@ export const Triage: React.FC = () => {
                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
                         <div className="leh-date-display" style={{ alignItems: 'flex-end' }}>
                            <span className="leh-date-main" style={{ fontSize: '11px', color: selectedVisit?.id === visit.id ? 'var(--leh-primary)' : 'inherit' }}>
-                              {new Date(visit.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {new Date(visit.checkin_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                            </span>
                            <span className="leh-date-sub" style={{ fontSize: '9px' }}>
-                              {new Date(visit.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                              {new Date(visit.checkin_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
                            </span>
                         </div>
                         <ChevronRight size={16} style={{ color: selectedVisit?.id === visit.id ? 'var(--leh-primary)' : 'var(--leh-border)', transform: selectedVisit?.id === visit.id ? 'translateX(4px)' : 'none', transition: 'transform 0.2s' }} />

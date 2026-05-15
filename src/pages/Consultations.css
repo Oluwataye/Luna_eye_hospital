@@ -1,10 +1,11 @@
 .consultations-page-container {
-  padding: 2.5rem;
-  max-width: 1800px;
-  margin: 0 auto;
+  height: calc(100vh - 80px);
+  overflow: hidden;
+  display: flex;
+  background: #f8fafc;
 }
 
-/* Form Controls Clinical Style */
+/* Core Clinical Controls */
 .clinical-input {
   width: 100%;
   height: 3.5rem;
@@ -19,40 +20,105 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
-.clinical-input:focus {
+/* --- Clinical Card Enhancements --- */
+.clinical-section-card {
   background: white;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
-  outline: none;
+  border-radius: 20px;
+  padding: 32px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.05),
+    0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  margin-bottom: 24px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.clinical-input::placeholder {
-  color: #cbd5e1;
-  font-weight: 500;
+.clinical-section-card:hover {
+  border-color: var(--leh-primary-light);
+  box-shadow: 
+    0 10px 15px -3px rgba(0, 0, 0, 0.08),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.eye-comparison-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 16px;
+}
+
+.eye-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 24px;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.eye-card:hover {
+  background: #ffffff;
+  border-color: var(--leh-primary);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
+}
+
+.eye-badge {
+  position: absolute;
+  top: -12px;
+  left: 20px;
+  padding: 4px 14px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: white;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.badge-od {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+}
+
+.badge-os {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.clinical-label-premium {
+  font-size: 12px;
+  font-weight: 800;
+  color: #64748b;
+  margin-bottom: 12px;
+  display: block;
+  letter-spacing: 0.02em;
+}
+
+.clinical-input, .clinical-textarea, .clinical-select {
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 0 16px;
+  height: 46px;
+  font-size: 14px;
+  font-weight: 600;
+  width: 100%;
+  color: #1e293b;
+  transition: all 0.2s ease;
+}
+
+.clinical-input:focus, .clinical-textarea:focus, .clinical-select:focus {
+  background: #ffffff;
+  border-color: var(--leh-primary);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+  outline: none;
 }
 
 .clinical-textarea {
-  width: 100%;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 1.5rem;
-  padding: 1.25rem;
-  font-size: 14px;
-  font-weight: 600;
-  color: #1e293b;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  resize: none;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  height: auto;
+  min-height: 100px;
+  padding: 12px 16px;
 }
 
-.clinical-textarea:focus {
-  background: white;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
-  outline: none;
-}
-
-/* Animation utilities for the clinical workspace */
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
@@ -62,36 +128,295 @@
   animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Custom Scrollbar for Workspace */
-.consultations-page-container ::-webkit-scrollbar {
-  width: 6px;
+/* Premium Form Feature Refinements (Dropdowns, Time, Checkbox) */
+
+/* Custom Select Styling */
+select.clinical-input {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1.25rem center;
+  background-size: 1.2rem;
+  padding-right: 3.5rem;
+  cursor: pointer;
 }
 
-.consultations-page-container ::-webkit-scrollbar-track {
+select.clinical-input:hover {
+  border-color: #cbd5e1;
+  background-color: #f8fafc;
+}
+
+/* Custom Date/Time Styling */
+input[type="time"].clinical-input,
+input[type="date"].clinical-input {
+  position: relative;
+  cursor: pointer;
+  padding-right: 1rem;
+}
+
+input[type="time"].clinical-input::-webkit-calendar-picker-indicator,
+input[type="date"].clinical-input::-webkit-calendar-picker-indicator {
   background: transparent;
+  bottom: 0;
+  color: transparent;
+  cursor: pointer;
+  height: auto;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: auto;
 }
 
-.consultations-page-container ::-webkit-scrollbar-thumb {
-  background: #e2e8f0;
+/* Label for Checkbox Grouping */
+.checkbox-clinical-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 1rem 1.5rem;
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  border-radius: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.checkbox-clinical-container:hover {
+  background: #eff6ff;
+  border-color: #dbeafe;
+}
+
+/* Modern Checkbox styling */
+input[type="checkbox"].clinical-checkbox {
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border: 2px solid #cbd5e1;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+  margin: 0;
+}
+
+input[type="checkbox"].clinical-checkbox:checked {
+  background: #2563eb;
+  border-color: #2563eb;
+  transform: scale(1.05);
+}
+
+input[type="checkbox"].clinical-checkbox:checked::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 2px;
+  width: 6px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg);
+}
+
+input[type="checkbox"].clinical-checkbox:focus {
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
+  outline: none;
+}
+
+/* Enhanced Clinical UI System (PRD 6.5) */
+.clinical-section-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 2rem;
+  padding: 3rem;
+  margin-bottom: 2.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.04), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow-x: auto;
+}
+
+.clinical-group-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 2rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 2px solid #f1f5f9;
+}
+
+.clinical-group-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.eye-comparison-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+  gap: 32px;
+  margin-bottom: 2rem;
+}
+
+.eye-card {
+  padding: 2.5rem;
+  background: #f8fafc;
+  border-radius: 1.5rem;
+  border: 1px solid #f1f5f9;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.eye-card:focus-within {
+  background: white;
+  border-color: #2563eb;
+  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.05);
+}
+
+.eye-badge {
+  display: inline-flex;
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+
+.badge-od { background: #eff6ff; color: #1d4ed8; }
+.badge-os { background: #fef2f2; color: #b91c1c; }
+
+.clinical-label-premium {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+  margin-bottom: 8px;
+}
+
+.medication-terminal-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1.5fr auto;
+  gap: 16px;
+  padding: 20px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.medication-terminal-row:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.04);
+  border-color: #2563eb;
+}
+
+.clinical-indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.dot-elevated { background: #ef4444; box-shadow: 0 0 10px rgba(239, 68, 68, 0.4); animation: pulse 2s infinite; }
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.5; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* --- STICKY SECTION HEADER --- */
+.section-header-sticky {
+  position: sticky;
+  top: -48px; /* Offset to align with workspace padding */
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 20px 40px;
+  margin: -48px -48px 32px -48px;
+  border-bottom: 1px solid var(--leh-border-light);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+}
+
+.section-header-sticky h2 {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--leh-text-dark);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+}
+/* --- MODERN SCROLLBARS --- */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 8px; /* Slightly taller for horizontal visibility */
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.02);
   border-radius: 10px;
 }
-
-.consultations-page-container ::-webkit-scrollbar-thumb:hover {
+.custom-scrollbar::-webkit-scrollbar-thumb {
   background: #cbd5e1;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
-/* Tab Navigation Adjustments */
-.sticky-nav-active {
-  position: sticky;
-  top: 100px;
+/* Sidebar Tab Styling */
+.leh-tab-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 16px 20px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+  border-radius: 14px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-bottom: 6px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
 }
 
-/* Clinical Med Row refined hover */
-.medication-terminal-row:hover {
-  border-color: #2563eb !important;
-  background-color: #ffffff !important;
-  transform: scale(1.01);
+.leh-tab-item:hover {
+  background: #f1f5f9;
+  color: var(--leh-primary);
+  transform: translateX(4px);
 }
+
+.leh-tab-item.active {
+  background: #eff6ff;
+  color: var(--leh-primary);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
+}
+
+.leh-tab-item.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--leh-primary);
+  border-radius: 0 4px 4px 0;
+}
+
 /* Print Optimization for Clinical Reports */
 @media print {
   body * {
@@ -116,4 +441,36 @@
     size: auto;
     margin: 15mm;
   }
+}
+
+/* --- Navigation & Layout Final Polish --- */
+.consultations-page-container {
+  z-index: 10;
+  position: relative;
+}
+
+/* Hide global footer when in high-density clinical mode */
+.consultations-page-container ~ .app-footer,
+.consultations-page-container .app-footer {
+  display: none !important;
+}
+
+/* Sidebar Alignment */
+.leh-tab-item span {
+  font-size: 13px;
+  letter-spacing: -0.01em;
+}
+
+.leh-tab-item svg {
+  min-width: 18px;
+}
+
+/* Fix for nested scrollbars: disable main content scroll when consultations is active */
+body:has(.consultations-page-container) .main-content {
+  overflow: hidden !important;
+}
+
+/* Ensure workspace is the primary scroll container */
+.consultations-page-container .custom-scrollbar {
+  scroll-padding-top: 20px;
 }

@@ -277,18 +277,31 @@ const ReprintManagement: React.FC = () => {
                  value={filters.from_date} 
                  onChange={e => setFilters({...filters, from_date: e.target.value})} 
                />
-               <button 
-                 onClick={() => setFilters({...filters, flagged_only: !filters.flagged_only})} 
-                 className={`leh-btn-outline ${filters.flagged_only ? 'leh-btn-active' : ''}`}
-                 style={{ 
-                   height: '42px', 
-                   background: filters.flagged_only ? '#fef2f2' : 'white', 
-                   borderColor: filters.flagged_only ? '#ef4444' : 'var(--leh-border-light)', 
-                   color: filters.flagged_only ? '#ef4444' : 'var(--leh-text-grey)' 
-                 }}
-               >
-                  <Flag size={14} /> {filters.flagged_only ? 'VIEWING: FLAGGED ONLY' : 'VIEWING: ALL LOGS'}
-               </button>
+                <button 
+                  onClick={() => setFilters({
+                    from_date: '',
+                    to_date: '',
+                    user_name: '',
+                    search: '',
+                    flagged_only: false
+                  })} 
+                  className="leh-btn-outline"
+                  style={{ height: '42px', fontSize: '11px', fontWeight: 'bold' }}
+                >
+                  <RefreshCcw size={14} /> RESET ALL FILTERS
+                </button>
+                <button 
+                  onClick={() => setFilters({...filters, flagged_only: !filters.flagged_only})} 
+                  className={`leh-btn-outline ${filters.flagged_only ? 'leh-btn-active' : ''}`}
+                  style={{ 
+                    height: '42px', 
+                    background: filters.flagged_only ? '#fef2f2' : 'white', 
+                    borderColor: filters.flagged_only ? '#ef4444' : 'var(--leh-border-light)', 
+                    color: filters.flagged_only ? '#ef4444' : 'var(--leh-text-grey)' 
+                  }}
+                >
+                   <Flag size={14} /> {filters.flagged_only ? 'SHOWING: FLAGGED ONLY' : 'SHOWING: ALL LOGS'}
+                </button>
             </div>
           </div>
           <div className="leh-table-wrapper">
@@ -308,10 +321,10 @@ const ReprintManagement: React.FC = () => {
                     <td style={{ paddingLeft: '32px' }}>
                        <div className="leh-date-display">
                           <span className="leh-date-main">
-                            {formatDateStandard(log.created_at)}
-                          </span>
-                         <span className="leh-date-sub">
-                           {new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                             {formatDateStandard(log.reprint_timestamp)}
+                           </span>
+                          <span className="leh-date-sub">
+                            {new Date(log.reprint_timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                          </span>
                        </div>
                     </td>
@@ -322,7 +335,7 @@ const ReprintManagement: React.FC = () => {
                        </div>
                     </td>
                     <td className="leh-table-bold">{log.patient_name || 'N/A'}</td>
-                    <td className="leh-table-bold" style={{ color: 'var(--leh-primary)' }}>{log.operator_name}</td>
+                    <td className="leh-table-bold" style={{ color: 'var(--leh-primary)' }}>{log.reprinted_by_name}</td>
                     <td style={{ paddingRight: '32px', textAlign: 'right' }}>
                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                           <button onClick={() => setReprintReceiptNo(log.receipt_number)} className="leh-refresh-btn" title="View & Print Receipt Preview" aria-label="View Receipt"><Eye size={14} /></button>
@@ -358,8 +371,8 @@ const ReprintManagement: React.FC = () => {
                         {r.role?.toUpperCase() || 'USER'}
                       </span>
                     </td>
-                    <td className="leh-label">{r.reason}</td>
-                    <td className="leh-label font-bold">{new Date(r.created_at).toLocaleString()}</td>
+                    <td className="leh-label">{r.restriction_reason}</td>
+                    <td className="leh-label font-bold">{new Date(r.restricted_at).toLocaleString()}</td>
                     <td style={{ paddingRight: '32px', textAlign: 'right' }}>
                        <button onClick={() => handleRemoveRestriction(r.user_id)} className="leh-btn-outline" style={{ height: '32px', padding: '0 12px', fontSize: '11px', color: 'var(--leh-red)', borderColor: '#fecaca' }}>
                           RESTORE ACCESS

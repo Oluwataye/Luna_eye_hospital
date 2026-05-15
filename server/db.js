@@ -192,6 +192,8 @@ const db = new sqlite3.Database(dbPath, (err) => {
         status TEXT,
         checkin_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         checkin_by TEXT,
+        started_at DATETIME,
+        consultant_name TEXT,
         FOREIGN KEY(patient_id) REFERENCES patients(id),
         FOREIGN KEY(visit_id) REFERENCES visits(id)
       )`);
@@ -525,6 +527,21 @@ const db = new sqlite3.Database(dbPath, (err) => {
           if (!err && columns && !columns.some(c => c.name === col.name)) {
             db.run(`ALTER TABLE patients ADD COLUMN ${col.name} ${col.type}`);
             console.log(`Migration: Added '${col.name}' column to patients table.`);
+          }
+        });
+      });
+
+      // Consultation Queue Expansion Migration
+      const queueCols = [
+        { name: 'started_at', type: 'DATETIME' },
+        { name: 'consultant_name', type: 'TEXT' }
+      ];
+
+      queueCols.forEach(col => {
+        db.all(`PRAGMA table_info(consultation_queue)`, (err, columns) => {
+          if (!err && columns && !columns.some(c => c.name === col.name)) {
+            db.run(`ALTER TABLE consultation_queue ADD COLUMN ${col.name} ${col.type}`);
+            console.log(`Migration: Added '${col.name}' column to consultation_queue table.`);
           }
         });
       });

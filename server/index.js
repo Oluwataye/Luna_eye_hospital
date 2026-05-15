@@ -247,7 +247,7 @@ app.post('/api/users', authorizeRoles(['Admin']), (req, res) => {
         }
         return res.status(500).json({ error: err.message });
       }
-      logAudit(null, 'Admin', 'Admin', 'USER_CREATE', 'Users', `Created new user: ${username} (${role})`, 'Critical');
+      logAudit(req.user.id, req.user.username, req.user.role, 'USER_CREATE', 'Users', `Created new user: ${username} (${role})`, 'Critical');
       res.status(201).json({ id: this.lastID, username, full_name, role, department: department || 'General', status: 'Active' });
     }
   );
@@ -674,10 +674,13 @@ app.get('/api/queue', (req, res) => {
 // GET triage queue — all patients ready for nursing assessment
 apiRouter.get('/triage-queue', (req, res) => {
   db.all(`
-    SELECT q.*, p.gender, p.dob, p.phone, p.blood_group, p.allergies
+    SELECT q.*, p.full_name, p.gender, p.dob, p.phone, p.blood_group, p.allergies
     FROM triage_queue q
-    JOIN patients p ON q.patient_id = p.id
-    WHERE date(q.checkin_at, 'localtime') = date('now', 'localtime')
+    JOIN patients p ON CAST(q.patient_id AS TEXT) = CAST(p.id AS TEXT)
+    WHERE (
+      date(q.checkin_at, 'localtime') = date('now', 'localtime')
+      OR (strftime('%s','now') - strftime('%s', q.checkin_at)) < 86400
+    )
     ORDER BY q.checkin_at ASC
   `, [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
@@ -688,7 +691,7 @@ apiRouter.get('/triage-queue', (req, res) => {
 // GET consultation queue — all patients ready for clinician review or currently being seen
 apiRouter.get('/consultation-queue', (req, res) => {
   db.all(`
-    SELECT q.*, p.gender, p.dob, p.phone,
+    SELECT q.*, p.full_name, p.gender, p.dob, p.phone,
            COALESCE(t.complaint, q.patient_name) as complaint
     FROM consultation_queue q
     JOIN patients p ON CAST(q.patient_id AS TEXT) = CAST(p.id AS TEXT)
