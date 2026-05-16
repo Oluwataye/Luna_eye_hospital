@@ -1,0 +1,23 @@
+VISIONCARE EMR CONCURRENT CONFIGURATION CHANGES LOG
+================================================
+
+DATE/TIME: 2026-05-16 10:25 AM
+------------------------------
+
+1. FILE: server/.env
+   ORIGINAL: PORT=80
+   NEW: PORT=3200
+   REASON: Reallocate port to avoid conflict with PharmCare Pro.
+
+2. FILE: StartVisionCareEMR.vbs
+   ORIGINAL: strURL = "http://localhost", findstr :80
+   NEW: strURL = "http://localhost:3200", findstr :3200
+   REASON: Update startup monitoring and browser launch URL.
+
+3. FILE: VisionCare-EMR.vbs
+   ORIGINAL: WshShell.Run "http://localhost", 9, False
+   NEW: WshShell.Run "http://localhost:3200", 9, False
+   REASON: Ensure direct desktop launcher opens the correct port.
+
+------------------------------
+END OF LOG

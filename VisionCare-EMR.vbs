@@ -14,7 +14,7 @@ WScript.Sleep 3000
 
 ' 3. Open the browser directly to the application
 ' It will use the default browser
-WshShell.Run "http://localhost", 9, False
+WshShell.Run "http://localhost:3200", 9, False
 
 Set WshShell = Nothing
 Set FSO = Nothing

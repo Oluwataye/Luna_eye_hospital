@@ -4,7 +4,7 @@ Set FSO = CreateObject("Scripting.FileSystemObject")
 ' Get the absolute path of the directory where this script is located
 strPath = FSO.GetParentFolderName(WScript.ScriptFullName)
 strDBPath = strPath & "\server\luna_eye_hospital.db"
-strURL = "http://localhost"
+strURL = "http://localhost:3200"
 
 On Error Resume Next
 
@@ -22,7 +22,7 @@ If Not FSO.FileExists(strDBPath) Then
 End If
 
 ' 3. Check if the application is already running (Port 80)
-Set objExec = WshShell.Exec("cmd /c netstat -ano | findstr :80")
+Set objExec = WshShell.Exec("cmd /c netstat -ano | findstr :3200")
 strOutput = objExec.StdOut.ReadAll
 
 If InStr(strOutput, "LISTENING") > 0 Then
