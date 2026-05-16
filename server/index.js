@@ -1234,7 +1234,7 @@ app.get('/api/consultations', (req, res) => {
 });
 
 // POST new consultation – accepts full clinical JSON
-app.post('/api/consultations', authorizeRoles(['Admin', 'Optometrist', 'Consultant']), (req, res) => {
+app.post('/api/consultations', authorizeRoles(['Admin', 'Optometrist', 'Consultant', 'Doctor']), (req, res) => {
   const data = req.body;
 
   // Only enforce strict validation if we are finalizing the visit

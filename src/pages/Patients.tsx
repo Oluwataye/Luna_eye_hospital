@@ -23,6 +23,8 @@ import { useNotification } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
 import { formatDateStandard } from '../utils/date';
 import { PatientStatus, StatusLabels } from '../constants/workflow';
+import { Modal } from '../components/Modal';
+import { FileText as FileIcon, Printer, ClipboardList, Info } from 'lucide-react';
 
 interface PatientsProps {
   view?: 'list' | 'profile' | 'checkin';
@@ -45,6 +47,10 @@ export const Patients: React.FC<PatientsProps> = ({ view: initialView = 'list' }
 
   // Check-in state
   const [checkInLoading, setCheckInLoading] = useState<string | null>(null); // stores which action is loading
+
+  // Consultation Details Modal State
+  const [selectedConsultation, setSelectedConsultation] = useState<any>(null);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   const fetchPatients = async () => {
     setLoading(true);
@@ -209,7 +215,8 @@ export const Patients: React.FC<PatientsProps> = ({ view: initialView = 'list' }
                     <th style={{ paddingLeft: '24px' }}>DATE</th>
                     <th>COMPLAINT</th>
                     <th>CONSULTANT</th>
-                    <th style={{ textAlign: 'right', paddingRight: '24px' }}>DIAGNOSIS</th>
+                    <th>DIAGNOSIS</th>
+                    <th style={{ textAlign: 'right', paddingRight: '24px' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -224,9 +231,26 @@ export const Patients: React.FC<PatientsProps> = ({ view: initialView = 'list' }
                     clinicalHistory.map((h: any) => (
                       <tr key={h.id} className="leh-table-row">
                         <td style={{ paddingLeft: '24px' }}>{formatDateStandard(h.created_at)}</td>
-                        <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.chief_complaint || h.complaint || 'N/A'}</td>
+                        <td style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.chief_complaint || h.complaint || 'N/A'}</td>
                         <td className="leh-label">{h.consultant_name || 'N/A'}</td>
-                        <td style={{ textAlign: 'right', paddingRight: '24px' }} className="leh-label">{h.primary_diagnosis || '—'}</td>
+                        <td className="leh-label">{h.primary_diagnosis || '—'}</td>
+                        <td style={{ textAlign: 'right', paddingRight: '24px' }}>
+                          {['admin', 'optometrist', 'consultant', 'doctor'].includes((user?.role || '').toLowerCase()) ? (
+                            <button 
+                              className="leh-btn-outline" 
+                              style={{ height: '32px', padding: '0 10px', borderRadius: '8px', fontSize: '11px', color: 'var(--leh-primary)' }}
+                              onClick={() => {
+                                setSelectedConsultation(h);
+                                setShowHistoryModal(true);
+                              }}
+                            >
+                              <Eye size={12} />
+                              <span>DETAILS</span>
+                            </button>
+                          ) : (
+                            <span className="leh-label" style={{ fontSize: '10px', opacity: 0.5 }}>Restricted</span>
+                          )}
+                        </td>
                       </tr>
                     ))
                   )}
@@ -235,6 +259,165 @@ export const Patients: React.FC<PatientsProps> = ({ view: initialView = 'list' }
             </div>
           </main>
         </div>
+
+        {/* CONSULTATION HISTORY DETAILS MODAL */}
+        <Modal
+          isOpen={showHistoryModal}
+          onClose={() => setShowHistoryModal(false)}
+          title="Clinical Consultation Details"
+          maxWidth="900px"
+          icon={<ClipboardList size={24} style={{ color: 'var(--leh-primary)' }} />}
+        >
+          {selectedConsultation && (() => {
+            const h = selectedConsultation;
+            let clinicalData: any = {};
+            try {
+              clinicalData = typeof h.clinical_data === 'string' ? JSON.parse(h.clinical_data) : (h.clinical_data || {});
+            } catch (e) { console.error('Failed to parse clinical data', e); }
+
+            return (
+              <div style={{ padding: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', marginBottom: '30px', background: '#f8fafc', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                  <div>
+                    <p style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>Visit Date</p>
+                    <p style={{ fontSize: '16px', fontWeight: '900', margin: 0 }}>{formatDateStandard(h.created_at)}</p>
+                  </div>
+                  <div>
+                    <p style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>Consulting Clinician</p>
+                    <p style={{ fontSize: '16px', fontWeight: '900', margin: 0, color: 'var(--leh-primary)' }}>{h.consultant_name || 'System record'}</p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                  {/* Section: Complaint */}
+                  <section>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'var(--leh-primary-light)', color: 'var(--leh-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Info size={16} />
+                      </div>
+                      <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Chief Complaint & History</h4>
+                    </div>
+                    <div className="leh-table-card" style={{ padding: '20px', background: 'white' }}>
+                      <p style={{ margin: '0 0 12px 0', fontSize: '14px', lineHeight: '1.6' }}><strong>Complaint:</strong> {h.complaint || 'No complaint recorded.'}</p>
+                      <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.6', color: '#475569' }}><strong>Clinical History:</strong> {clinicalData.clinical_notes || 'No additional history recorded.'}</p>
+                    </div>
+                  </section>
+
+                  {/* Section: Vitals & VA */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
+                    <section>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'var(--leh-primary-light)', color: 'var(--leh-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Activity size={16} />
+                        </div>
+                        <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Baseline Vitals</h4>
+                      </div>
+                      <div className="leh-table-card" style={{ padding: '20px', background: 'white', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                         <div><span className="leh-label" style={{ fontSize: '11px' }}>BP</span><p style={{ margin: 0, fontWeight: '800' }}>{h.bp || 'N/A'}</p></div>
+                         <div><span className="leh-label" style={{ fontSize: '11px' }}>IOP (OD/OS)</span><p style={{ margin: 0, fontWeight: '800' }}>{h.iop_od || '-'}/{h.iop_os || '-'} <small>{clinicalData.iop_method}</small></p></div>
+                      </div>
+                    </section>
+
+                    <section>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'var(--leh-primary-light)', color: 'var(--leh-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Eye size={16} />
+                        </div>
+                        <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Visual Acuity</h4>
+                      </div>
+                      <div className="leh-table-card" style={{ padding: '0', background: 'white', overflow: 'hidden' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                          <thead>
+                            <tr style={{ background: '#f8fafc' }}>
+                              <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #eee' }}>Eye</th>
+                              <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #eee' }}>Unaided</th>
+                              <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #eee' }}>Pinhole</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}><strong>OD</strong></td>
+                              <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>{h.va_od_unaided || '-'}</td>
+                              <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>{h.va_od_pinhole || '-'}</td>
+                            </tr>
+                            <tr>
+                              <td style={{ padding: '8px' }}><strong>OS</strong></td>
+                              <td style={{ padding: '8px' }}>{h.va_os_unaided || '-'}</td>
+                              <td style={{ padding: '8px' }}>{h.va_os_pinhole || '-'}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+                  </div>
+
+                  {/* Section: Diagnosis & Management */}
+                  <section>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Stethoscope size={16} />
+                      </div>
+                      <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Diagnosis & Management Plan</h4>
+                    </div>
+                    <div className="leh-table-card" style={{ padding: '24px', background: 'white', borderLeft: '4px solid #10b981' }}>
+                      <div style={{ marginBottom: '20px' }}>
+                         <span className="leh-label" style={{ fontSize: '11px', display: 'block', marginBottom: '4px' }}>Primary Diagnosis</span>
+                         <p style={{ margin: 0, fontSize: '18px', fontWeight: '900', color: '#065f46' }}>{h.primary_diagnosis || 'No diagnosis recorded.'}</p>
+                         {h.diagnosis_notes && <p style={{ margin: '8px 0 0 0', fontSize: '13px', fontStyle: 'italic', color: '#64748b' }}>"{h.diagnosis_notes}"</p>}
+                      </div>
+                      <div>
+                         <span className="leh-label" style={{ fontSize: '11px', display: 'block', marginBottom: '4px' }}>Management Plan</span>
+                         <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{h.management_plan || 'N/A'}</p>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Section: Medications if any */}
+                  {clinicalData.plan_meds && clinicalData.plan_meds.length > 0 && (
+                    <section>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#fef2f2', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <ClipboardList size={16} />
+                        </div>
+                        <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Prescribed Medications</h4>
+                      </div>
+                      <div className="leh-table-card" style={{ padding: '0', background: 'white', overflow: 'hidden' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                          <thead>
+                            <tr style={{ background: '#fef2f2' }}>
+                              <th style={{ padding: '12px', textAlign: 'left' }}>Medication</th>
+                              <th style={{ padding: '12px', textAlign: 'left' }}>Dosage</th>
+                              <th style={{ padding: '12px', textAlign: 'left' }}>Frequency</th>
+                              <th style={{ padding: '12px', textAlign: 'left' }}>Duration</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {clinicalData.plan_meds.map((med: any, idx: number) => (
+                              <tr key={idx} style={{ borderTop: '1px solid #fee2e2' }}>
+                                <td style={{ padding: '12px', fontWeight: '700' }}>{med.drug_name} {med.strength}</td>
+                                <td style={{ padding: '12px' }}>{med.dose}</td>
+                                <td style={{ padding: '12px' }}>{med.frequency}</td>
+                                <td style={{ padding: '12px' }}>{med.duration}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+                  )}
+                </div>
+
+                <div style={{ marginTop: '40px', paddingTop: '20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                  <button className="leh-btn-outline" onClick={() => setShowHistoryModal(false)}>CLOSE</button>
+                  <button className="leh-btn-primary" onClick={() => window.print()}>
+                    <Printer size={18} />
+                    <span>PRINT RECORD</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+        </Modal>
       </div>
     );
   }

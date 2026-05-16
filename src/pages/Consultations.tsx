@@ -144,7 +144,9 @@ export const Consultations: React.FC = () => {
   ];
   const [showTriageModal, setShowTriageModal] = useState(false);
   const [showSendBackModal, setShowSendBackModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [triageData, setTriageData] = useState<any>(null);
+  const [historyList, setHistoryList] = useState<any[]>([]);
   const [sendBackNote, setSendBackNote] = useState('');
 
   const [formData, setFormData] = useState<any>({
@@ -217,6 +219,7 @@ export const Consultations: React.FC = () => {
   const fetchConsultation = useCallback(async (patientId: string, visitId: number) => {
     try {
       const consultations = await api.getConsultations(patientId);
+      setHistoryList(Array.isArray(consultations) ? consultations : []);
       const currentConsultation = consultations.find((c: any) => c.visit_id === visitId);
       if (currentConsultation) {
         let savedData = {};
@@ -1049,6 +1052,10 @@ export const Consultations: React.FC = () => {
                  <HistoryIcon size={16} />
                  <span style={{ fontSize: '11px' }}>VIEW TRIAGE</span>
               </button>
+              <button className="leh-btn-outline" onClick={() => setShowHistoryModal(true)} style={{ background: 'white', borderColor: 'var(--leh-primary)', color: 'var(--leh-primary)' }}>
+                 <ClipboardList size={16} />
+                 <span style={{ fontSize: '11px' }}>VIEW HISTORY</span>
+              </button>
               <button className="leh-btn-outline" onClick={() => {
                 notify('info', 'Preparing print layout...');
                 setTimeout(window.print, 500);
@@ -1546,6 +1553,84 @@ export const Consultations: React.FC = () => {
                  <button className="leh-btn-primary" style={{ flex: 1, height: '54px', borderRadius: '16px', background: '#ef4444', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)' }} onClick={handleSendBack}>
                     Confirm Reversion
                  </button>
+              </div>
+           </div>
+      {showHistoryModal && (
+        <div className="leh-modal-overlay">
+           <div className="leh-modal-content" style={{ maxWidth: '800px' }}>
+              <div className="leh-modal-header">
+                 <div className="leh-modal-title">
+                    <HistoryIcon size={28} style={{ color: 'var(--leh-primary)' }} />
+                    <span>Clinical Consultation History</span>
+                 </div>
+                 <div className="leh-modal-subtitle">Past clinical records for {selectedPatient?.full_name}</div>
+                 <button className="leh-modal-close" onClick={() => setShowHistoryModal(false)}><X size={20} /></button>
+              </div>
+              <div className="leh-modal-body" style={{ padding: '0' }}>
+                 {historyList && historyList.filter(h => h.visit_id !== selectedPatient?.visit_id).length > 0 ? (
+                    <div style={{ maxHeight: '60vh', overflowY: 'auto', padding: '32px' }}>
+                       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                          {historyList
+                            .filter(h => h.visit_id !== selectedPatient?.visit_id)
+                            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                            .map((h, idx) => {
+                               let cData: any = {};
+                               try { cData = typeof h.clinical_data === 'string' ? JSON.parse(h.clinical_data) : (h.clinical_data || {}); } catch(e) {}
+                               
+                               return (
+                                 <div key={idx} className="eye-card" style={{ padding: '24px', borderLeft: '4px solid var(--leh-primary)' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
+                                       <div>
+                                          <span style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Visit Date</span>
+                                          <p style={{ margin: 0, fontWeight: '900', color: '#1e293b' }}>{formatDateStandard(h.created_at)}</p>
+                                       </div>
+                                       <div style={{ textAlign: 'right' }}>
+                                          <span style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Clinician</span>
+                                          <p style={{ margin: 0, fontWeight: '700', color: 'var(--leh-primary)' }}>{h.consultant_name}</p>
+                                       </div>
+                                    </div>
+                                    <div style={{ marginBottom: '12px' }}>
+                                       <span className="leh-label" style={{ fontSize: '10px' }}>PRIMARY DIAGNOSIS</span>
+                                       <p style={{ margin: '2px 0 0 0', fontWeight: '800', color: '#059669' }}>{h.primary_diagnosis || 'None recorded'}</p>
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                       <div>
+                                          <span className="leh-label" style={{ fontSize: '10px' }}>CHIEF COMPLAINT</span>
+                                          <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#475569' }}>{h.complaint || 'N/A'}</p>
+                                       </div>
+                                       <div>
+                                          <span className="leh-label" style={{ fontSize: '10px' }}>MANAGEMENT PLAN</span>
+                                          <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#475569' }}>{h.management_plan || 'N/A'}</p>
+                                       </div>
+                                    </div>
+                                    {cData.plan_meds && cData.plan_meds.length > 0 && (
+                                       <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #f1f5f9' }}>
+                                          <span className="leh-label" style={{ fontSize: '10px' }}>PRESCRIBED MEDICATIONS</span>
+                                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
+                                             {cData.plan_meds.map((m: any, i: number) => (
+                                                <span key={i} className="leh-status-badge blue" style={{ fontSize: '10px' }}>{m.drug_name} {m.strength} ({m.frequency})</span>
+                                             ))}
+                                          </div>
+                                       </div>
+                                    )}
+                                 </div>
+                               );
+                            })
+                          }
+                       </div>
+                    </div>
+                 ) : (
+                    <div style={{ textAlign: 'center', padding: '80px 32px' }}>
+                       <div style={{ width: '80px', height: '80px', background: '#f8fafc', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                          <HistoryIcon size={40} color="#cbd5e1" />
+                       </div>
+                       <h3 style={{ margin: '0 0 8px 0', color: '#1e293b' }}>No Previous History</h3>
+                       <p style={{ margin: 0, color: '#64748b' }}>This appears to be the first consultation for this patient record.</p>
+                    </div>
+                 )}
+              </div>
+              <div className="leh-modal-footer">
+                 <button className="leh-btn-primary" style={{ width: '100%', height: '54px', borderRadius: '16px' }} onClick={() => setShowHistoryModal(false)}>Acknowledge & Close</button>
               </div>
            </div>
         </div>
