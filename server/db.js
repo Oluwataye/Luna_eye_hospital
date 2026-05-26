@@ -22,7 +22,9 @@ const db = new sqlite3.Database(dbPath, (err) => {
     db.run('PRAGMA mmap_size = 134217728');
     // Enable foreign key enforcement
     db.run('PRAGMA foreign_keys = ON');
-    console.log('[DB] PRAGMAs set: WAL mode, 16 MB cache, memory temp store');
+    // Set busy timeout to 10 seconds to avoid SQLITE_BUSY errors under concurrency
+    db.run('PRAGMA busy_timeout = 10000');
+    console.log('[DB] PRAGMAs set: WAL mode, 16 MB cache, memory temp store, busy timeout 10s');
     
     // Create required tables
     db.serialize(() => {

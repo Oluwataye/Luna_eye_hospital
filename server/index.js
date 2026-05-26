@@ -1,3 +1,4 @@
+process.env.UV_THREADPOOL_SIZE = 64; // Scale up Node's internal thread pool for SQLite & bcrypt concurrency
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
@@ -579,7 +580,7 @@ app.post('/api/patients', authorizeRoles(['Admin', 'Receptionist']), (req, res) 
       console.log(`Generating Patient ID: ${id} (Previous: ${lastPatient ? lastPatient.id : 'None'})`);
       
       db.serialize(() => {
-        db.run('BEGIN TRANSACTION');
+        db.run('BEGIN IMMEDIATE TRANSACTION');
         
         const stmt = db.prepare(`
           INSERT INTO patients (
@@ -726,7 +727,7 @@ app.put('/api/visits/:id/status', (req, res) => {
   const { status, performed_by, reason } = req.body;
   
   db.serialize(() => {
-    db.run('BEGIN TRANSACTION');
+    db.run('BEGIN IMMEDIATE TRANSACTION');
     
     // 1. Update visits table
     db.run('UPDATE visits SET status = ? WHERE id = ?', [status, id], function(err) {
@@ -889,7 +890,7 @@ app.post('/api/triage', authorizeRoles(['Admin', 'Nurse']), (req, res) => {
   if (!patient_id) return res.status(400).json({ error: 'patient_id is required' });
 
   db.serialize(() => {
-    db.run('BEGIN TRANSACTION');
+    db.run('BEGIN IMMEDIATE TRANSACTION');
 
     db.get('SELECT id FROM triage WHERE visit_id = ?', [visit_id], (err, existing) => {
       if (err) {
@@ -1053,7 +1054,7 @@ app.post('/api/transactions', authorizeRoles(['Admin', 'Receptionist']), (req, r
   const receipt_no = `REC-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000)}`;
   
   db.serialize(() => {
-    db.run('BEGIN TRANSACTION');
+    db.run('BEGIN IMMEDIATE TRANSACTION');
     
     const sql = `
       INSERT INTO transactions (
@@ -1217,7 +1218,7 @@ app.post('/api/inventory', authorizeRoles(['Admin']), (req, res) => {
   `;
   
   db.serialize(() => {
-    db.run('BEGIN TRANSACTION');
+    db.run('BEGIN IMMEDIATE TRANSACTION');
     db.run(sql, [id, name, category, stock, reorder_level, price, cost_price, expiry_date, supplier, batch_number, attrString], function(err) {
       if (err) {
         db.run('ROLLBACK');
@@ -1267,7 +1268,7 @@ app.put('/api/inventory/:id/stock', authorizeRoles(['Admin']), (req, res) => {
   const { quantity_change, reason, type, performed_by, reference_id } = req.body; 
   
   db.serialize(() => {
-    db.run('BEGIN TRANSACTION');
+    db.run('BEGIN IMMEDIATE TRANSACTION');
     
     // Check if resulting stock goes below 0
     db.get('SELECT stock FROM inventory WHERE id = ?', [id], (err, row) => {
@@ -1616,7 +1617,7 @@ app.post('/api/admissions', (req, res) => {
   console.log(`[ADMISSION] Attempting to admit patient ${patient_id} to ${ward_name}`);
   
   db.serialize(() => {
-    db.run('BEGIN TRANSACTION');
+    db.run('BEGIN IMMEDIATE TRANSACTION');
     
     const stmt = db.prepare('INSERT INTO admissions (patient_id, ward_name, bed_number, admitting_doctor, reason, notes) VALUES (?, ?, ?, ?, ?, ?)');
     stmt.run(patient_id, ward_name, bed_number, admitting_doctor, reason, notes, function(err) {
@@ -1722,7 +1723,7 @@ app.post('/api/purchase-orders', (req, res) => {
   const total_amount = items.reduce((sum, i) => sum + (i.qty * i.unit_cost), 0);
   
   db.serialize(() => {
-    db.run('BEGIN TRANSACTION');
+    db.run('BEGIN IMMEDIATE TRANSACTION');
     db.run('INSERT INTO purchase_orders (po_number, supplier_id, total_amount, status) VALUES (?, ?, ?, ?)', 
       [po_number, supplier_id, total_amount, 'Draft'], function(err) {
       if (err) {
@@ -1750,7 +1751,7 @@ app.post('/api/purchase-orders/:id/receive', (req, res) => {
   const { received_items } = req.body; // Array of { item_id (po_item_id), inventory_id, qty_received, cost_price }
 
   db.serialize(() => {
-    db.run('BEGIN TRANSACTION');
+    db.run('BEGIN IMMEDIATE TRANSACTION');
     
     // Update PO items received qty
     const updatePOItem = db.prepare('UPDATE purchase_order_items SET received_qty = received_qty + ? WHERE id = ?');
@@ -1883,7 +1884,7 @@ app.patch('/api/transactions/:id/payment', (req, res) => {
   const { amount_paid, payment_method, cashier } = req.body;
   
   db.serialize(() => {
-    db.run('BEGIN TRANSACTION');
+    db.run('BEGIN IMMEDIATE TRANSACTION');
     
     db.get('SELECT total_amount, discount, amount_paid, patient_id, receipt_no FROM transactions WHERE id = ?', [id], (err, row) => {
       if (err || !row) {
@@ -2192,7 +2193,7 @@ app.get('/api/settings', (req, res) => {
 app.put('/api/settings', (req, res) => {
   const settings = req.body;
   db.serialize(() => {
-    db.run('BEGIN TRANSACTION');
+    db.run('BEGIN IMMEDIATE TRANSACTION');
     const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
     Object.entries(settings).forEach(([key, value]) => {
       stmt.run(key, String(value));
@@ -2800,7 +2801,7 @@ app.post('/api/purchase-orders', (req, res) => {
   } = req.body;
 
   db.serialize(() => {
-    db.run('BEGIN TRANSACTION');
+    db.run('BEGIN IMMEDIATE TRANSACTION');
     
     db.run(`
       INSERT INTO procurement (
