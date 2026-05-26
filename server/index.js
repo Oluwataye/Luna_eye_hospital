@@ -18,7 +18,11 @@ const { PatientStatus } = require('./constants');
 
 const app = express();
 const PORT = process.env.PORT || 80; // Changed default to 80 for LAN accessibility
-const JWT_SECRET = process.env.JWT_SECRET || 'luna_eye_hospital_secret_key_2026';
+// Use JWT secret from environment or generate a secure random 256-bit one on startup to prevent hardcoded defaults
+const JWT_SECRET = process.env.JWT_SECRET || require('crypto').randomBytes(32).toString('hex');
+if (!process.env.JWT_SECRET) {
+  console.warn('[SECURITY WARNING] JWT_SECRET environment variable is not set. A random secret has been generated. Active sessions will invalidate on server restart.');
+}
 
 // --- AUDIT LOG HELPER ---
 const logAudit = (user_id, user_name, user_role, action_type, module, details, status = 'Standard', ip_address = '127.0.0.1') => {
@@ -84,7 +88,7 @@ const corsOptions = {
 // ── Rate limiters ──
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10,
+  max: 5, // Maximum 5 attempts per 15 minutes
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many login attempts. Please wait 15 minutes before trying again.' },
@@ -112,15 +116,73 @@ const requestTimeout = (req, res, next) => {
   next();
 };
 
+// ── Input Sanitization Helpers ──
+const sanitizeString = (str) => {
+  if (typeof str !== 'string') return str;
+  // Remove script tags and escape < and > to prevent HTML injection and XSS
+  return str
+    .replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, '')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+};
+
+const sanitizeObject = (obj) => {
+  if (obj === null || typeof obj !== 'object') return obj;
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      if (typeof obj[key] === 'string') {
+        obj[key] = sanitizeString(obj[key]);
+      } else if (typeof obj[key] === 'object') {
+        obj[key] = sanitizeObject(obj[key]);
+      }
+    }
+  }
+  return obj;
+};
+
+const sanitizeInput = (req, res, next) => {
+  if (req.body) req.body = sanitizeObject(req.body);
+  if (req.query) req.query = sanitizeObject(req.query);
+  if (req.params) req.params = sanitizeObject(req.params);
+  next();
+};
+
 // ── Apply global middleware ──
-app.use(helmet({ contentSecurityPolicy: false })); // CSP disabled — app serves its own SPA assets
+// Secure Helmet CSP configuration permitting local SPA behavior
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      connectSrc: ["'self'", "ws:", "http://localhost:3200", "http://127.0.0.1:3200"]
+    }
+  }
+}));
 app.use(compression()); // gzip all responses
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '2mb' })); // limit request body size
-app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+
+// Reject oversized payloads (JSON and URL-encoded limits set to 1MB)
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+// Reject malformed payloads cleanly
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    console.warn('[SECURITY] Malformed JSON payload rejected');
+    return res.status(400).json({ error: 'Malformed JSON payload' });
+  }
+  next(err);
+});
+
+// Sanitize user inputs
+app.use(sanitizeInput);
+
 app.use(requestTimeout);
 app.use(loginLimiter);
-app.use('/api', apiLimiter);
+app.use(apiLimiter); // Apply rate limiting to all endpoints globally
 
 // ── Request logger ──
 app.use((req, res, next) => {
@@ -169,8 +231,21 @@ const authorizeRoles = (allowedRoles) => {
   };
 };
 
+// --- GLOBAL API SECURITY RULES (RLS / Role-Based Access Control) ---
+
+// 1. Enforce token authentication globally on all /api routes (except open routes)
+app.use('/api', authenticateToken);
+
+// 2. Lock down administrative/financial groups to Admin role only
+app.use('/api/reports', authorizeRoles(['Admin']));
+app.use('/api/reprints', authorizeRoles(['Admin']));
+app.use('/api/backups', authorizeRoles(['Admin']));
+app.use('/api/restore', authorizeRoles(['Admin']));
+app.use('/api/db-stats', authorizeRoles(['Admin']));
+app.use('/api/users', authorizeRoles(['Admin']));
+
+// Mount apiRouter for legacy endpoints
 const apiRouter = express.Router();
-apiRouter.use(authenticateToken);
 app.use('/api', apiRouter);
 
 // --- LAN DOMAIN RESOLVER (NBNS/DNS) ---
@@ -492,7 +567,8 @@ app.post('/api/login', (req, res) => {
         return res.status(401).json({ error: 'Invalid username or password' });
     }
     
-    const isMatch = password === user.password || bcrypt.compareSync(password, user.password);
+    // Verify password strictly using bcrypt (no plain text fallbacks)
+    const isMatch = bcrypt.compareSync(password, user.password);
     
     if (!isMatch) {
         logAudit(null, username, 'Guest', 'LOGIN_FAILED', 'Auth', `Failed login attempt for user: ${username}`);
@@ -622,7 +698,7 @@ app.post('/api/patients', authorizeRoles(['Admin', 'Receptionist']), (req, res) 
 });
 
 // PUT update patient
-app.put('/api/patients/:id', (req, res) => {
+app.put('/api/patients/:id', authorizeRoles(['Admin', 'Receptionist']), (req, res) => {
   const { id } = req.params;
   const { 
     full_name, gender, dob, phone, alternate_phone, address, 
@@ -722,7 +798,7 @@ app.post('/api/check-in', authorizeRoles(['Admin', 'Receptionist', 'Nurse']), (r
 });
 
 // PUT update visit status — advances patient through the clinical workflow
-app.put('/api/visits/:id/status', (req, res) => {
+app.put('/api/visits/:id/status', authorizeRoles(['Admin', 'Receptionist', 'Nurse', 'Optometrist', 'Consultant', 'Doctor']), (req, res) => {
   const { id } = req.params;
   const { status, performed_by, reason } = req.body;
   
@@ -1540,7 +1616,7 @@ app.get('/api/investigations', (req, res) => {
 });
 
 // POST new investigation (requesting a test)
-app.post('/api/investigations', (req, res) => {
+app.post('/api/investigations', authorizeRoles(['Admin', 'Optometrist', 'Consultant', 'Doctor', 'Nurse']), (req, res) => {
   const { patient_id, test_name, requested_by, inventory_id, unit, reference_range } = req.body;
   const stmt = db.prepare('INSERT INTO investigations (patient_id, test_name, requested_by, inventory_id, unit, reference_range) VALUES (?, ?, ?, ?, ?, ?)');
   stmt.run(patient_id, test_name, requested_by, inventory_id || null, unit || null, reference_range || null, function(err) {
@@ -1551,7 +1627,7 @@ app.post('/api/investigations', (req, res) => {
 });
 
 // PUT update investigation results
-app.put('/api/investigations/:id', (req, res) => {
+app.put('/api/investigations/:id', authorizeRoles(['Admin', 'Optometrist', 'Consultant', 'Doctor', 'Nurse']), (req, res) => {
   const { id } = req.params;
   const { results_notes, status, test_value, medical_comments, billing_status } = req.body;
   
@@ -1612,7 +1688,7 @@ app.get('/api/admissions', (req, res) => {
 });
 
 // POST new admission
-app.post('/api/admissions', (req, res) => {
+app.post('/api/admissions', authorizeRoles(['Admin', 'Optometrist', 'Consultant', 'Doctor', 'Nurse']), (req, res) => {
   const { patient_id, ward_name, bed_number, admitting_doctor, reason, notes } = req.body;
   console.log(`[ADMISSION] Attempting to admit patient ${patient_id} to ${ward_name}`);
   
@@ -1646,7 +1722,7 @@ app.post('/api/admissions', (req, res) => {
 });
 
 // PUT update admission (Discharge or Add Notes)
-app.put('/api/admissions/:id', (req, res) => {
+app.put('/api/admissions/:id', authorizeRoles(['Admin', 'Optometrist', 'Consultant', 'Doctor', 'Nurse']), (req, res) => {
   const { id } = req.params;
   const { status, notes } = req.body;
   
@@ -1693,7 +1769,7 @@ app.get('/api/suppliers', (req, res) => {
 });
 
 // POST new supplier
-app.post('/api/suppliers', (req, res) => {
+app.post('/api/suppliers', authorizeRoles(['Admin']), (req, res) => {
   const { name, contact_person, phone, email, address, created_by } = req.body;
   const sql = 'INSERT INTO suppliers (name, contact_person, phone, email, address) VALUES (?, ?, ?, ?, ?)';
   db.run(sql, [name, contact_person, phone, email, address], function(err) {
@@ -1717,7 +1793,7 @@ app.get('/api/purchase-orders', (req, res) => {
 });
 
 // POST new purchase order
-app.post('/api/purchase-orders', (req, res) => {
+app.post('/api/purchase-orders', authorizeRoles(['Admin']), (req, res) => {
   const { supplier_id, items } = req.body;
   const po_number = `PO-${Date.now()}`;
   const total_amount = items.reduce((sum, i) => sum + (i.qty * i.unit_cost), 0);
@@ -1746,7 +1822,7 @@ app.post('/api/purchase-orders', (req, res) => {
 });
 
 // POST receive goods for PO
-app.post('/api/purchase-orders/:id/receive', (req, res) => {
+app.post('/api/purchase-orders/:id/receive', authorizeRoles(['Admin']), (req, res) => {
   const poId = req.params.id;
   const { received_items } = req.body; // Array of { item_id (po_item_id), inventory_id, qty_received, cost_price }
 
@@ -2286,7 +2362,7 @@ app.get('/api/wards', (req, res) => {
   });
 });
 
-app.post('/api/wards', (req, res) => {
+app.post('/api/wards', authorizeRoles(['Admin']), (req, res) => {
   const { name, description } = req.body;
   db.run('INSERT INTO wards (name, description) VALUES (?, ?)', [name, description], function(err) {
     if (err) return res.status(500).json({ error: err.message });
@@ -2294,7 +2370,7 @@ app.post('/api/wards', (req, res) => {
   });
 });
 
-app.put('/api/wards/:id', (req, res) => {
+app.put('/api/wards/:id', authorizeRoles(['Admin']), (req, res) => {
   const { id } = req.params;
   const { name, description } = req.body;
   db.run('UPDATE wards SET name = ?, description = ? WHERE id = ?', [name, description, id], function(err) {
@@ -2303,7 +2379,7 @@ app.put('/api/wards/:id', (req, res) => {
   });
 });
 
-app.delete('/api/wards/:id', (req, res) => {
+app.delete('/api/wards/:id', authorizeRoles(['Admin']), (req, res) => {
   const { id } = req.params;
   db.run('DELETE FROM wards WHERE id = ?', [id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
@@ -2319,7 +2395,7 @@ app.get('/api/discounts', (req, res) => {
   });
 });
 
-app.post('/api/discounts', (req, res) => {
+app.post('/api/discounts', authorizeRoles(['Admin']), (req, res) => {
   const { name, value, type, requires_auth } = req.body;
   db.run('INSERT INTO discounts (name, value, type, requires_auth) VALUES (?, ?, ?, ?)', 
     [name, value, type, requires_auth ? 1 : 0], function(err) {
@@ -2328,7 +2404,7 @@ app.post('/api/discounts', (req, res) => {
   });
 });
 
-app.put('/api/discounts/:id', (req, res) => {
+app.put('/api/discounts/:id', authorizeRoles(['Admin']), (req, res) => {
   const { id } = req.params;
   const { name, value, type, requires_auth, is_active } = req.body;
   db.run('UPDATE discounts SET name = ?, value = ?, type = ?, requires_auth = ?, is_active = ? WHERE id = ?', 
@@ -2338,7 +2414,7 @@ app.put('/api/discounts/:id', (req, res) => {
   });
 });
 
-app.delete('/api/discounts/:id', (req, res) => {
+app.delete('/api/discounts/:id', authorizeRoles(['Admin']), (req, res) => {
   const { id } = req.params;
   db.run('DELETE FROM discounts WHERE id = ?', [id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
@@ -2354,7 +2430,7 @@ app.get('/api/inventory-categories', (req, res) => {
   });
 });
 
-app.post('/api/inventory-categories', (req, res) => {
+app.post('/api/inventory-categories', authorizeRoles(['Admin']), (req, res) => {
   const { name, description, attribute_template } = req.body;
   db.run('INSERT INTO inventory_categories (name, description, attribute_template) VALUES (?, ?, ?)', [name, description, attribute_template || 'NONE'], function(err) {
     if (err) return res.status(500).json({ error: err.message });
@@ -2362,7 +2438,7 @@ app.post('/api/inventory-categories', (req, res) => {
   });
 });
 
-app.put('/api/inventory-categories/:id', (req, res) => {
+app.put('/api/inventory-categories/:id', authorizeRoles(['Admin']), (req, res) => {
   const { id } = req.params;
   const { name, description, attribute_template } = req.body;
   db.run('UPDATE inventory_categories SET name = ?, description = ?, attribute_template = ? WHERE id = ?', [name, description, attribute_template || 'NONE', id], function(err) {
@@ -2381,7 +2457,7 @@ app.get('/api/inventory/count', (req, res) => {
   });
 });
 
-app.delete('/api/inventory-categories/:id', (req, res) => {
+app.delete('/api/inventory-categories/:id', authorizeRoles(['Admin']), (req, res) => {
   const { id } = req.params;
 
   // Verify category exists
@@ -2768,7 +2844,7 @@ app.get('/api/suppliers', (req, res) => {
 });
 
 // POST new supplier
-app.post('/api/suppliers', (req, res) => {
+app.post('/api/suppliers', authorizeRoles(['Admin']), (req, res) => {
   const { name, contact_person, phone, email, address } = req.body;
   db.run(
     'INSERT INTO suppliers (name, contact_person, phone, email, address) VALUES (?, ?, ?, ?, ?)',
@@ -2794,7 +2870,7 @@ app.get('/api/purchase-orders', (req, res) => {
 });
 
 // POST new procurement record
-app.post('/api/purchase-orders', (req, res) => {
+app.post('/api/purchase-orders', authorizeRoles(['Admin']), (req, res) => {
   const { 
     supplier_id, item_name, quantity_received, unit_cost, total_cost, 
     invoice_number, amount_paid, balance, status, purchase_date, received_by, notes 

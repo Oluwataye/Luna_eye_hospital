@@ -463,14 +463,33 @@ const db = new sqlite3.Database(dbPath, (err) => {
 
 
 
-      // Insert default Admin user if none exists
+      // Insert default Admin user if none exists (hashed with bcrypt)
       db.get('SELECT * FROM users WHERE role = "Admin"', (err, row) => {
         if (!row) {
+          const bcrypt = require('bcryptjs');
+          const hashedPassword = bcrypt.hashSync('admin', 10);
           const stmt = db.prepare('INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)');
-          // Password should be hashed in production, but leaving plain for MVP/demo simplicity
-          stmt.run('admin', 'admin', 'System Administrator', 'Admin');
+          stmt.run('admin', hashedPassword, 'System Administrator', 'Admin');
           stmt.finalize();
-          console.log('Default admin user created.');
+          console.log('Default admin user created (hashed).');
+        }
+      });
+
+      // Migration: Hash any legacy plain text passwords in the database
+      db.all('SELECT id, username, password FROM users', [], (err, rows) => {
+        if (!err && rows) {
+          const bcrypt = require('bcryptjs');
+          const bcryptRegex = /^\$2[ayb]\$[0-9]{2}\$[./A-Za-z0-9]{53}$/;
+          rows.forEach(row => {
+            if (!bcryptRegex.test(row.password)) {
+              const hashedPassword = bcrypt.hashSync(row.password, 10);
+              db.run('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, row.id], (err2) => {
+                if (!err2) {
+                  console.log(`Migration: Hashed legacy password for user: ${row.username}`);
+                }
+              });
+            }
+          });
         }
       });
 

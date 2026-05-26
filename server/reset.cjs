@@ -1,15 +1,18 @@
 const sqlite3 = require('sqlite3').verbose();
+const bcrypt = require('bcryptjs');
 const db = new sqlite3.Database('./luna_eye_hospital.db');
 db.serialize(() => {
-  // Reset admin to known plain-text password
-  db.run("UPDATE users SET password = 'admin123' WHERE username = 'admin'", function(err) {
+  // Reset admin to known password (hashed)
+  const adminHash = bcrypt.hashSync('admin123', 10);
+  db.run("UPDATE users SET password = ? WHERE username = 'admin'", [adminHash], function(err) {
     if (err) console.error('admin:', err.message);
-    else console.log('admin password reset to: admin123');
+    else console.log('admin password reset to: admin123 (hashed)');
   });
-  // Also reset all others to plain-text for testing
-  db.run("UPDATE users SET password = 'password' WHERE username IN ('doctor','nurse','pharmacist','reception','receptionist')", function(err) {
+  // Also reset all others to password (hashed)
+  const userHash = bcrypt.hashSync('password', 10);
+  db.run("UPDATE users SET password = ? WHERE username IN ('doctor','nurse','pharmacist','reception','receptionist')", [userHash], function(err) {
     if (err) console.error('others:', err.message);
-    else console.log('Other users reset to: password');
+    else console.log('Other users reset to: password (hashed)');
   });
 });
 setTimeout(() => process.exit(0), 500);
