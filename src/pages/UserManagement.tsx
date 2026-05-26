@@ -81,7 +81,12 @@ export const UserManagement: React.FC = () => {
     e.preventDefault();
     try {
       if (editingUser) {
-        await api.updateUser(editingUser.id, formData);
+        const { password, ...rest } = formData;
+        const payload: any = { ...rest };
+        if (password) {
+          payload.password = password;
+        }
+        await api.updateUser(editingUser.id, payload);
         notify('success', 'User account updated successfully');
       } else {
         await api.createUser(formData);
@@ -210,7 +215,9 @@ export const UserManagement: React.FC = () => {
                     <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--leh-text-muted)' }}>{userAccount.department || 'General'}</span>
                   </td>
                   <td>
-                     <span className="leh-status-badge green" style={{ fontSize: '10px' }}>ACTIVE</span>
+                     <span className={`leh-status-badge ${userAccount.status?.toLowerCase() === 'inactive' ? 'red' : 'green'}`} style={{ fontSize: '10px' }}>
+                       {userAccount.status?.toUpperCase() || 'ACTIVE'}
+                     </span>
                   </td>
                   <td>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
@@ -310,19 +317,19 @@ export const UserManagement: React.FC = () => {
                         onChange={e => setFormData({...formData, username: e.target.value})}
                       />
                     </div>
-                    {!editingUser && (
-                      <div className="leh-form-group full-width">
-                        <label className="leh-label">TEMPORARY PASSWORD</label>
-                        <input
-                          type="password"
-                          className="leh-input"
-                          required
-                          placeholder="••••••••"
-                          value={formData.password}
-                          onChange={e => setFormData({...formData, password: e.target.value})}
-                        />
-                      </div>
-                    )}
+                    <div className="leh-form-group full-width">
+                      <label className="leh-label">
+                        {editingUser ? 'RESET PASSWORD (LEAVE BLANK TO KEEP UNCHANGED)' : 'TEMPORARY PASSWORD'}
+                      </label>
+                      <input
+                        type="password"
+                        className="leh-input"
+                        required={!editingUser}
+                        placeholder={editingUser ? 'Leave blank to keep current password' : '••••••••'}
+                        value={formData.password}
+                        onChange={e => setFormData({...formData, password: e.target.value})}
+                      />
+                    </div>
                   </div>
                 </div>
 

@@ -11,6 +11,10 @@ interface PrintInvestigationProps {
     requested_by: string;
     completed_at: string;
     created_at: string;
+    test_value?: string;
+    unit?: string;
+    reference_range?: string;
+    medical_comments?: string;
   };
 }
 
@@ -38,6 +42,20 @@ export const PrintInvestigation: React.FC<PrintInvestigationProps> = ({ investig
       <div style={{ marginTop: '40px' }}>
         <h2 style={{ fontSize: '20px', textDecoration: 'underline', marginBottom: '20px' }}>INVESTIGATION REPORT: {investigation.test_name}</h2>
         
+        {investigation.unit && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px', padding: '15px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+            <div>
+              <p style={{ margin: '0 0 5px 0', fontSize: '12px', fontWeight: 'bold' }}>TEST VALUE</p>
+              <p style={{ margin: 0, fontSize: '18px' }}>{investigation.test_value || 'N/A'} {investigation.unit}</p>
+              {investigation.reference_range && <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#64748b' }}>Ref: {investigation.reference_range}</p>}
+            </div>
+            <div>
+              <p style={{ margin: '0 0 5px 0', fontSize: '12px', fontWeight: 'bold' }}>MEDICAL COMMENTS</p>
+              <p style={{ margin: 0, fontSize: '16px' }}>{investigation.medical_comments || 'None'}</p>
+            </div>
+          </div>
+        )}
+
         <div style={{ padding: '20px', border: '1px solid #e2e8f0', borderRadius: '8px', minHeight: '300px', fontSize: '16px', lineHeight: '1.6' }}>
           <div style={{ whiteSpace: 'pre-wrap' }}>
             {investigation.results_notes}

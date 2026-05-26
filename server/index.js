@@ -5,11 +5,14 @@ const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
-const dgram = require('dgram'); // For DNS/NBNS Responder
+const dgram = require('dgram');
 const os = require('os');
 const cron = require('node-cron');
 const db = require('./db');
-require('dotenv').config();
+const compression = require('compression');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const { PatientStatus } = require('./constants');
 
 const app = express();
@@ -36,8 +39,89 @@ const notify = (user_role, message, module) => {
 // Database file path
 const dbPath = path.resolve(__dirname, 'luna_eye_hospital.db');
 
-app.use(cors());
-app.use(express.json());
+// ── SQLITE_BUSY retry helper ──
+// Wraps db.run with exponential backoff retries on SQLITE_BUSY / SQLITE_LOCKED
+const BUSY_MAX_RETRIES = 4;
+const dbRun = (sql, params = [], retries = 0) => new Promise((resolve, reject) => {
+  db.run(sql, params, function (err) {
+    if (err && (err.code === 'SQLITE_BUSY' || err.code === 'SQLITE_LOCKED') && retries < BUSY_MAX_RETRIES) {
+      const delay = Math.pow(2, retries) * 50; // 50ms, 100ms, 200ms, 400ms
+      console.warn(`[DB] BUSY retry ${retries + 1} in ${delay}ms for: ${sql.slice(0, 60)}`);
+      setTimeout(() => dbRun(sql, params, retries + 1).then(resolve).catch(reject), delay);
+    } else if (err) {
+      reject(err);
+    } else {
+      resolve(this);
+    }
+  });
+});
+
+// ── CORS ──
+const ENV_LAN_IP = process.env.LAN_IP || '';
+const allowedOrigins = [
+  'http://localhost:3200',
+  'http://127.0.0.1:3200',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:3100',
+  'http://127.0.0.1:3100',
+  ...(ENV_LAN_IP ? [`http://${ENV_LAN_IP}`, `http://${ENV_LAN_IP}:3200`, `http://${ENV_LAN_IP}:3100`] : []),
+  `http://${process.env.DOMAIN_NAME || 'lunaeyehospital'}`,
+];
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (same-origin, mobile, curl)
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    console.warn(`[CORS] Rejected origin: ${origin}`);
+    callback(null, false);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+// ── Rate limiters ──
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts. Please wait 15 minutes before trying again.' },
+  skip: (req) => req.path !== '/api/login' && req.path !== '/login',
+});
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please slow down.' },
+});
+
+// ── Request timeout middleware (15 s) ──
+const requestTimeout = (req, res, next) => {
+  const TIMEOUT_MS = 15000;
+  const timer = setTimeout(() => {
+    if (!res.headersSent) {
+      console.error(`[TIMEOUT] ${req.method} ${req.url} exceeded ${TIMEOUT_MS}ms`);
+      res.status(408).json({ error: 'Request timed out. Please try again.' });
+    }
+  }, TIMEOUT_MS);
+  res.on('finish', () => clearTimeout(timer));
+  res.on('close', () => clearTimeout(timer));
+  next();
+};
+
+// ── Apply global middleware ──
+app.use(helmet({ contentSecurityPolicy: false })); // CSP disabled — app serves its own SPA assets
+app.use(compression()); // gzip all responses
+app.use(cors(corsOptions));
+app.use(express.json({ limit: '2mb' })); // limit request body size
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+app.use(requestTimeout);
+app.use(loginLimiter);
+app.use('/api', apiLimiter);
+
+// ── Request logger ──
 app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
@@ -62,7 +146,7 @@ const authenticateToken = (req, res, next) => {
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
       console.error(`[AUTH] Token error for ${path}: ${err.message}`);
-      return res.status(403).json({ error: 'Token invalid or expired' });
+      return res.status(401).json({ error: 'Token invalid or expired' });
     }
     req.user = user;
     next();
@@ -192,13 +276,35 @@ app.get('/api/db-stats', (req, res) => {
   fs.stat(dbPath, (err, stats) => {
     if (err) return res.status(500).json({ error: 'Could not read database file stats' });
     
-    res.json({
-      size_mb: (stats.size / (1024 * 1024)).toFixed(2),
-      last_modified: stats.mtime,
-      status: 'Healthy'
+    db.all("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'", [], async (err, rows) => {
+      if (err) return res.status(500).json({ error: 'Could not query database tables' });
+      
+      try {
+        const tableStats = [];
+        for (const row of rows) {
+          const countResult = await new Promise((resolve, reject) => {
+            db.get(`SELECT COUNT(*) as count FROM "${row.name}"`, [], (err, result) => {
+              if (err) reject(err);
+              else resolve(result ? result.count : 0);
+            });
+          });
+          tableStats.push({ name: row.name, rows: countResult });
+        }
+        
+        res.json({
+          size: `${(stats.size / (1024 * 1024)).toFixed(2)} MB`,
+          size_mb: (stats.size / (1024 * 1024)).toFixed(2),
+          last_modified: stats.mtime,
+          status: 'Healthy',
+          tables: tableStats
+        });
+      } catch (dbErr) {
+        res.status(500).json({ error: 'Failed to retrieve table row counts' });
+      }
     });
   });
 });
+
 
 // GET download database backup
 app.get('/api/backup', authorizeRoles(['Admin']), (req, res) => {
@@ -278,6 +384,16 @@ app.put('/api/users/:id', authorizeRoles(['Admin']), (req, res) => {
   db.run(sql, params, function(err) {
     if (err) return res.status(500).json({ error: err.message });
     logAudit(null, 'Admin', 'Admin', 'USER_UPDATE', 'Users', `Updated user ID ${id}: ${updates.join(', ')}`, 'Critical');
+    res.json({ success: true });
+  });
+});
+
+// DELETE deactivate user
+app.delete('/api/users/:id', authorizeRoles(['Admin']), (req, res) => {
+  const { id } = req.params;
+  db.run("UPDATE users SET status = 'Inactive' WHERE id = ?", [id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    logAudit(req.user?.id, req.user?.username, req.user?.role, 'USER_DEACTIVATE', 'Users', `Deactivated user ID ${id}`, 'Critical');
     res.json({ success: true });
   });
 });
@@ -974,6 +1090,19 @@ app.post('/api/transactions', authorizeRoles(['Admin', 'Receptionist']), (req, r
             errorOccurred = true;
           }
           
+          if (invId && !errorOccurred) {
+            db.run(
+              `UPDATE investigations SET billing_status = 'Paid' 
+               WHERE patient_id = ? AND inventory_id = ? AND billing_status = 'Unpaid'`,
+              [patient_id, invId],
+              (errInv) => {
+                if (errInv) {
+                  console.error('[Billing] Error updating investigation billing status:', errInv);
+                }
+              }
+            );
+          }
+          
           // Only update inventory for items that have a valid inventory ID (e.g. starts with INV-)
           const isInventoryItem = invId && invId.startsWith('INV-');
           
@@ -1075,19 +1204,21 @@ app.get('/api/inventory', (req, res) => {
 
 // POST new inventory item
 app.post('/api/inventory', authorizeRoles(['Admin']), (req, res) => {
-  const { name, category, stock, reorder_level, price, cost_price, expiry_date, supplier, batch_number } = req.body;
+  const { name, category, stock, reorder_level, price, cost_price, expiry_date, supplier, batch_number, attributes } = req.body;
   const id = `INV-${Date.now()}`;
+  
+  const attrString = attributes ? (typeof attributes === 'string' ? attributes : JSON.stringify(attributes)) : null;
   
   const sql = `
     INSERT INTO inventory (
       id, name, category, stock, reorder_level, price, 
-      cost_price, expiry_date, supplier, batch_number
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      cost_price, expiry_date, supplier, batch_number, attributes
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
   
   db.serialize(() => {
     db.run('BEGIN TRANSACTION');
-    db.run(sql, [id, name, category, stock, reorder_level, price, cost_price, expiry_date, supplier, batch_number], function(err) {
+    db.run(sql, [id, name, category, stock, reorder_level, price, cost_price, expiry_date, supplier, batch_number, attrString], function(err) {
       if (err) {
         db.run('ROLLBACK');
         return res.status(500).json({ error: err.message });
@@ -1102,9 +1233,31 @@ app.post('/api/inventory', authorizeRoles(['Admin']), (req, res) => {
       }
       
       db.run('COMMIT', () => {
-        res.status(201).json({ id, name, category, stock, reorder_level, price });
+        res.status(201).json({ id, name, category, stock, reorder_level, price, attributes });
       });
     });
+  });
+});
+
+// PUT update inventory item details
+app.put('/api/inventory/:id', authorizeRoles(['Admin']), (req, res) => {
+  const { id } = req.params;
+  const { name, category, stock, reorder_level, price, cost_price, expiry_date, supplier, batch_number, attributes } = req.body;
+  
+  const attrString = attributes ? (typeof attributes === 'string' ? attributes : JSON.stringify(attributes)) : null;
+  
+  const sql = `
+    UPDATE inventory 
+    SET name = ?, category = ?, stock = ?, reorder_level = ?, price = ?, 
+        cost_price = ?, expiry_date = ?, supplier = ?, batch_number = ?, attributes = ?
+    WHERE id = ?
+  `;
+  
+  db.run(sql, [name, category, stock, reorder_level, price, cost_price, expiry_date, supplier, batch_number, attrString, id], function(err) {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.json({ message: 'Inventory item updated successfully', item: { id, name, category, stock, reorder_level, price, attributes } });
   });
 });
 
@@ -1351,9 +1504,11 @@ app.post('/api/consultations', authorizeRoles(['Admin', 'Optometrist', 'Consulta
 
 // GET investigations
 app.get('/api/investigations', (req, res) => {
-  const { patient_id, status } = req.query;
+  const { patient_id, status, billing_status } = req.query;
   let query = `
-    SELECT i.*, p.full_name as patient_name
+    SELECT i.*, p.full_name as patient_name,
+           (SELECT name FROM inventory WHERE id = i.inventory_id) as inventory_name,
+           (SELECT price FROM inventory WHERE id = i.inventory_id) as price
     FROM investigations i
     JOIN patients p ON i.patient_id = p.id
     WHERE 1=1
@@ -1369,6 +1524,11 @@ app.get('/api/investigations', (req, res) => {
     query += ' AND i.status = ?';
     params.push(status);
   }
+
+  if (billing_status) {
+    query += ' AND i.billing_status = ?';
+    params.push(billing_status);
+  }
   
   query += ' ORDER BY i.created_at DESC';
   
@@ -1380,11 +1540,11 @@ app.get('/api/investigations', (req, res) => {
 
 // POST new investigation (requesting a test)
 app.post('/api/investigations', (req, res) => {
-  const { patient_id, test_name, requested_by } = req.body;
-  const stmt = db.prepare('INSERT INTO investigations (patient_id, test_name, requested_by) VALUES (?, ?, ?)');
-  stmt.run(patient_id, test_name, requested_by, function(err) {
+  const { patient_id, test_name, requested_by, inventory_id, unit, reference_range } = req.body;
+  const stmt = db.prepare('INSERT INTO investigations (patient_id, test_name, requested_by, inventory_id, unit, reference_range) VALUES (?, ?, ?, ?, ?, ?)');
+  stmt.run(patient_id, test_name, requested_by, inventory_id || null, unit || null, reference_range || null, function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    res.status(201).json({ id: this.lastID, patient_id, test_name, status: 'Pending', requested_by });
+    res.status(201).json({ id: this.lastID, patient_id, test_name, status: 'Pending', billing_status: 'Unpaid', requested_by });
   });
   stmt.finalize();
 });
@@ -1392,13 +1552,25 @@ app.post('/api/investigations', (req, res) => {
 // PUT update investigation results
 app.put('/api/investigations/:id', (req, res) => {
   const { id } = req.params;
-  const { results_notes, status } = req.body;
+  const { results_notes, status, test_value, medical_comments, billing_status } = req.body;
   
-  db.run(`
-    UPDATE investigations 
-    SET results_notes = ?, status = ?, completed_at = CURRENT_TIMESTAMP 
-    WHERE id = ?
-  `, [results_notes, status || 'Completed', id], function(err) {
+  const updates = [];
+  const params = [];
+  
+  if (results_notes !== undefined) { updates.push('results_notes = ?'); params.push(results_notes); }
+  if (status !== undefined) { updates.push('status = ?'); params.push(status); }
+  if (test_value !== undefined) { updates.push('test_value = ?'); params.push(test_value); }
+  if (medical_comments !== undefined) { updates.push('medical_comments = ?'); params.push(medical_comments); }
+  if (billing_status !== undefined) { updates.push('billing_status = ?'); params.push(billing_status); }
+  
+  if (status === 'Completed' || status === 'Reviewed') {
+    updates.push('completed_at = CURRENT_TIMESTAMP');
+  }
+
+  if (updates.length === 0) return res.json({ success: true, id });
+
+  params.push(id);
+  db.run(`UPDATE investigations SET ${updates.join(', ')} WHERE id = ?`, params, function(err) {
     if (err) return res.status(500).json({ error: err.message });
     if (this.changes === 0) return res.status(404).json({ error: 'Investigation not found' });
     
@@ -1634,23 +1806,20 @@ app.get('/api/procurement/stats', (req, res) => {
 // Sales Report
 // Sales & Revenue Report Summary
 app.get('/api/reports/sales/summary', (req, res) => {
-  const today = new Date().toISOString().split('T')[0];
-  const thisMonth = new Date().toISOString().substring(0, 7);
-  
   const queries = {
-    todaySales: `SELECT SUM(amount_paid) as total FROM transactions WHERE date(created_at) = ? AND status IN ('Paid', 'Partial')`,
-    monthSales: `SELECT SUM(amount_paid) as total FROM transactions WHERE date(created_at) LIKE ? AND status IN ('Paid', 'Partial')`,
-    monthTransactions: `SELECT COUNT(*) as count FROM transactions WHERE date(created_at) LIKE ?`,
+    todaySales: `SELECT SUM(amount_paid) as total FROM transactions WHERE date(created_at, 'localtime') = date('now', 'localtime') AND status IN ('Paid', 'Partial')`,
+    monthSales: `SELECT SUM(amount_paid) as total FROM transactions WHERE strftime('%Y-%m', created_at, 'localtime') = strftime('%Y-%m', 'now', 'localtime') AND status IN ('Paid', 'Partial')`,
+    monthTransactions: `SELECT COUNT(*) as count FROM transactions WHERE strftime('%Y-%m', created_at, 'localtime') = strftime('%Y-%m', 'now', 'localtime')`,
     outstandingDebts: `SELECT SUM(balance) as total FROM transactions WHERE status IN ('Unpaid', 'Partial')`
   };
 
   db.serialize(() => {
     let results = {};
-    db.get(queries.todaySales, [today], (err, row) => {
+    db.get(queries.todaySales, [], (err, row) => {
       results.todaySales = row?.total || 0;
-      db.get(queries.monthSales, [thisMonth + '%'], (err, row) => {
+      db.get(queries.monthSales, [], (err, row) => {
         results.monthSales = row?.total || 0;
-        db.get(queries.monthTransactions, [thisMonth + '%'], (err, row) => {
+        db.get(queries.monthTransactions, [], (err, row) => {
           results.monthTransactions = row?.count || 0;
           db.get(queries.outstandingDebts, [], (err, row) => {
             results.outstandingDebts = row?.total || 0;
@@ -1795,16 +1964,13 @@ app.get('/api/reports/patients/activity', (req, res) => {
 
 // Patient Summary Stats
 app.get('/api/reports/patients/summary', (req, res) => {
-  const today = new Date().toISOString().split('T')[0];
-  const thisMonth = new Date().toISOString().substring(0, 7);
-  
   db.get(`
     SELECT 
       (SELECT COUNT(*) FROM patients) as total_registered,
-      (SELECT COUNT(*) FROM visits WHERE date(visit_date) = ?) as visits_today,
+      (SELECT COUNT(*) FROM visits WHERE date(visit_date, 'localtime') = date('now', 'localtime')) as visits_today,
       (SELECT COUNT(*) FROM admissions WHERE status = 'Admitted') as currently_admitted,
-      (SELECT COUNT(*) FROM admissions WHERE status = 'Discharged' AND date(discharge_date) LIKE ?) as discharged_this_month
-  `, [today, thisMonth + '%'], (err, row) => {
+      (SELECT COUNT(*) FROM admissions WHERE status = 'Discharged' AND strftime('%Y-%m', discharge_date, 'localtime') = strftime('%Y-%m', 'now', 'localtime')) as discharged_this_month
+  `, [], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(row);
   });
@@ -1826,15 +1992,14 @@ app.get('/api/reports/expenses', (req, res) => {
 });
 
 app.get('/api/reports/expenses/summary', (req, res) => {
-  const thisMonth = new Date().toISOString().substring(0, 7);
   db.get(`
     SELECT 
       SUM(CASE WHEN category != 'Salary' THEN amount ELSE 0 END) as total_expenses,
       SUM(CASE WHEN category = 'Salary' THEN amount ELSE 0 END) as total_salaries,
       COUNT(*) as entry_count
     FROM expenses 
-    WHERE date(date) LIKE ?
-  `, [thisMonth + '%'], (err, row) => {
+    WHERE strftime('%Y-%m', date, 'localtime') = strftime('%Y-%m', 'now', 'localtime')
+  `, [], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(row || { total_expenses: 0, total_salaries: 0, entry_count: 0 });
   });
@@ -1854,18 +2019,16 @@ app.get('/api/reports/audit', (req, res) => {
 });
 
 app.get('/api/reports/audit/summary', (req, res) => {
-  const today = new Date().toISOString().split('T')[0];
-  const thisMonth = new Date().toISOString().substring(0, 7);
   db.get(`
     SELECT 
-      (SELECT COUNT(*) FROM audit_logs WHERE date(created_at) = ?) as today_count,
-      (SELECT COUNT(*) FROM audit_logs WHERE date(created_at) LIKE ?) as month_count,
-      (SELECT COUNT(DISTINCT user_name) FROM audit_logs WHERE date(created_at) = ?) as active_users,
+      (SELECT COUNT(*) FROM audit_logs WHERE date(created_at, 'localtime') = date('now', 'localtime')) as today_count,
+      (SELECT COUNT(*) FROM audit_logs WHERE strftime('%Y-%m', created_at, 'localtime') = strftime('%Y-%m', 'now', 'localtime')) as month_count,
+      (SELECT COUNT(DISTINCT user_name) FROM audit_logs WHERE date(created_at, 'localtime') = date('now', 'localtime')) as active_users,
       (SELECT COUNT(*) FROM audit_logs WHERE 
         action_type IN ('Billing Void', 'Stock Adjustment', 'Backup Restore', 'User Deletion', 'Password Reset')
         OR status = 'Critical'
       ) as flagged_count
-  `, [today, thisMonth + '%', today], (err, row) => {
+  `, [], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(row || { today_count: 0, month_count: 0, active_users: 0, flagged_count: 0 });
   });
@@ -1935,14 +2098,13 @@ app.get('/api/reports/procurement', (req, res) => {
 
 // Procurement Summary Stats
 app.get('/api/reports/procurement/summary', (req, res) => {
-  const thisMonth = new Date().toISOString().substring(0, 7);
   db.get(`
     SELECT 
-      (SELECT SUM(total_amount) FROM purchase_orders WHERE date(created_at) LIKE ?) as total_this_month,
+      (SELECT SUM(total_amount) FROM purchase_orders WHERE strftime('%Y-%m', created_at, 'localtime') = strftime('%Y-%m', 'now', 'localtime')) as total_this_month,
       (SELECT SUM(balance) FROM suppliers) as total_payables,
       (SELECT COUNT(*) FROM suppliers) as total_suppliers,
-      (SELECT COUNT(*) FROM purchase_orders WHERE date(created_at) LIKE ?) as pos_this_month
-  `, [thisMonth + '%', thisMonth + '%'], (err, row) => {
+      (SELECT COUNT(*) FROM purchase_orders WHERE strftime('%Y-%m', created_at, 'localtime') = strftime('%Y-%m', 'now', 'localtime')) as pos_this_month
+  `, [], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(row);
   });
@@ -2192,17 +2354,17 @@ app.get('/api/inventory-categories', (req, res) => {
 });
 
 app.post('/api/inventory-categories', (req, res) => {
-  const { name, description } = req.body;
-  db.run('INSERT INTO inventory_categories (name, description) VALUES (?, ?)', [name, description], function(err) {
+  const { name, description, attribute_template } = req.body;
+  db.run('INSERT INTO inventory_categories (name, description, attribute_template) VALUES (?, ?, ?)', [name, description, attribute_template || 'NONE'], function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    res.status(201).json({ id: this.lastID, name, description });
+    res.status(201).json({ id: this.lastID, name, description, attribute_template: attribute_template || 'NONE' });
   });
 });
 
 app.put('/api/inventory-categories/:id', (req, res) => {
   const { id } = req.params;
-  const { name, description } = req.body;
-  db.run('UPDATE inventory_categories SET name = ?, description = ? WHERE id = ?', [name, description, id], function(err) {
+  const { name, description, attribute_template } = req.body;
+  db.run('UPDATE inventory_categories SET name = ?, description = ?, attribute_template = ? WHERE id = ?', [name, description, attribute_template || 'NONE', id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true });
   });
@@ -2491,6 +2653,34 @@ app.patch('/api/reprints/settings', (req, res) => {
   );
 });
 
+// Endpoint 8b: Search receipts for reprint
+app.get('/api/reprints/search-receipts', (req, res) => {
+  const { search, start_date, end_date } = req.query;
+  let query = `
+    SELECT t.*, COALESCE(p.full_name, 'Walk-in Patient') as patient_name, p.id as patient_file_id
+    FROM transactions t
+    LEFT JOIN patients p ON t.patient_id = p.id
+    WHERE 1=1
+  `;
+  const params = [];
+
+  if (search) {
+    query += ' AND (t.receipt_no LIKE ? OR p.full_name LIKE ? OR t.patient_id LIKE ?)';
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+  }
+  if (start_date && end_date) {
+    query += ' AND date(t.created_at) BETWEEN ? AND ?';
+    params.push(start_date, end_date);
+  }
+
+  query += ' ORDER BY t.created_at DESC LIMIT 100';
+
+  db.all(query, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
 // Endpoint 9: Get receipt data for reprint
 app.get('/api/billing/receipts/:receipt_number', (req, res) => {
   const { receipt_number } = req.params;
@@ -2526,6 +2716,9 @@ app.get('/api/billing/receipts/:receipt_number', (req, res) => {
     });
   });
 });
+
+
+
 
 // --- SERVE FRONTEND ---
 const DIST_PATH = path.join(__dirname, '..', 'dist');
@@ -2686,7 +2879,8 @@ db.get('SELECT COUNT(*) as count FROM procurement', (err, row) => {
   }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+// ── Start server ──
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`--------------------------------------------------`);
   console.log(`Luna Eye Hospital Server: ACTIVE`);
   console.log(`Port: ${PORT}`);
@@ -2696,8 +2890,44 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`--------------------------------------------------`);
 });
 
-// Final catch-all for debugging 404s
+// ── 404 catch-all (must be after all routes) ──
 app.use((req, res) => {
   console.log(`[404] NOT FOUND: ${req.method} ${req.url}`);
-  res.status(404).json({ error: `Route ${req.method} ${req.url} not found on this server` });
+  res.status(404).json({ error: `Route ${req.method} ${req.url} not found` });
+});
+
+// ── Global error handler (must be last, 4 args) ──
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  console.error('[UNHANDLED ERROR]', err);
+  if (res.headersSent) return;
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({ error: err.message || 'Internal server error' });
+});
+
+// ── Graceful shutdown ──
+const shutdown = (signal) => {
+  console.log(`\n[SHUTDOWN] ${signal} received — draining connections…`);
+  server.close(() => {
+    console.log('[SHUTDOWN] HTTP server closed.');
+    db.close((err) => {
+      if (err) console.error('[SHUTDOWN] DB close error:', err);
+      else console.log('[SHUTDOWN] Database connection closed cleanly.');
+      process.exit(0);
+    });
+  });
+  // Force exit after 10 s if drain takes too long
+  setTimeout(() => {
+    console.error('[SHUTDOWN] Force exit after timeout.');
+    process.exit(1);
+  }, 10000);
+};
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT',  () => shutdown('SIGINT'));
+process.on('uncaughtException', (err) => {
+  console.error('[UNCAUGHT EXCEPTION]', err);
+  shutdown('uncaughtException');
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[UNHANDLED REJECTION]', reason);
 });

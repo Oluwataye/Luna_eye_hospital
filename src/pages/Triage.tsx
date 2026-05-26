@@ -15,7 +15,6 @@ import {
   Heart,
   Droplets,
   Stethoscope,
-  Info,
   Users,
   Zap,
   LayoutDashboard,
@@ -333,20 +332,7 @@ export const Triage: React.FC = () => {
                         <VitalField label="TEMPERATURE" unit="°C" placeholder="36.5" name="temperature" value={formData.temperature} onChange={handleInputChange} icon={Thermometer} />
                         <VitalField label="BODY WEIGHT" unit="kg" placeholder="70" name="weight" value={formData.weight} onChange={handleInputChange} icon={Scale} />
                      </div>
-                     <div className="leh-form-group" style={{ marginBottom: 0 }}>
-                        <label className="vital-label-redesign">
-                           <Info size={12} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
-                           CHIEF COMPLAINT / CLINICAL OBSERVATION
-                        </label>
-                        <textarea 
-                          className="leh-input" 
-                          style={{ height: '140px', paddingTop: '16px', lineHeight: '1.6', fontSize: '14px', borderRadius: '16px' }} 
-                          placeholder="Describe the patient's primary symptoms and clinical presentation..."
-                          name="complaint"
-                          value={formData.complaint}
-                          onChange={handleInputChange}
-                        ></textarea>
-                     </div>
+
                   </div>
 
                   {/* VA Assessment */}

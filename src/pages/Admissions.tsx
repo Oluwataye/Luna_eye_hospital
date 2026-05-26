@@ -120,7 +120,7 @@ export const Admissions: React.FC = () => {
       setShowDischargeModal(false);
       loadData();
     } catch (err: any) {
-      notify('error', 'Failed to discharge patient');
+      notify('error', 'Failed to discharge patient: ' + (err.message || 'Connection error'));
     }
   };
 

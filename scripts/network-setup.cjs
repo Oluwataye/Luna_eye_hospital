@@ -54,7 +54,7 @@ function configureFirewall() {
     console.log('Configuring Windows Firewall rules...');
     try {
         const rules = [
-            { name: 'Luna EMR HTTP', port: 80, proto: 'TCP' },
+            { name: 'Luna EMR HTTP', port: 3200, proto: 'TCP' },
             { name: 'Luna EMR DNS', port: 53, proto: 'UDP' },
             { name: 'Luna EMR NBNS', port: 137, proto: 'UDP' }
         ];
@@ -88,7 +88,7 @@ function configureAppServer() {
     }
     
     const settings = {
-        'PORT': '80',
+        'PORT': '3200',
         'LAN_IP': lanIp,
         'DOMAIN_NAME': DOMAIN
     };

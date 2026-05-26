@@ -55,6 +55,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { formatDateStandard, formatDateTimeStandard } from '../utils/date';
 import { PatientStatus } from '../constants/workflow';
+import './Consultations.css';
 
 // --- TYPES ---
 interface Medication {
@@ -113,6 +114,183 @@ const ODSideBySide = ({ label, childrenOD, childrenOS }: any) => (
   </div>
 );
 
+const getAcuitySeverity = (val: string) => {
+  if (!val) return { label: 'Not Tested', color: '#64748b', bg: '#f1f5f9' };
+  
+  // Near Vision Options
+  if (val.startsWith('N')) {
+    const num = parseInt(val.substring(1), 10);
+    if (num <= 6) return { label: 'Normal Near', color: '#10b981', bg: '#ecfdf5' };
+    if (num <= 12) return { label: 'Mild Impairment', color: '#f59e0b', bg: '#fffbeb' };
+    if (num <= 24) return { label: 'Mod Impairment', color: '#f97316', bg: '#fff7ed' };
+    return { label: 'Severe Impairment', color: '#ef4444', bg: '#fef2f2' };
+  }
+  
+  // Snellen Distance Options
+  if (val === '6/6') return { label: 'Normal Vision', color: '#10b981', bg: '#ecfdf5' };
+  if (val === '6/9' || val === '6/12') return { label: 'Mild Impairment', color: '#f59e0b', bg: '#fffbeb' };
+  if (val === '6/18' || val === '6/24' || val === '6/36') return { label: 'Mod Impairment', color: '#f97316', bg: '#fff7ed' };
+  if (val === '6/60' || val === '3/60' || val === '1/60') return { label: 'Severe Impairment', color: '#ef4444', bg: '#fef2f2' };
+  if (['CF', 'HM', 'PL', 'NPL'].includes(val)) return { label: 'Profound Impairment', color: '#7c3aed', bg: '#f5f3ff' };
+  
+  return { label: 'Custom', color: '#64748b', bg: '#f1f5f9' };
+};
+
+const VisualAcuitySelector = ({ options, value, onChange, disabled }: { options: string[]; value: string; onChange: (val: string) => void; disabled?: boolean }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const severity = getAcuitySeverity(value);
+  
+  // Decide which quick-select options to display based on the type of options list
+  const isNear = options.some(opt => /^N\d+/.test(opt));
+  const quickOptions = isNear 
+    ? ['N5', 'N8', 'N12', 'N18'] 
+    : ['6/6', '6/12', '6/60', 'CF', 'NPL'];
+
+  return (
+    <div className="va-selector-container">
+      {/* Quick Select Chips */}
+      <div className="va-chips-wrapper">
+        {quickOptions.map(opt => {
+          const isSelected = value === opt;
+          const optSeverity = getAcuitySeverity(opt);
+          return (
+            <button
+              key={opt}
+              type="button"
+              disabled={disabled}
+              onClick={() => onChange(opt)}
+              className={`va-quick-chip ${isSelected ? 'active' : ''}`}
+              style={{
+                '--chip-active-color': optSeverity.color,
+                '--chip-active-bg': optSeverity.bg
+              } as React.CSSProperties}
+            >
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Custom Dropdown */}
+      <div className="va-dropdown-container">
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => setIsOpen(!isOpen)}
+          className={`va-dropdown-trigger ${isOpen ? 'open' : ''}`}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span 
+              className="clinical-indicator-dot" 
+              style={{ 
+                backgroundColor: severity.color,
+                margin: 0,
+                width: '10px',
+                height: '10px',
+                boxShadow: `0 0 6px ${severity.color}80` 
+              }} 
+            />
+            <span style={{ fontWeight: 800, fontSize: '13px' }}>
+              {value || 'Not Tested'}
+            </span>
+            <span className="va-severity-badge" style={{ backgroundColor: severity.bg, color: severity.color }}>
+              {severity.label}
+            </span>
+          </div>
+          <svg 
+            xmlns="http://www.w3.org/2000/svg" 
+            width="16" 
+            height="16" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2.5" 
+            strokeLinecap="round" 
+            strokeLinejoin="round" 
+            className="chevron-icon"
+            style={{ 
+              transition: 'transform 0.2s ease', 
+              transform: isOpen ? 'rotate(180deg)' : 'none',
+              marginLeft: 'auto',
+              color: '#94a3b8'
+            }}
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+
+        {isOpen && (
+          <>
+            {/* Backdrop */}
+            <div 
+              style={{ 
+                position: 'fixed', 
+                inset: 0, 
+                zIndex: 999, 
+                cursor: 'default' 
+              }} 
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+              }} 
+            />
+            
+            {/* Dropdown Menu */}
+            <div className="va-dropdown-menu custom-scrollbar">
+              <div className="va-dropdown-header">Select Acuity Value</div>
+              
+              {options.map(opt => {
+                const isItemSel = value === opt;
+                const itemSeverity = getAcuitySeverity(opt);
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => {
+                      onChange(opt);
+                      setIsOpen(false);
+                    }}
+                    className={`va-dropdown-item ${isItemSel ? 'active' : ''}`}
+                  >
+                    <span 
+                      className="clinical-indicator-dot" 
+                      style={{ 
+                        backgroundColor: itemSeverity.color, 
+                        margin: 0,
+                        width: '8px',
+                        height: '8px'
+                      }} 
+                    />
+                    <span style={{ fontWeight: 700, fontSize: '13px', color: '#1e293b' }}>
+                      {opt}
+                    </span>
+                    <span className="va-severity-badge" style={{ backgroundColor: itemSeverity.bg, color: itemSeverity.color, marginLeft: 'auto' }}>
+                      {itemSeverity.label}
+                    </span>
+                  </button>
+                );
+              })}
+              
+              <div style={{ padding: '8px', borderTop: '1px solid #f1f5f9', marginTop: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange('');
+                    setIsOpen(false);
+                  }}
+                  className="va-dropdown-clear-btn"
+                >
+                  Clear Selection
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // --- MAIN PAGE COMPONENT ---
 
 export const Consultations: React.FC = () => {
@@ -131,16 +309,16 @@ export const Consultations: React.FC = () => {
   const menuItems = [
     { id: 'History', label: 'History & Complaint', icon: User },
     { id: 'Vitals', label: 'Vitals Review', icon: Activity },
-    { id: 'Vision', label: 'Visual Acuity', icon: Eye },
-    { id: 'IOP', label: 'Intraocular Pressure', icon: Target },
-    { id: 'Refraction', label: 'Refraction', icon: Glasses },
-    { id: 'AnteriorSeg', label: 'Anterior Segment', icon: Eye },
-    { id: 'Dilation', label: 'Dilation', icon: Droplets },
-    { id: 'Fundoscopy', label: 'Fundoscopy', icon: Eye },
-    { id: 'Diagnosis', label: 'Clinical Diagnosis', icon: Target },
-    { id: 'Plan', label: 'Treatment Plan', icon: Pill },
-    { id: 'Notes', label: 'Clinical Notes', icon: ClipboardList },
-    { id: 'Surgery', label: 'Surgery & Admission', icon: Scissors }
+    { id: 'Vision', label: '1. Visual Acuity', icon: Eye },
+    { id: 'OcularExam', label: '2. Ocular Examination', icon: Eye },
+    { id: 'Refraction', label: '3. Refraction', icon: Glasses },
+    { id: 'DilatedFunduscopy', label: '4. Dilated Funduscopy', icon: Droplets },
+    { id: 'CVF', label: '5. Confrontation Fields (CVF)', icon: Eye },
+    { id: 'Pachymetry', label: '6. Pachymetry', icon: Target },
+    { id: 'Investigations', label: '7. Investigations', icon: ClipboardList },
+    { id: 'Diagnosis', label: '8. Clinical Diagnosis', icon: Target },
+    { id: 'Plan', label: '9. Treatment Plan', icon: Pill },
+    { id: 'Surgery', label: '10. Surgery & Admission', icon: Scissors }
   ];
   const [showTriageModal, setShowTriageModal] = useState(false);
   const [showSendBackModal, setShowSendBackModal] = useState(false);
@@ -148,6 +326,16 @@ export const Consultations: React.FC = () => {
   const [triageData, setTriageData] = useState<any>(null);
   const [historyList, setHistoryList] = useState<any[]>([]);
   const [sendBackNote, setSendBackNote] = useState('');
+
+  const [labTests, setLabTests] = useState<any[]>([]);
+  const [patientInvestigations, setPatientInvestigations] = useState<any[]>([]);
+  const [selectedLabTestId, setSelectedLabTestId] = useState<string>('');
+  const [commentsState, setCommentsState] = useState<{ [key: number]: string }>({});
+  const [isDispatching, setIsDispatching] = useState(false);
+
+  const [drugInventory, setDrugInventory] = useState<any[]>([]);
+  const [activeDrugSearchIdx, setActiveDrugSearchIdx] = useState<number | null>(null);
+  const [activeSelectionIndex, setActiveSelectionIndex] = useState<number>(0);
 
   const [formData, setFormData] = useState<any>({
     complaint: '', hpi: '', ocular_history: '', medical_history: '', drug_history: '', allergies: '', family_history: '',
@@ -192,10 +380,16 @@ export const Consultations: React.FC = () => {
     plan_meds: [] as Medication[],
     plan_types: [],
     plan_followup_date: '', plan_instructions: '',
+    investigations_notes: '',
     notes_internal: '', notes_reception: '', notes_nurse: '',
     surgery_advised: false, surgery_type: '', surgery_urgency: 'Elective', surgery_notes: '',
     surgery_date: '', surgery_surgeon: '', surgery_preop: '', surgery_counselled: false, surgery_counsel_notes: '',
-    admission_advised: false, admission_reason: '', admission_urgency: 'Routine'
+    admission_advised: false, admission_reason: '', admission_urgency: 'Routine',
+    exam_gonioscopy_od: 'Open Angle (Grade 4)', exam_gonioscopy_os: 'Open Angle (Grade 4)', exam_gonioscopy_notes: '',
+    exam_fundus_od: 'Normal', exam_fundus_os: 'Normal', exam_fundus_notes: '',
+    cvf_od: 'Full', cvf_os: 'Full', cvf_notes: '',
+    pachymetry_od: '', pachymetry_os: '', pachymetry_notes: '',
+    investigations_fbs: '', investigations_rbs: '', investigations_hba1c: '', investigations_rvs: 'Not Done'
   });
 
   const [sectionStatus, setSectionStatus] = useState<any>({});
@@ -242,16 +436,16 @@ export const Consultations: React.FC = () => {
         const status: any = {};
         if ((savedData as any).complaint) status['History'] = true;
         if ((savedData as any).vitals_bp_systolic) status['Vitals'] = true;
-        if ((savedData as any).va_od_unaided_dv) status['VA'] = true;
-        if ((savedData as any).iop_od) status['IOP'] = true;
+        if ((savedData as any).va_od_unaided_dv) status['Vision'] = true;
+        if ((savedData as any).as_lids_od || (savedData as any).iop_od || (savedData as any).exam_gonioscopy_od) status['OcularExam'] = true;
         if ((savedData as any).ref_od_sph) status['Refraction'] = true;
-        if ((savedData as any).as_lids_od) status['AnteriorSeg'] = true;
-        if ((savedData as any).dil_adequate) status['Dilation'] = true;
-        if ((savedData as any).fs_disc_cdr_od) status['Fundoscopy'] = true;
-        if ((savedData as any).diag_od) status['Diagnosis'] = true;
+        if ((savedData as any).dil_adequate || (savedData as any).fs_disc_cdr_od) status['DilatedFunduscopy'] = true;
+        if ((savedData as any).cvf_od) status['CVF'] = true;
+        if ((savedData as any).pachymetry_od) status['Pachymetry'] = true;
+        if ((savedData as any).investigations_fbs || (savedData as any).patientInvestigations?.length > 0) status['Investigations'] = true;
+        if ((savedData as any).diagnosis_primary) status['Diagnosis'] = true;
         if ((savedData as any).plan_meds?.length > 0) status['Plan'] = true;
-        if ((savedData as any).clinical_notes) status['Notes'] = true;
-        if ((savedData as any).surgery_advised) status['Surgery'] = true;
+        if ((savedData as any).surgery_advised || (savedData as any).admission_advised) status['Surgery'] = true;
         setSectionStatus(status);
         
         setIsLocked(currentConsultation.finalized === 1 || currentConsultation.finalize === 1);
@@ -287,6 +481,70 @@ export const Consultations: React.FC = () => {
     }
   }, []);
 
+  // Load lab/diagnostic & drug inventory items
+  useEffect(() => {
+    api.getInventory().then((items: any[]) => {
+      const tests = items.filter((i: any) =>
+        ['laboratory', 'test', 'lab test', 'diagnostic'].includes((i.category || '').toLowerCase())
+      );
+      setLabTests(tests);
+      const drugs = items.filter((i: any) =>
+        ['drugs', 'medication', 'drug', 'pharmacy'].includes((i.category || '').toLowerCase())
+      );
+      setDrugInventory(drugs);
+    }).catch(console.warn);
+  }, []);
+
+  const loadPatientInvestigations = useCallback(async (patientId: string) => {
+    try {
+      const data = await api.getInvestigations(patientId);
+      const list = Array.isArray(data) ? data : [];
+      setPatientInvestigations(list);
+      // Seed local comment state from saved medical_comments
+      const seed: { [key: number]: string } = {};
+      list.forEach((inv: any) => { seed[inv.id] = inv.medical_comments || ''; });
+      setCommentsState(seed);
+    } catch (err) {
+      console.warn('Failed to load patient investigations:', err);
+    }
+  }, []);
+
+  const handleDispatchTest = async () => {
+    if (!selectedLabTestId || !selectedPatient) return;
+    const test = labTests.find((t: any) => String(t.id) === String(selectedLabTestId));
+    if (!test) return;
+    setIsDispatching(true);
+    try {
+      await api.requestInvestigation({
+        patient_id: selectedPatient.patient_id || selectedPatient.id,
+        test_name: test.name,
+        requested_by: user?.full_name || 'Clinician',
+        inventory_id: test.id,
+        unit: test.unit || '',
+        reference_range: test.reference_range || ''
+      });
+      notify('success', `Test dispatched to LIS: ${test.name}`);
+      setSelectedLabTestId('');
+      await loadPatientInvestigations(selectedPatient.patient_id || selectedPatient.id);
+    } catch (err: any) {
+      notify('error', `Failed to dispatch test: ${err.message}`);
+    } finally {
+      setIsDispatching(false);
+    }
+  };
+
+  const handleSaveComment = async (invId: number) => {
+    try {
+      await api.updateInvestigationResult(invId, { medical_comments: commentsState[invId] || '' });
+      notify('success', 'Clinician comment saved');
+      if (selectedPatient) {
+        await loadPatientInvestigations(selectedPatient.patient_id || selectedPatient.id);
+      }
+    } catch (err: any) {
+      notify('error', `Failed to save comment: ${err.message}`);
+    }
+  };
+
   const handlePatientSelect = async (p: any) => {
     try {
       await api.updateVisitStatus(p.visit_id, PatientStatus.IN_CONSULTATION, user?.full_name);
@@ -300,6 +558,8 @@ export const Consultations: React.FC = () => {
       
       setIsDirty(false); // Reset dirty state on new patient
       setIsLocked(false); // Reset lock
+      setSelectedLabTestId(''); // Reset test selection
+      await loadPatientInvestigations(p.patient_id || p.id);
       notify('info', `Consultation Started: ${p.full_name}`);
       loadQueue();
     } catch (err: any) {
@@ -317,7 +577,7 @@ export const Consultations: React.FC = () => {
 
   const markSectionNormal = (section: string) => {
     const normalValues: any = {};
-    if (section === 'AnteriorSeg') {
+    if (section === 'OcularExam') {
       normalValues.as_lids_od = 'Normal'; normalValues.as_lids_os = 'Normal';
       normalValues.as_conj_od = 'Normal'; normalValues.as_conj_os = 'Normal';
       normalValues.as_cornea_od = 'Clear'; normalValues.as_cornea_os = 'Clear';
@@ -325,7 +585,11 @@ export const Consultations: React.FC = () => {
       normalValues.as_ac_cells_od = 'None'; normalValues.as_ac_cells_os = 'None';
       normalValues.as_iris_od = 'Normal'; normalValues.as_iris_os = 'Normal';
       normalValues.as_lens_od = 'Clear'; normalValues.as_lens_os = 'Clear';
-    } else if (section === 'Fundoscopy') {
+      normalValues.exam_gonioscopy_od = 'Open Angle (Grade 4)'; normalValues.exam_gonioscopy_os = 'Open Angle (Grade 4)';
+      normalValues.exam_fundus_od = 'Normal'; normalValues.exam_fundus_os = 'Normal';
+    } else if (section === 'DilatedFunduscopy') {
+      normalValues.dil_adequate = 'Adequate';
+      normalValues.dil_od = 'Yes'; normalValues.dil_os = 'Yes';
       normalValues.fs_disc_margins_od = 'Distinct'; normalValues.fs_disc_margins_os = 'Distinct';
       normalValues.fs_disc_color_od = 'Pink'; normalValues.fs_disc_color_os = 'Pink';
       normalValues.fs_macula_od = 'Normal Reflex'; normalValues.fs_macula_os = 'Normal Reflex';
@@ -363,10 +627,10 @@ export const Consultations: React.FC = () => {
      if (finalize) {
        const missing = [];
        if (!formData.complaint || formData.complaint.trim().length < 5) {
-         missing.push('Section A: Chief Complaint (min 5 chars)');
+         missing.push('Section 1: Chief Complaint (min 5 chars)');
        }
         if (!formData.diagnosis_primary?.trim()) {
-          missing.push('Section I: Primary Diagnosis');
+          missing.push('Section 8: Primary Diagnosis');
         }
 
        if (missing.length > 0) {
@@ -536,7 +800,7 @@ export const Consultations: React.FC = () => {
                 <div className="clinical-group-title">Acuity Measurements</div>
                 <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
                    <span style={{ fontSize: '12px', fontWeight: '800', color: '#64748b' }}>METHOD:</span>
-                   <select className="clinical-input" name="va_method" value={formData.va_method} onChange={handleInputChange} style={{ height: '40px', width: '180px' }}>
+                   <select className="clinical-input" name="va_method" value={formData.va_method} onChange={handleInputChange} style={{ height: '40px', width: '180px' }} disabled={isLocked}>
                       <option>Snellen Chart</option>
                       <option>LogMAR</option>
                       <option>Allen Pictures</option>
@@ -544,43 +808,236 @@ export const Consultations: React.FC = () => {
                    </select>
                 </div>
               </div>
-              
-              <div style={{ display: 'grid', gap: '40px' }}>
-                <ODSideBySide label="DISTANCE VISION (Unaided)" 
-                  childrenOD={<ClinicalField><select className="clinical-input" name="va_od_unaided_dv" value={formData.va_od_unaided_dv} onChange={handleInputChange}><option value="">Select Result</option>{SNELLEN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>}
-                  childrenOS={<ClinicalField><select className="clinical-input" name="va_os_unaided_dv" value={formData.va_os_unaided_dv} onChange={handleInputChange}><option value="">Select Result</option>{SNELLEN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>}
-                />
-                <ODSideBySide label="NEAR VISION (Unaided)" 
-                  childrenOD={<ClinicalField><select className="clinical-input" name="va_od_unaided_nv" value={formData.va_od_unaided_nv} onChange={handleInputChange}><option value="">Select Result</option>{['N5', 'N6', 'N8', 'N10', 'N12', 'N14', 'N18', 'N24', 'N36', 'N48'].map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>}
-                  childrenOS={<ClinicalField><select className="clinical-input" name="va_os_unaided_nv" value={formData.va_os_unaided_nv} onChange={handleInputChange}><option value="">Select Result</option>{['N5', 'N6', 'N8', 'N10', 'N12', 'N14', 'N18', 'N24', 'N36', 'N48'].map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>}
-                />
-                <ODSideBySide label="PINHOLE (PH)" 
-                  childrenOD={<ClinicalField><select className="clinical-input" name="va_od_ph" value={formData.va_od_ph} onChange={handleInputChange}><option value="">Select Result</option>{SNELLEN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>}
-                  childrenOS={<ClinicalField><select className="clinical-input" name="va_os_ph" value={formData.va_os_ph} onChange={handleInputChange}><option value="">Select Result</option>{SNELLEN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>}
+
+              <ODSideBySide 
+                childrenOD={
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                    <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                      <span className="clinical-label-premium" style={{ fontSize: '12px', color: 'var(--leh-primary)', marginBottom: '8px', display: 'block' }}>DISTANCE VISION</span>
+                      <div style={{ display: 'grid', gap: '16px' }}>
+                        <div>
+                          <label className="clinical-label-premium" style={{ fontSize: '10px', color: '#64748b' }}>Unaided (DV)</label>
+                          <VisualAcuitySelector 
+                            options={SNELLEN_OPTIONS} 
+                            value={formData.va_od_unaided_dv} 
+                            onChange={(val) => {
+                              setFormData((prev: any) => ({ ...prev, va_od_unaided_dv: val }));
+                              setIsDirty(true);
+                            }}
+                            disabled={isLocked}
+                          />
+                        </div>
+                        <div>
+                          <label className="clinical-label-premium" style={{ fontSize: '10px', color: '#64748b' }}>Aided (DV)</label>
+                          <VisualAcuitySelector 
+                            options={SNELLEN_OPTIONS} 
+                            value={formData.va_od_aided_dv} 
+                            onChange={(val) => {
+                              setFormData((prev: any) => ({ ...prev, va_od_aided_dv: val }));
+                              setIsDirty(true);
+                            }}
+                            disabled={isLocked}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                      <span className="clinical-label-premium" style={{ fontSize: '12px', color: 'var(--leh-primary)', marginBottom: '8px', display: 'block' }}>NEAR VISION</span>
+                      <div style={{ display: 'grid', gap: '16px' }}>
+                        <div>
+                          <label className="clinical-label-premium" style={{ fontSize: '10px', color: '#64748b' }}>Unaided (NV)</label>
+                          <VisualAcuitySelector 
+                            options={['N5', 'N6', 'N8', 'N10', 'N12', 'N14', 'N18', 'N24', 'N36', 'N48']} 
+                            value={formData.va_od_unaided_nv} 
+                            onChange={(val) => {
+                              setFormData((prev: any) => ({ ...prev, va_od_unaided_nv: val }));
+                              setIsDirty(true);
+                            }}
+                            disabled={isLocked}
+                          />
+                        </div>
+                        <div>
+                          <label className="clinical-label-premium" style={{ fontSize: '10px', color: '#64748b' }}>Aided (NV)</label>
+                          <VisualAcuitySelector 
+                            options={['N5', 'N6', 'N8', 'N10', 'N12', 'N14', 'N18', 'N24', 'N36', 'N48']} 
+                            value={formData.va_od_aided_nv} 
+                            onChange={(val) => {
+                              setFormData((prev: any) => ({ ...prev, va_od_aided_nv: val }));
+                              setIsDirty(true);
+                            }}
+                            disabled={isLocked}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                      <span className="clinical-label-premium" style={{ fontSize: '12px', color: 'var(--leh-primary)', marginBottom: '8px', display: 'block' }}>PINHOLE (PH)</span>
+                      <VisualAcuitySelector 
+                        options={SNELLEN_OPTIONS} 
+                        value={formData.va_od_ph} 
+                        onChange={(val) => {
+                          setFormData((prev: any) => ({ ...prev, va_od_ph: val }));
+                          setIsDirty(true);
+                        }}
+                        disabled={isLocked}
+                      />
+                    </div>
+                  </div>
+                }
+                childrenOS={
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                    <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                      <span className="clinical-label-premium" style={{ fontSize: '12px', color: 'var(--leh-primary)', marginBottom: '8px', display: 'block' }}>DISTANCE VISION</span>
+                      <div style={{ display: 'grid', gap: '16px' }}>
+                        <div>
+                          <label className="clinical-label-premium" style={{ fontSize: '10px', color: '#64748b' }}>Unaided (DV)</label>
+                          <VisualAcuitySelector 
+                            options={SNELLEN_OPTIONS} 
+                            value={formData.va_os_unaided_dv} 
+                            onChange={(val) => {
+                              setFormData((prev: any) => ({ ...prev, va_os_unaided_dv: val }));
+                              setIsDirty(true);
+                            }}
+                            disabled={isLocked}
+                          />
+                        </div>
+                        <div>
+                          <label className="clinical-label-premium" style={{ fontSize: '10px', color: '#64748b' }}>Aided (DV)</label>
+                          <VisualAcuitySelector 
+                            options={SNELLEN_OPTIONS} 
+                            value={formData.va_os_aided_dv} 
+                            onChange={(val) => {
+                              setFormData((prev: any) => ({ ...prev, va_os_aided_dv: val }));
+                              setIsDirty(true);
+                            }}
+                            disabled={isLocked}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                      <span className="clinical-label-premium" style={{ fontSize: '12px', color: 'var(--leh-primary)', marginBottom: '8px', display: 'block' }}>NEAR VISION</span>
+                      <div style={{ display: 'grid', gap: '16px' }}>
+                        <div>
+                          <label className="clinical-label-premium" style={{ fontSize: '10px', color: '#64748b' }}>Unaided (NV)</label>
+                          <VisualAcuitySelector 
+                            options={['N5', 'N6', 'N8', 'N10', 'N12', 'N14', 'N18', 'N24', 'N36', 'N48']} 
+                            value={formData.va_os_unaided_nv} 
+                            onChange={(val) => {
+                              setFormData((prev: any) => ({ ...prev, va_os_unaided_nv: val }));
+                              setIsDirty(true);
+                            }}
+                            disabled={isLocked}
+                          />
+                        </div>
+                        <div>
+                          <label className="clinical-label-premium" style={{ fontSize: '10px', color: '#64748b' }}>Aided (NV)</label>
+                          <VisualAcuitySelector 
+                            options={['N5', 'N6', 'N8', 'N10', 'N12', 'N14', 'N18', 'N24', 'N36', 'N48']} 
+                            value={formData.va_os_aided_nv} 
+                            onChange={(val) => {
+                              setFormData((prev: any) => ({ ...prev, va_os_aided_nv: val }));
+                              setIsDirty(true);
+                            }}
+                            disabled={isLocked}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                      <span className="clinical-label-premium" style={{ fontSize: '12px', color: 'var(--leh-primary)', marginBottom: '8px', display: 'block' }}>PINHOLE (PH)</span>
+                      <VisualAcuitySelector 
+                        options={SNELLEN_OPTIONS} 
+                        value={formData.va_os_ph} 
+                        onChange={(val) => {
+                          setFormData((prev: any) => ({ ...prev, va_os_ph: val }));
+                          setIsDirty(true);
+                        }}
+                        disabled={isLocked}
+                      />
+                    </div>
+                  </div>
+                }
+              />
+
+              <div className="leh-form-group" style={{ marginTop: '32px' }}>
+                <label className="clinical-label-premium">Visual Acuity Clinical Notes</label>
+                <textarea 
+                  className="clinical-textarea" 
+                  name="va_notes" 
+                  value={formData.va_notes} 
+                  onChange={handleInputChange} 
+                  placeholder="Enter any notes on visual acuity, test behaviors, anomalies..."
+                  disabled={isLocked}
+                  style={{ height: '80px' }}
                 />
               </div>
+
             </div>
           </div>
         );
-      case 'IOP':
+      case 'OcularExam':
         return (
           <div className="animate-slide-up">
-            <SectionHeader title="Section D: Intraocular Pressure" icon={Target} onSave={() => handleSave(false)} isSaving={isSaving} />
+            <SectionHeader title="Section 2: Ocular Examination" icon={Eye} onMarkNormal={() => markSectionNormal('OcularExam')} onSave={() => handleSave(false)} isSaving={isSaving} />
             <div className="clinical-section-card">
               <div className="clinical-group-header" style={{ marginBottom: '32px' }}>
-                <div className="clinical-group-title">Tonometry Results</div>
-                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                   <span style={{ fontSize: '12px', fontWeight: '800', color: '#64748b' }}>METHOD:</span>
-                   <select className="clinical-input" name="iop_method" value={formData.iop_method} onChange={handleInputChange} style={{ height: '40px', width: '220px' }}>
-                      <option>Non-contact Tonometer</option>
-                      <option>Goldmann Applanation</option>
-                      <option>Tono-Pen</option>
-                      <option>iCare</option>
-                   </select>
-                </div>
+                <div className="clinical-group-title">Slit Lamp Biomicroscopy</div>
               </div>
               
-              <div style={{ display: 'grid', gap: '40px' }}>
+              <div style={{ display: 'grid', gap: '32px' }}>
+                <ODSideBySide label="LIDS & ADNEXA" 
+                  childrenOD={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_lids_od" value={formData.as_lids_od} onChange={handleInputChange} disabled={isLocked}>{LIDS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_lids_notes_od" value={formData.as_lids_notes_od} onChange={handleInputChange} placeholder="Lid notes..." style={{ height: '38px', fontSize: '12px' }} disabled={isLocked} /></div>}
+                  childrenOS={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_lids_os" value={formData.as_lids_os} onChange={handleInputChange} disabled={isLocked}>{LIDS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_lids_notes_os" value={formData.as_lids_notes_os} onChange={handleInputChange} placeholder="Lid notes..." style={{ height: '38px', fontSize: '12px' }} disabled={isLocked} /></div>}
+                />
+                <ODSideBySide label="CONJUNCTIVA / SCLERA" 
+                  childrenOD={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_conj_od" value={formData.as_conj_od} onChange={handleInputChange} disabled={isLocked}>{CONJ_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_conj_notes_od" value={formData.as_conj_notes_od} onChange={handleInputChange} placeholder="Conj notes..." style={{ height: '38px', fontSize: '12px' }} disabled={isLocked} /></div>}
+                  childrenOS={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_conj_os" value={formData.as_conj_os} onChange={handleInputChange} disabled={isLocked}>{CONJ_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_conj_notes_os" value={formData.as_conj_notes_os} onChange={handleInputChange} placeholder="Conj notes..." style={{ height: '38px', fontSize: '12px' }} disabled={isLocked} /></div>}
+                />
+                <ODSideBySide label="CORNEA / TEAR FILM" 
+                  childrenOD={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_cornea_od" value={formData.as_cornea_od} onChange={handleInputChange} disabled={isLocked}>{CORNEA_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_cornea_notes_od" value={formData.as_cornea_notes_od} onChange={handleInputChange} placeholder="Cornea notes..." style={{ height: '38px', fontSize: '12px' }} disabled={isLocked} /></div>}
+                  childrenOS={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_cornea_os" value={formData.as_cornea_os} onChange={handleInputChange} disabled={isLocked}>{CORNEA_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_cornea_notes_os" value={formData.as_cornea_notes_os} onChange={handleInputChange} placeholder="Cornea notes..." style={{ height: '38px', fontSize: '12px' }} disabled={isLocked} /></div>}
+                />
+                <ODSideBySide label="ANTERIOR CHAMBER" 
+                  childrenOD={
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <ClinicalField label="Depth"><select className="clinical-input" name="as_ac_depth_od" value={formData.as_ac_depth_od} onChange={handleInputChange} disabled={isLocked}>{AC_DEPTH_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
+                      <ClinicalField label="Cells"><select className="clinical-input" name="as_ac_cells_od" value={formData.as_ac_cells_od} onChange={handleInputChange} disabled={isLocked}>{AC_CELLS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
+                    </div>
+                  }
+                  childrenOS={
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <ClinicalField label="Depth"><select className="clinical-input" name="as_ac_depth_os" value={formData.as_ac_depth_os} onChange={handleInputChange} disabled={isLocked}>{AC_DEPTH_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
+                      <ClinicalField label="Cells"><select className="clinical-input" name="as_ac_cells_os" value={formData.as_ac_cells_os} onChange={handleInputChange} disabled={isLocked}>{AC_CELLS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
+                    </div>
+                  }
+                />
+                <ODSideBySide label="IRIS / PUPIL" 
+                  childrenOD={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_iris_od" value={formData.as_iris_od} onChange={handleInputChange} disabled={isLocked}>{IRIS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_iris_notes_od" value={formData.as_iris_notes_od} onChange={handleInputChange} placeholder="Iris notes..." style={{ height: '38px', fontSize: '12px' }} disabled={isLocked} /></div>}
+                  childrenOS={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_iris_os" value={formData.as_iris_os} onChange={handleInputChange} disabled={isLocked}>{IRIS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_iris_notes_os" value={formData.as_iris_notes_os} onChange={handleInputChange} placeholder="Iris notes..." style={{ height: '38px', fontSize: '12px' }} disabled={isLocked} /></div>}
+                />
+                <ODSideBySide label="LENS (Cataract Grading)" 
+                  childrenOD={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_lens_od" value={formData.as_lens_od} onChange={handleInputChange} disabled={isLocked}>{LENS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_lens_notes_od" value={formData.as_lens_notes_od} onChange={handleInputChange} placeholder="Lens notes..." style={{ height: '38px', fontSize: '12px' }} disabled={isLocked} /></div>}
+                  childrenOS={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_lens_os" value={formData.as_lens_os} onChange={handleInputChange} disabled={isLocked}>{LENS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_lens_notes_os" value={formData.as_lens_notes_os} onChange={handleInputChange} placeholder="Lens notes..." style={{ height: '38px', fontSize: '12px' }} disabled={isLocked} /></div>}
+                />
+
+                <div className="clinical-group-header" style={{ marginTop: '40px', marginBottom: '32px' }}>
+                  <div className="clinical-group-title">Tonometry & IOP</div>
+                  <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                     <span style={{ fontSize: '12px', fontWeight: '800', color: '#64748b' }}>METHOD:</span>
+                     <select className="clinical-input" name="iop_method" value={formData.iop_method} onChange={handleInputChange} style={{ height: '40px', width: '220px' }} disabled={isLocked}>
+                        <option>Non-contact Tonometer</option>
+                        <option>Goldmann Applanation</option>
+                        <option>Tono-Pen</option>
+                        <option>iCare</option>
+                     </select>
+                  </div>
+                </div>
+                
                 <ODSideBySide label="IOP (mmHg)" 
                   childrenOD={
                     <div style={{ position: 'relative' }}>
@@ -591,7 +1048,7 @@ export const Consultations: React.FC = () => {
                   }
                   childrenOS={
                     <div style={{ position: 'relative' }}>
-                      <input type="number" className="clinical-input" name="iop_os" value={formData.iop_os} onChange={handleInputChange} placeholder="0" style={{ border: formData.iop_os > 21 ? '2px solid #ef4444' : '', background: formData.iop_os > 21 ? '#fff1f2' : '', paddingRight: '60px' }} />
+                      <input type="number" className="clinical-input" name="iop_os" value={formData.iop_os} onChange={handleInputChange} placeholder="0" style={{ border: formData.iop_os > 21 ? '2px solid #ef4444' : '', background: formData.iop_os > 21 ? '#fff1f2' : '', paddingRight: '60px' }} disabled={isLocked} />
                       <span style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', fontWeight: '800', color: '#94a3b8' }}>mmHg</span>
                       {formData.iop_os > 21 && <div className="clinical-indicator-dot dot-elevated" style={{ position: 'absolute', right: '4px', top: '4px' }}></div>}
                     </div>
@@ -601,13 +1058,84 @@ export const Consultations: React.FC = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 2.5fr', gap: '32px' }}>
                    <div className="leh-form-group">
                       <label className="clinical-label-premium">Time of Measurement</label>
-                      <input type="time" className="clinical-input" name="iop_time" value={formData.iop_time} onChange={handleInputChange} />
+                      <input type="time" className="clinical-input" name="iop_time" value={formData.iop_time} onChange={handleInputChange} disabled={isLocked} />
                    </div>
                    <div className="leh-form-group">
                       <label className="clinical-label-premium">Tonometry Observations</label>
-                      <input type="text" className="clinical-input" name="iop_notes" value={formData.iop_notes} onChange={handleInputChange} placeholder="Asymmetry, corneal thickness corrections..." />
+                      <input type="text" className="clinical-input" name="iop_notes" value={formData.iop_notes} onChange={handleInputChange} placeholder="Asymmetry, corneal thickness corrections..." disabled={isLocked} />
                    </div>
                 </div>
+
+                <div className="clinical-group-header" style={{ marginTop: '40px', marginBottom: '32px' }}>
+                  <div className="clinical-group-title">Gonioscopy</div>
+                </div>
+                <ODSideBySide label="GONIOSCOPY" 
+                  childrenOD={
+                    <select className="clinical-input" name="exam_gonioscopy_od" value={formData.exam_gonioscopy_od} onChange={handleInputChange} disabled={isLocked}>
+                      <option value="">Select Grade/Findings</option>
+                      <option value="Open Angle (Grade 4)">Open Angle (Grade 4)</option>
+                      <option value="Open Angle (Grade 3)">Open Angle (Grade 3)</option>
+                      <option value="Narrow Angle (Grade 2)">Narrow Angle (Grade 2)</option>
+                      <option value="Narrow Angle (Grade 1)">Narrow Angle (Grade 1)</option>
+                      <option value="Closed Angle (Grade 0)">Closed Angle (Grade 0)</option>
+                      <option value="PAS (Peripheral Anterior Synechiae)">PAS (Peripheral Anterior Synechiae)</option>
+                      <option value="Neovascularization">Neovascularization</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  }
+                  childrenOS={
+                    <select className="clinical-input" name="exam_gonioscopy_os" value={formData.exam_gonioscopy_os} onChange={handleInputChange} disabled={isLocked}>
+                      <option value="">Select Grade/Findings</option>
+                      <option value="Open Angle (Grade 4)">Open Angle (Grade 4)</option>
+                      <option value="Open Angle (Grade 3)">Open Angle (Grade 3)</option>
+                      <option value="Narrow Angle (Grade 2)">Narrow Angle (Grade 2)</option>
+                      <option value="Narrow Angle (Grade 1)">Narrow Angle (Grade 1)</option>
+                      <option value="Closed Angle (Grade 0)">Closed Angle (Grade 0)</option>
+                      <option value="PAS (Peripheral Anterior Synechiae)">PAS (Peripheral Anterior Synechiae)</option>
+                      <option value="Neovascularization">Neovascularization</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  }
+                />
+                <div className="leh-form-group" style={{ marginTop: '16px' }}>
+                   <label className="clinical-label-premium">Gonioscopy Notes</label>
+                   <input type="text" className="clinical-input" name="exam_gonioscopy_notes" value={formData.exam_gonioscopy_notes} onChange={handleInputChange} placeholder="Angle structure details, pigmentation, etc..." disabled={isLocked} />
+                </div>
+
+                <div className="clinical-group-header" style={{ marginTop: '40px', marginBottom: '32px' }}>
+                  <div className="clinical-group-title">Undilated Fundus Examination</div>
+                </div>
+                <ODSideBySide label="FUNDUS FINDINGS" 
+                  childrenOD={
+                    <select className="clinical-input" name="exam_fundus_od" value={formData.exam_fundus_od} onChange={handleInputChange} disabled={isLocked}>
+                      <option value="Normal">Normal</option>
+                      <option value="Optic Disc Cupping">Optic Disc Cupping</option>
+                      <option value="Macular Degeneration">Macular Degeneration</option>
+                      <option value="Retinal Hemorrhage">Retinal Hemorrhage</option>
+                      <option value="Exudates">Exudates</option>
+                      <option value="Drusen">Drusen</option>
+                      <option value="Vessel Attenuation">Vessel Attenuation</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  }
+                  childrenOS={
+                    <select className="clinical-input" name="exam_fundus_os" value={formData.exam_fundus_os} onChange={handleInputChange} disabled={isLocked}>
+                      <option value="Normal">Normal</option>
+                      <option value="Optic Disc Cupping">Optic Disc Cupping</option>
+                      <option value="Macular Degeneration">Macular Degeneration</option>
+                      <option value="Retinal Hemorrhage">Retinal Hemorrhage</option>
+                      <option value="Exudates">Exudates</option>
+                      <option value="Drusen">Drusen</option>
+                      <option value="Vessel Attenuation">Vessel Attenuation</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  }
+                />
+                <div className="leh-form-group" style={{ marginTop: '16px' }}>
+                   <label className="clinical-label-premium">Undilated Fundus Notes</label>
+                   <input type="text" className="clinical-input" name="exam_fundus_notes" value={formData.exam_fundus_notes} onChange={handleInputChange} placeholder="General posterior pole observations..." disabled={isLocked} />
+                </div>
+
               </div>
             </div>
           </div>
@@ -615,7 +1143,7 @@ export const Consultations: React.FC = () => {
       case 'Refraction':
         return (
           <div className="animate-slide-up">
-            <SectionHeader title="Section E: Refraction (Objective/Subjective)" icon={Glasses} onSave={() => handleSave(false)} isSaving={isSaving} />
+            <SectionHeader title="Section 3: Refraction (Objective/Subjective)" icon={Glasses} onSave={() => handleSave(false)} isSaving={isSaving} />
             
             <div style={{ display: 'grid', gap: '32px' }}>
               <div className="clinical-section-card">
@@ -625,16 +1153,16 @@ export const Consultations: React.FC = () => {
                 <ODSideBySide label="REFRACTION (Sph / Cyl x Axis)" 
                    childrenOD={
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                      <input className="clinical-input" name="ref_od_sph" value={formData.ref_od_sph} onChange={handleInputChange} placeholder="SPH" />
-                      <input className="clinical-input" name="ref_od_cyl" value={formData.ref_od_cyl} onChange={handleInputChange} placeholder="CYL" />
-                      <input className="clinical-input" name="ref_od_axis" value={formData.ref_od_axis} onChange={handleInputChange} placeholder="AXIS" />
+                      <input className="clinical-input" name="ref_od_sph" value={formData.ref_od_sph} onChange={handleInputChange} placeholder="SPH" disabled={isLocked} />
+                      <input className="clinical-input" name="ref_od_cyl" value={formData.ref_od_cyl} onChange={handleInputChange} placeholder="CYL" disabled={isLocked} />
+                      <input className="clinical-input" name="ref_od_axis" value={formData.ref_od_axis} onChange={handleInputChange} placeholder="AXIS" disabled={isLocked} />
                     </div>
                    }
                    childrenOS={
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                      <input className="clinical-input" name="ref_os_sph" value={formData.ref_os_sph} onChange={handleInputChange} placeholder="SPH" />
-                      <input className="clinical-input" name="ref_os_cyl" value={formData.ref_os_cyl} onChange={handleInputChange} placeholder="CYL" />
-                      <input className="clinical-input" name="ref_os_axis" value={formData.ref_os_axis} onChange={handleInputChange} placeholder="AXIS" />
+                      <input className="clinical-input" name="ref_os_sph" value={formData.ref_os_sph} onChange={handleInputChange} placeholder="SPH" disabled={isLocked} />
+                      <input className="clinical-input" name="ref_os_cyl" value={formData.ref_os_cyl} onChange={handleInputChange} placeholder="CYL" disabled={isLocked} />
+                      <input className="clinical-input" name="ref_os_axis" value={formData.ref_os_axis} onChange={handleInputChange} placeholder="AXIS" disabled={isLocked} />
                     </div>
                    }
                 />
@@ -646,70 +1174,24 @@ export const Consultations: React.FC = () => {
                 </div>
                 <div style={{ display: 'grid', gap: '32px' }}>
                    <ODSideBySide label="DISTANCE REFRACTION" 
-                      childrenOD={<div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '8px' }}><input className="clinical-input" name="ref_od_subjective_dv" value={formData.ref_od_subjective_dv} onChange={handleInputChange} placeholder="OD RX" /><input className="clinical-input" name="ref_od_va" value={formData.ref_od_va} onChange={handleInputChange} placeholder="VA" /></div>}
-                      childrenOS={<div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '8px' }}><input className="clinical-input" name="ref_os_subjective_dv" value={formData.ref_os_subjective_dv} onChange={handleInputChange} placeholder="OS RX" /><input className="clinical-input" name="ref_os_va" value={formData.ref_os_va} onChange={handleInputChange} placeholder="VA" /></div>}
+                      childrenOD={<div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '8px' }}><input className="clinical-input" name="ref_od_subjective_dv" value={formData.ref_od_subjective_dv} onChange={handleInputChange} placeholder="OD RX" disabled={isLocked} /><input className="clinical-input" name="ref_od_va" value={formData.ref_od_va} onChange={handleInputChange} placeholder="VA" disabled={isLocked} /></div>}
+                      childrenOS={<div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '8px' }}><input className="clinical-input" name="ref_os_subjective_dv" value={formData.ref_os_subjective_dv} onChange={handleInputChange} placeholder="OS RX" disabled={isLocked} /><input className="clinical-input" name="ref_os_va" value={formData.ref_os_va} onChange={handleInputChange} placeholder="VA" disabled={isLocked} /></div>}
                    />
                    <ODSideBySide label="NEAR ADDITION" 
-                      childrenOD={<input className="clinical-input" name="ref_od_near_add" value={formData.ref_od_near_add} onChange={handleInputChange} placeholder="OD Add" />}
-                      childrenOS={<input className="clinical-input" name="ref_os_near_add" value={formData.ref_os_near_add} onChange={handleInputChange} placeholder="OS Add" />}
+                      childrenOD={<input className="clinical-input" name="ref_od_near_add" value={formData.ref_od_near_add} onChange={handleInputChange} placeholder="OD Add" disabled={isLocked} />}
+                      childrenOS={<input className="clinical-input" name="ref_os_near_add" value={formData.ref_os_near_add} onChange={handleInputChange} placeholder="OS Add" disabled={isLocked} />}
                    />
                 </div>
               </div>
             </div>
           </div>
         );
-      case 'AnteriorSeg':
+      case 'DilatedFunduscopy':
         return (
           <div className="animate-slide-up">
-            <SectionHeader title="Section F: Anterior Segment / Slit Lamp" icon={Eye} onMarkNormal={() => markSectionNormal('AnteriorSeg')} onSave={() => handleSave(false)} isSaving={isSaving} />
-            <div className="clinical-section-card">
-              <div className="clinical-group-header" style={{ marginBottom: '32px' }}>
-                <div className="clinical-group-title">Slit Lamp Biomicroscopy</div>
-              </div>
-              
-              <div style={{ display: 'grid', gap: '32px' }}>
-                <ODSideBySide label="LIDS & ADNEXA" 
-                  childrenOD={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_lids_od" value={formData.as_lids_od} onChange={handleInputChange}>{LIDS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_lids_notes_od" value={formData.as_lids_notes_od} onChange={handleInputChange} placeholder="Lid notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
-                  childrenOS={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_lids_os" value={formData.as_lids_os} onChange={handleInputChange}>{LIDS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_lids_notes_os" value={formData.as_lids_notes_os} onChange={handleInputChange} placeholder="Lid notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
-                />
-                <ODSideBySide label="CONJUNCTIVA / SCLERA" 
-                  childrenOD={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_conj_od" value={formData.as_conj_od} onChange={handleInputChange}>{CONJ_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_conj_notes_od" value={formData.as_conj_notes_od} onChange={handleInputChange} placeholder="Conj notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
-                  childrenOS={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_conj_os" value={formData.as_conj_os} onChange={handleInputChange}>{CONJ_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_conj_notes_os" value={formData.as_conj_notes_os} onChange={handleInputChange} placeholder="Conj notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
-                />
-                <ODSideBySide label="CORNEA / TEAR FILM" 
-                  childrenOD={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_cornea_od" value={formData.as_cornea_od} onChange={handleInputChange}>{CORNEA_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_cornea_notes_od" value={formData.as_cornea_notes_od} onChange={handleInputChange} placeholder="Cornea notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
-                  childrenOS={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_cornea_os" value={formData.as_cornea_os} onChange={handleInputChange}>{CORNEA_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_cornea_notes_os" value={formData.as_cornea_notes_os} onChange={handleInputChange} placeholder="Cornea notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
-                />
-                <ODSideBySide label="ANTERIOR CHAMBER" 
-                  childrenOD={
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                      <ClinicalField label="Depth"><select className="clinical-input" name="as_ac_depth_od" value={formData.as_ac_depth_od} onChange={handleInputChange}>{AC_DEPTH_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
-                      <ClinicalField label="Cells"><select className="clinical-input" name="as_ac_cells_od" value={formData.as_ac_cells_od} onChange={handleInputChange}>{AC_CELLS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
-                    </div>
-                  }
-                  childrenOS={
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                      <ClinicalField label="Depth"><select className="clinical-input" name="as_ac_depth_os" value={formData.as_ac_depth_os} onChange={handleInputChange}>{AC_DEPTH_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
-                      <ClinicalField label="Cells"><select className="clinical-input" name="as_ac_cells_os" value={formData.as_ac_cells_os} onChange={handleInputChange}>{AC_CELLS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
-                    </div>
-                  }
-                />
-                <ODSideBySide label="IRIS / PUPIL" 
-                  childrenOD={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_iris_od" value={formData.as_iris_od} onChange={handleInputChange}>{IRIS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_iris_notes_od" value={formData.as_iris_notes_od} onChange={handleInputChange} placeholder="Iris notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
-                  childrenOS={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_iris_os" value={formData.as_iris_os} onChange={handleInputChange}>{IRIS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_iris_notes_os" value={formData.as_iris_notes_os} onChange={handleInputChange} placeholder="Iris notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
-                />
-                <ODSideBySide label="LENS (Cataract Grading)" 
-                  childrenOD={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_lens_od" value={formData.as_lens_od} onChange={handleInputChange}>{LENS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_lens_notes_od" value={formData.as_lens_notes_od} onChange={handleInputChange} placeholder="Lens notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
-                  childrenOS={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="as_lens_os" value={formData.as_lens_os} onChange={handleInputChange}>{LENS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="as_lens_notes_os" value={formData.as_lens_notes_os} onChange={handleInputChange} placeholder="Lens notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
-                />
-              </div>
-            </div>
-          </div>
-        );
-      case 'Dilation':
-        return (
-          <div className="animate-slide-up">
-            <SectionHeader title="Section G: Dilation" icon={Droplets} onMarkNormal={() => markSectionNormal('Dilation')} onSave={() => handleSave(false)} isSaving={isSaving} />
+            <SectionHeader title="Section 4: Dilated Funduscopy" icon={Droplets} onMarkNormal={() => markSectionNormal('DilatedFunduscopy')} onSave={() => handleSave(false)} isSaving={isSaving} />
+            
+            {/* Dilation Details */}
             <div className="clinical-section-card">
               <div className="clinical-group-header" style={{ marginBottom: '32px' }}>
                 <div className="clinical-group-title">Mydriatic Administration</div>
@@ -717,7 +1199,7 @@ export const Consultations: React.FC = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '32px' }}>
                 <div className="leh-form-group">
                    <label className="clinical-label-premium">Dilation Drops Used</label>
-                   <select className="clinical-input" name="dil_agent" value={formData.dil_agent} onChange={handleInputChange}>
+                   <select className="clinical-input" name="dil_agent" value={formData.dil_agent} onChange={handleInputChange} disabled={isLocked}>
                       <option value="">Select Agent</option>
                       <option>Tropicamide 1%</option>
                       <option>Tropicamide 0.5%</option>
@@ -728,36 +1210,55 @@ export const Consultations: React.FC = () => {
                 </div>
                 <div className="leh-form-group">
                    <label className="clinical-label-premium">Time Administered</label>
-                   <input type="time" className="clinical-input" name="dil_time_od" value={formData.dil_time_od} onChange={handleInputChange} />
+                   <input type="time" className="clinical-input" name="dil_time_od" value={formData.dil_time_od} onChange={handleInputChange} disabled={isLocked} />
                 </div>
               </div>
               <div style={{ marginTop: '32px' }}>
                 <ODSideBySide label="DILATED?" 
                    childrenOD={
-                    <select className="clinical-input" name="dil_od" value={formData.dil_od} onChange={handleInputChange}>
+                    <select className="clinical-input" name="dil_od" value={formData.dil_od} onChange={handleInputChange} disabled={isLocked}>
                        <option value="No">No</option><option value="Yes">Yes</option>
                     </select>
                    }
                    childrenOS={
-                    <select className="clinical-input" name="dil_os" value={formData.dil_os} onChange={handleInputChange}>
+                    <select className="clinical-input" name="dil_os" value={formData.dil_os} onChange={handleInputChange} disabled={isLocked}>
                        <option value="No">No</option><option value="Yes">Yes</option>
                     </select>
                    }
                 />
               </div>
+              <div style={{ marginTop: '32px' }}>
+                <ODSideBySide label="DILATED VA" 
+                   childrenOD={
+                    <input className="clinical-input" name="dil_va_od" value={formData.dil_va_od} onChange={handleInputChange} placeholder="OD VA" disabled={isLocked} />
+                   }
+                   childrenOS={
+                    <input className="clinical-input" name="dil_va_os" value={formData.dil_va_os} onChange={handleInputChange} placeholder="OS VA" disabled={isLocked} />
+                   }
+                />
+              </div>
+              <div style={{ marginTop: '32px', display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '32px' }}>
+                <div className="leh-form-group">
+                  <label className="clinical-label-premium">Dilation Adequacy</label>
+                  <select className="clinical-input" name="dil_adequate" value={formData.dil_adequate} onChange={handleInputChange} disabled={isLocked}>
+                    <option value="Adequate">Adequate</option>
+                    <option value="Inadequate">Inadequate</option>
+                  </select>
+                </div>
+                <div className="leh-form-group">
+                  <label className="clinical-label-premium">Dilation Notes</label>
+                  <input type="text" className="clinical-input" name="dil_notes" value={formData.dil_notes} onChange={handleInputChange} placeholder="Reaction details, drop frequency, etc..." disabled={isLocked} />
+                </div>
+              </div>
             </div>
-          </div>
-        );
-      case 'Fundoscopy':
-        return (
-          <div className="animate-slide-up">
-            <SectionHeader title="Section H: Fundoscopy" icon={Search} onMarkNormal={() => markSectionNormal('Fundoscopy')} onSave={() => handleSave(false)} isSaving={isSaving} />
+
+            {/* Fundoscopy findings */}
             <div className="clinical-section-card">
               <div className="clinical-group-header" style={{ marginBottom: '32px' }}>
                 <div className="clinical-group-title">Posterior Segment Evaluation</div>
                 <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
                    <span style={{ fontSize: '12px', fontWeight: '800', color: '#64748b' }}>METHOD:</span>
-                   <select className="clinical-input" name="fs_method" value={formData.fs_method} onChange={handleInputChange} style={{ height: '40px', width: '220px' }}>
+                   <select className="clinical-input" name="fs_method" value={formData.fs_method} onChange={handleInputChange} style={{ height: '40px', width: '220px' }} disabled={isLocked}>
                       <option>Slit Lamp with 90D Lens</option>
                       <option>Indirect Ophthalmoscopy</option>
                       <option>Direct Ophthalmoscopy</option>
@@ -770,38 +1271,324 @@ export const Consultations: React.FC = () => {
                   childrenOD={
                     <div style={{ display: 'grid', gap: '8px' }}>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                        <ClinicalField label="CDR"><input className="clinical-input" name="fs_disc_cdr_od" value={formData.fs_disc_cdr_od} onChange={handleInputChange} placeholder="0.3" /></ClinicalField>
-                        <ClinicalField label="Margin"><select className="clinical-input" name="fs_disc_margins_od" value={formData.fs_disc_margins_od} onChange={handleInputChange}>{DISC_MARGIN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
+                        <ClinicalField label="CDR"><input className="clinical-input" name="fs_disc_cdr_od" value={formData.fs_disc_cdr_od} onChange={handleInputChange} placeholder="0.3" disabled={isLocked} /></ClinicalField>
+                        <ClinicalField label="Margin"><select className="clinical-input" name="fs_disc_margins_od" value={formData.fs_disc_margins_od} onChange={handleInputChange} disabled={isLocked}>{DISC_MARGIN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
                       </div>
-                      <ClinicalField label="Color"><select className="clinical-input" name="fs_disc_color_od" value={formData.fs_disc_color_od} onChange={handleInputChange}>{DISC_COLOR_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
+                      <ClinicalField label="Color"><select className="clinical-input" name="fs_disc_color_od" value={formData.fs_disc_color_od} onChange={handleInputChange} disabled={isLocked}>{DISC_COLOR_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
                     </div>
                   }
                   childrenOS={
                     <div style={{ display: 'grid', gap: '8px' }}>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                        <ClinicalField label="CDR"><input className="clinical-input" name="fs_disc_cdr_os" value={formData.fs_disc_cdr_os} onChange={handleInputChange} placeholder="0.3" /></ClinicalField>
-                        <ClinicalField label="Margin"><select className="clinical-input" name="fs_disc_margins_os" value={formData.fs_disc_margins_os} onChange={handleInputChange}>{DISC_MARGIN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
+                        <ClinicalField label="CDR"><input className="clinical-input" name="fs_disc_cdr_os" value={formData.fs_disc_cdr_os} onChange={handleInputChange} placeholder="0.3" disabled={isLocked} /></ClinicalField>
+                        <ClinicalField label="Margin"><select className="clinical-input" name="fs_disc_margins_os" value={formData.fs_disc_margins_os} onChange={handleInputChange} disabled={isLocked}>{DISC_MARGIN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
                       </div>
-                      <ClinicalField label="Color"><select className="clinical-input" name="fs_disc_color_os" value={formData.fs_disc_color_os} onChange={handleInputChange}>{DISC_COLOR_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
+                      <ClinicalField label="Color"><select className="clinical-input" name="fs_disc_color_os" value={formData.fs_disc_color_os} onChange={handleInputChange} disabled={isLocked}>{DISC_COLOR_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></ClinicalField>
                     </div>
                   }
                 />
                 <ODSideBySide label="MACULA / FOVEA" 
-                  childrenOD={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="fs_macula_od" value={formData.fs_macula_od} onChange={handleInputChange}>{MACULA_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="fs_macula_notes_od" value={formData.fs_macula_notes_od} onChange={handleInputChange} placeholder="Macula notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
-                  childrenOS={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="fs_macula_os" value={formData.fs_macula_os} onChange={handleInputChange}>{MACULA_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="fs_macula_notes_os" value={formData.fs_macula_notes_os} onChange={handleInputChange} placeholder="Macula notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
+                  childrenOD={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="fs_macula_od" value={formData.fs_macula_od} onChange={handleInputChange} disabled={isLocked}>{MACULA_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="fs_macula_notes_od" value={formData.fs_macula_notes_od} onChange={handleInputChange} placeholder="Macula notes..." style={{ height: '38px', fontSize: '12px' }} disabled={isLocked} /></div>}
+                  childrenOS={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="fs_macula_os" value={formData.fs_macula_os} onChange={handleInputChange} disabled={isLocked}>{MACULA_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><input className="clinical-input" name="fs_macula_notes_os" value={formData.fs_macula_notes_os} onChange={handleInputChange} placeholder="Macula notes..." style={{ height: '38px', fontSize: '12px' }} disabled={isLocked} /></div>}
                 />
                 <ODSideBySide label="RETINAL VESSELS" 
-                  childrenOD={<div style={{ display: 'grid', gap: '8px' }}><input className="clinical-input" name="fs_vessels_av_od" value={formData.fs_vessels_av_od} onChange={handleInputChange} placeholder="A/V 2:3" /><select className="clinical-input" name="fs_vessels_nipping_od" value={formData.fs_vessels_nipping_od} onChange={handleInputChange}><option value="Absent">AV Nipping: Absent</option><option value="Present">AV Nipping: Present</option></select></div>}
-                  childrenOS={<div style={{ display: 'grid', gap: '8px' }}><input className="clinical-input" name="fs_vessels_av_os" value={formData.fs_vessels_av_os} onChange={handleInputChange} placeholder="A/V 2:3" /><select className="clinical-input" name="fs_vessels_nipping_os" value={formData.fs_vessels_nipping_os} onChange={handleInputChange}><option value="Absent">AV Nipping: Absent</option><option value="Present">AV Nipping: Present</option></select></div>}
+                  childrenOD={<div style={{ display: 'grid', gap: '8px' }}><input className="clinical-input" name="fs_vessels_av_od" value={formData.fs_vessels_av_od} onChange={handleInputChange} placeholder="A/V 2:3" disabled={isLocked} /><select className="clinical-input" name="fs_vessels_nipping_od" value={formData.fs_vessels_nipping_od} onChange={handleInputChange} disabled={isLocked}><option value="Absent">AV Nipping: Absent</option><option value="Present">AV Nipping: Present</option></select></div>}
+                  childrenOS={<div style={{ display: 'grid', gap: '8px' }}><input className="clinical-input" name="fs_vessels_av_os" value={formData.fs_vessels_av_os} onChange={handleInputChange} placeholder="A/V 2:3" disabled={isLocked} /><select className="clinical-input" name="fs_vessels_nipping_os" value={formData.fs_vessels_nipping_os} onChange={handleInputChange} disabled={isLocked}><option value="Absent">AV Nipping: Absent</option><option value="Present">AV Nipping: Present</option></select></div>}
                 />
                 <ODSideBySide label="PERIPHERY" 
-                  childrenOD={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="fs_periph_od" value={formData.fs_periph_od} onChange={handleInputChange}><option value="Normal">Normal</option><option value="Break/Tear">Break/Tear</option><option value="Detachment">Detachment</option><option value="Lattice">Lattice</option><option value="Other">Other</option></select><input className="clinical-input" name="fs_periph_notes_od" value={formData.fs_periph_notes_od} onChange={handleInputChange} placeholder="Periph notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
-                  childrenOS={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="fs_periph_os" value={formData.fs_periph_os} onChange={handleInputChange}><option value="Normal">Normal</option><option value="Break/Tear">Break/Tear</option><option value="Detachment">Detachment</option><option value="Lattice">Lattice</option><option value="Other">Other</option></select><input className="clinical-input" name="fs_periph_notes_os" value={formData.fs_periph_notes_os} onChange={handleInputChange} placeholder="Periph notes..." style={{ height: '38px', fontSize: '12px' }} /></div>}
+                  childrenOD={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="fs_periph_od" value={formData.fs_periph_od} onChange={handleInputChange} disabled={isLocked}><option value="Normal">Normal</option><option value="Break/Tear">Break/Tear</option><option value="Detachment">Detachment</option><option value="Lattice">Lattice</option><option value="Other">Other</option></select><input className="clinical-input" name="fs_periph_notes_od" value={formData.fs_periph_notes_od} onChange={handleInputChange} placeholder="Periph notes..." style={{ height: '38px', fontSize: '12px' }} disabled={isLocked} /></div>}
+                  childrenOS={<div style={{ display: 'grid', gap: '8px' }}><select className="clinical-input" name="fs_periph_os" value={formData.fs_periph_os} onChange={handleInputChange} disabled={isLocked}><option value="Normal">Normal</option><option value="Break/Tear">Break/Tear</option><option value="Detachment">Detachment</option><option value="Lattice">Lattice</option><option value="Other">Other</option></select><input className="clinical-input" name="fs_periph_notes_os" value={formData.fs_periph_notes_os} onChange={handleInputChange} placeholder="Periph notes..." style={{ height: '38px', fontSize: '12px' }} disabled={isLocked} /></div>}
                 />
                 <div className="leh-form-group">
                    <label className="clinical-label-premium">Posterior Segment Summary</label>
-                   <textarea className="clinical-textarea" name="fs_summary" value={formData.fs_summary} onChange={handleInputChange} placeholder="Overall posterior pole assessment..." style={{ height: '80px' }} />
+                   <textarea className="clinical-textarea" name="fs_summary" value={formData.fs_summary} onChange={handleInputChange} placeholder="Overall posterior pole assessment..." style={{ height: '80px' }} disabled={isLocked} />
                 </div>
+              </div>
+            </div>
+          </div>
+        );
+      case 'CVF':
+        return (
+          <div className="animate-slide-up">
+            <SectionHeader title="Section 5: Confrontation Visual Field (CVF)" icon={Eye} onSave={() => handleSave(false)} isSaving={isSaving} />
+            <div className="clinical-section-card">
+              <div className="clinical-group-header" style={{ marginBottom: '32px' }}>
+                <div className="clinical-group-title">Confrontation Fields</div>
+              </div>
+              <ODSideBySide label="CONFRONTATION FIELDS" 
+                childrenOD={
+                  <select className="clinical-input" name="cvf_od" value={formData.cvf_od} onChange={handleInputChange} disabled={isLocked}>
+                    <option value="Full">Full / Normal</option>
+                    <option value="Temporal Hemianopia">Temporal Hemianopia</option>
+                    <option value="Nasal Defect">Nasal Defect</option>
+                    <option value="Altitudinal Defect">Altitudinal Defect</option>
+                    <option value="Scotoma">Scotoma</option>
+                    <option value="Constricted">Constricted</option>
+                    <option value="Other">Other</option>
+                  </select>
+                }
+                childrenOS={
+                  <select className="clinical-input" name="cvf_os" value={formData.cvf_os} onChange={handleInputChange} disabled={isLocked}>
+                    <option value="Full">Full / Normal</option>
+                    <option value="Temporal Hemianopia">Temporal Hemianopia</option>
+                    <option value="Nasal Defect">Nasal Defect</option>
+                    <option value="Altitudinal Defect">Altitudinal Defect</option>
+                    <option value="Scotoma">Scotoma</option>
+                    <option value="Constricted">Constricted</option>
+                    <option value="Other">Other</option>
+                  </select>
+                }
+              />
+              <div className="leh-form-group" style={{ marginTop: '24px' }}>
+                 <label className="clinical-label-premium">CVF Clinical Notes</label>
+                 <textarea className="clinical-textarea" name="cvf_notes" value={formData.cvf_notes} onChange={handleInputChange} placeholder="Describe any field defects or visual field details..." style={{ height: '80px' }} disabled={isLocked} />
+              </div>
+            </div>
+          </div>
+        );
+      case 'Pachymetry':
+        return (
+          <div className="animate-slide-up">
+            <SectionHeader title="Section 6: Corneal Pachymetry" icon={Target} onSave={() => handleSave(false)} isSaving={isSaving} />
+            <div className="clinical-section-card">
+              <div className="clinical-group-header" style={{ marginBottom: '32px' }}>
+                <div className="clinical-group-title">Central Corneal Thickness (CCT)</div>
+              </div>
+              <ODSideBySide label="CORNEAL THICKNESS (µm)" 
+                childrenOD={
+                  <div style={{ position: 'relative' }}>
+                    <input type="number" className="clinical-input" name="pachymetry_od" value={formData.pachymetry_od} onChange={handleInputChange} placeholder="e.g. 545" style={{ paddingRight: '50px' }} disabled={isLocked} />
+                    <span style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', fontWeight: '800', color: '#94a3b8' }}>µm</span>
+                  </div>
+                }
+                childrenOS={
+                  <div style={{ position: 'relative' }}>
+                    <input type="number" className="clinical-input" name="pachymetry_os" value={formData.pachymetry_os} onChange={handleInputChange} placeholder="e.g. 545" style={{ paddingRight: '50px' }} disabled={isLocked} />
+                    <span style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', fontWeight: '800', color: '#94a3b8' }}>µm</span>
+                  </div>
+                }
+              />
+              <div className="leh-form-group" style={{ marginTop: '24px' }}>
+                 <label className="clinical-label-premium">Pachymetry Clinical Notes</label>
+                 <textarea className="clinical-textarea" name="pachymetry_notes" value={formData.pachymetry_notes} onChange={handleInputChange} placeholder="Enter any notes on corneal thickness or glaucoma corrections..." style={{ height: '80px' }} disabled={isLocked} />
+              </div>
+            </div>
+          </div>
+        );
+      case 'Investigations':
+        return (
+          <div className="animate-slide-up">
+            <SectionHeader title="Section 7: Investigations & Laboratory" icon={ClipboardList} onSave={() => handleSave(false)} isSaving={isSaving} />
+
+            {/* Point-of-Care / Rapid Tests */}
+            <div className="clinical-section-card" style={{ marginBottom: '24px' }}>
+              <div className="clinical-group-header">
+                <div className="clinical-group-title">Point-of-Care / Rapid Investigations</div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginTop: '16px' }}>
+                <div className="leh-form-group">
+                  <label className="clinical-label-premium">FBS (Fasting Blood Sugar)</label>
+                  <input type="text" className="clinical-input" name="investigations_fbs" value={formData.investigations_fbs} onChange={handleInputChange} placeholder="e.g. 95 mg/dL" disabled={isLocked} />
+                </div>
+                <div className="leh-form-group">
+                  <label className="clinical-label-premium">RBS (Random Blood Sugar)</label>
+                  <input type="text" className="clinical-input" name="investigations_rbs" value={formData.investigations_rbs} onChange={handleInputChange} placeholder="e.g. 120 mg/dL" disabled={isLocked} />
+                </div>
+                <div className="leh-form-group">
+                  <label className="clinical-label-premium">HbA1c</label>
+                  <input type="text" className="clinical-input" name="investigations_hba1c" value={formData.investigations_hba1c} onChange={handleInputChange} placeholder="e.g. 5.7%" disabled={isLocked} />
+                </div>
+                <div className="leh-form-group">
+                  <label className="clinical-label-premium">RVS (Retroviral Screening)</label>
+                  <select className="clinical-input" name="investigations_rvs" value={formData.investigations_rvs} onChange={handleInputChange} disabled={isLocked}>
+                    <option value="Not Done">Not Done</option>
+                    <option value="Non-Reactive">Non-Reactive</option>
+                    <option value="Reactive">Reactive</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Dispatch Panel ── */}
+            <div className="clinical-section-card" style={{ marginBottom: '24px' }}>
+              <div className="clinical-group-header">
+                <div className="clinical-group-title">Dispatch Lab Test to LIS</div>
+                <span style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--leh-text-muted)' }}>
+                  {labTests.length === 0 ? 'No lab items found in inventory — add items under category "Laboratory"' : `${labTests.length} test(s) available`}
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '12px', marginTop: '16px', alignItems: 'flex-end' }}>
+                <div style={{ flex: 1 }}>
+                  <label className="clinical-label-premium">Select Test</label>
+                  <select
+                    className="clinical-input"
+                    value={selectedLabTestId}
+                    onChange={(e) => setSelectedLabTestId(e.target.value)}
+                    disabled={isLocked || labTests.length === 0}
+                  >
+                    <option value="">-- Choose a lab test --</option>
+                    {labTests.map((t: any) => (
+                      <option key={t.id} value={t.id}>{t.name}{t.selling_price ? ` — ₦${Number(t.selling_price).toLocaleString()}` : ''}</option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  className="leh-btn-primary"
+                  onClick={handleDispatchTest}
+                  disabled={!selectedLabTestId || isDispatching || isLocked}
+                  style={{ height: '44px', padding: '0 24px', whiteSpace: 'nowrap' }}
+                >
+                  {isDispatching ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
+                  DISPATCH TEST
+                </button>
+                <button
+                  className="leh-btn-outline"
+                  onClick={() => selectedPatient && loadPatientInvestigations(selectedPatient.patient_id || selectedPatient.id)}
+                  style={{ height: '44px', padding: '0 14px' }}
+                  title="Refresh investigations list"
+                >
+                  <RefreshCcw size={16} />
+                </button>
+              </div>
+            </div>
+
+            {/* ── Investigations Table ── */}
+            <div className="clinical-section-card">
+              <div className="clinical-group-header" style={{ marginBottom: '16px' }}>
+                <div className="clinical-group-title">Requested Investigations</div>
+                <span style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--leh-text-muted)' }}>
+                  {patientInvestigations.length} test(s) on record
+                </span>
+              </div>
+
+              {patientInvestigations.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--leh-text-muted)' }}>
+                  <ClipboardList size={40} style={{ opacity: 0.25, marginBottom: '12px', display: 'block', margin: '0 auto 12px' }} />
+                  <p style={{ fontSize: '14px' }}>No investigations requested for this patient yet.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {patientInvestigations.map((inv: any) => {
+                    const isPaid = inv.billing_status === 'Paid';
+                    const isCompleted = inv.status === 'Completed';
+                    const canComment = user?.role === 'Admin' || user?.role === 'Optometrist';
+                    const borderColor = isPaid ? (isCompleted ? '#10b981' : '#2563eb') : '#f59e0b';
+                    return (
+                      <div
+                        key={inv.id}
+                        className="eye-card"
+                        style={{ padding: '20px', borderLeft: `4px solid ${borderColor}`, position: 'relative' }}
+                      >
+                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '16px', alignItems: 'start' }}>
+                          {/* Test Info */}
+                          <div>
+                            <div style={{ fontWeight: '800', fontSize: '14px', color: 'var(--leh-text-dark)', marginBottom: '4px' }}>
+                              {inv.test_name}
+                            </div>
+                            <div style={{ fontSize: '11px', color: 'var(--leh-text-muted)' }}>
+                              Requested: {inv.created_at ? new Date(inv.created_at).toLocaleDateString() : '—'} &middot; By: {inv.requested_by || '—'}
+                            </div>
+                            {inv.test_value && (
+                              <div style={{ marginTop: '8px', padding: '6px 12px', background: 'rgba(16,185,129,0.1)', borderRadius: '8px', fontSize: '13px', fontWeight: '700' }}>
+                                Result: {inv.test_value}{inv.unit ? ` ${inv.unit}` : ''}
+                                {inv.reference_range && <span style={{ color: '#94a3b8', fontSize: '11px', fontWeight: '400' }}> (Ref: {inv.reference_range})</span>}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Test Status */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <span className="clinical-label-premium" style={{ fontSize: '9px' }}>TEST STATUS</span>
+                            <span style={{
+                              padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', display: 'inline-block',
+                              background: isCompleted ? '#d1fae5' : '#fef3c7',
+                              color: isCompleted ? '#065f46' : '#92400e'
+                            }}>
+                              {inv.status || 'Pending'}
+                            </span>
+                          </div>
+
+                          {/* Billing Status */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <span className="clinical-label-premium" style={{ fontSize: '9px' }}>BILLING</span>
+                            <span style={{
+                              padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', display: 'inline-block',
+                              background: isPaid ? '#d1fae5' : '#fee2e2',
+                              color: isPaid ? '#065f46' : '#991b1b'
+                            }}>
+                              {isPaid ? '✓ Paid' : '⚠ Unpaid'}
+                            </span>
+                            {!isPaid && <span style={{ fontSize: '10px', color: '#ef4444' }}>Go to Billing to pay</span>}
+                          </div>
+
+                          {/* LIS Notes */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span className="clinical-label-premium" style={{ fontSize: '9px' }}>LIS NOTES</span>
+                            <span style={{ fontSize: '12px', color: 'var(--leh-text-muted)', fontStyle: 'italic' }}>
+                              {inv.results_notes || '—'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Clinician Comment (only for completed tests, Admin/Optometrist) */}
+                        {isCompleted && canComment && (
+                          <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--leh-border-light)' }}>
+                            <label className="clinical-label-premium">Clinician Comment on Result</label>
+                            <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                              <textarea
+                                className="clinical-textarea"
+                                style={{ height: '64px', flex: 1 }}
+                                placeholder="Add clinical interpretation or follow-up note..."
+                                value={commentsState[inv.id] ?? (inv.medical_comments || '')}
+                                onChange={(e) => setCommentsState((prev) => ({ ...prev, [inv.id]: e.target.value }))}
+                              />
+                              <button
+                                className="leh-btn-primary"
+                                style={{ height: '64px', padding: '0 16px', fontSize: '11px', whiteSpace: 'nowrap', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                                onClick={() => handleSaveComment(inv.id)}
+                              >
+                                <Save size={14} />
+                                SAVE
+                              </button>
+                            </div>
+                            {inv.medical_comments && (
+                              <div style={{ marginTop: '8px', fontSize: '12px', color: '#64748b', fontStyle: 'italic' }}>
+                                Last saved: "{inv.medical_comments}"
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {isCompleted && !canComment && (
+                          <div style={{ marginTop: '12px', padding: '10px 14px', background: '#f1f5f9', borderRadius: '8px', fontSize: '12px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <AlertCircle size={14} />
+                            Only Optometrists and Admins can add clinical comments.
+                          </div>
+                        )}
+                        {!isCompleted && !isPaid && (
+                          <div style={{ marginTop: '12px', padding: '10px 14px', background: '#fef3c7', borderRadius: '8px', fontSize: '12px', color: '#92400e', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <AlertTriangle size={14} />
+                            Awaiting payment in Billing before the LIS can process this test.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* General Notes */}
+              <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid var(--leh-border-light)' }}>
+                <ClinicalField label="General Investigation Notes" fullWidth>
+                  <textarea
+                    className="clinical-textarea"
+                    name="investigations_notes"
+                    value={formData.investigations_notes}
+                    onChange={handleInputChange}
+                    placeholder="Additional notes on investigations ordered..."
+                    style={{ height: '80px' }}
+                    disabled={isLocked}
+                  />
+                </ClinicalField>
               </div>
             </div>
           </div>
@@ -809,7 +1596,7 @@ export const Consultations: React.FC = () => {
       case 'Diagnosis':
         return (
           <div className="animate-slide-up">
-            <SectionHeader title="Section I: Assessment & Diagnosis" icon={Activity} onSave={() => handleSave(false)} isSaving={isSaving} />
+            <SectionHeader title="Section 8: Clinical Diagnosis" icon={Target} onSave={() => handleSave(false)} isSaving={isSaving} />
             <div className="clinical-section-card">
               <div className="clinical-group-header" style={{ marginBottom: '32px' }}>
                 <div className="clinical-group-title">Clinical Impression</div>
@@ -844,7 +1631,7 @@ export const Consultations: React.FC = () => {
       case 'Plan':
         return (
           <div className="animate-slide-up">
-            <SectionHeader title="Section J: Management Plan" icon={ClipboardList} onSave={() => handleSave(false)} isSaving={isSaving} />
+            <SectionHeader title="Section 9: Treatment Plan" icon={Pill} onSave={() => handleSave(false)} isSaving={isSaving} />
             
             <div style={{ display: 'grid', gap: '32px' }}>
               <div className="clinical-section-card">
@@ -862,23 +1649,95 @@ export const Consultations: React.FC = () => {
                         <p style={{ fontSize: '14px', color: '#64748b', fontWeight: '600' }}>No medications prescribed yet.</p>
                      </div>
                    )}
-                   {(formData.plan_meds || []).map((med: Medication, idx: number) => (
-                      <div key={idx} className="medication-terminal-row">
-                         <ClinicalField label="Drug Name"><input className="clinical-input" value={med.drug_name} onChange={(e) => updateMedication(idx, 'drug_name', e.target.value)} placeholder="e.g. G. Timolol" /></ClinicalField>
-                         <ClinicalField label="Dose/Freq"><input className="clinical-input" value={med.dose} onChange={(e) => updateMedication(idx, 'dose', e.target.value)} placeholder="e.g. 1 drop BD" /></ClinicalField>
-                         <ClinicalField label="Duration"><input className="clinical-input" value={med.duration} onChange={(e) => updateMedication(idx, 'duration', e.target.value)} placeholder="e.g. 1 month" /></ClinicalField>
-                         <ClinicalField label="Route">
-                            <select className="clinical-input" value={med.route} onChange={(e) => updateMedication(idx, 'route', e.target.value)}>
-                               <option>Topical</option><option>Oral</option><option>Injection</option>
-                            </select>
-                         </ClinicalField>
-                         <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                            <button onClick={() => removeMedication(idx)} style={{ height: '56px', width: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fef2f2', color: '#ef4444', border: '1px solid #fee2e2', borderRadius: '1rem', cursor: 'pointer' }}>
-                               <Trash2 size={20} />
-                            </button>
-                         </div>
-                      </div>
-                   ))}
+                    {(formData.plan_meds || []).map((med: Medication, idx: number) => {
+                      const filteredDrugs = drugInventory.filter((d: any) =>
+                        d.name.toLowerCase().includes((med.drug_name || '').toLowerCase())
+                      );
+                      return (
+                        <div key={idx} className="medication-terminal-row" style={{ overflow: 'visible' }}>
+                           <ClinicalField label="Drug Name">
+                              <div style={{ position: 'relative' }}>
+                                 <input
+                                    className="clinical-input"
+                                    value={med.drug_name}
+                                    onChange={(e) => {
+                                       updateMedication(idx, 'drug_name', e.target.value);
+                                       setActiveDrugSearchIdx(idx);
+                                       setActiveSelectionIndex(0);
+                                    }}
+                                    onFocus={() => {
+                                       setActiveDrugSearchIdx(idx);
+                                       setActiveSelectionIndex(0);
+                                    }}
+                                    onBlur={() => {
+                                       setTimeout(() => {
+                                          setActiveDrugSearchIdx(prev => prev === idx ? null : prev);
+                                       }, 200);
+                                    }}
+                                    onKeyDown={(e) => {
+                                       if (activeDrugSearchIdx === idx) {
+                                          if (e.key === 'ArrowDown') {
+                                             e.preventDefault();
+                                             setActiveSelectionIndex(prev => Math.min(prev + 1, filteredDrugs.length - 1));
+                                          } else if (e.key === 'ArrowUp') {
+                                             e.preventDefault();
+                                             setActiveSelectionIndex(prev => Math.max(prev - 1, 0));
+                                          } else if (e.key === 'Enter') {
+                                             e.preventDefault();
+                                             if (filteredDrugs[activeSelectionIndex]) {
+                                                updateMedication(idx, 'drug_name', filteredDrugs[activeSelectionIndex].name);
+                                                setActiveDrugSearchIdx(null);
+                                             }
+                                          } else if (e.key === 'Escape') {
+                                             e.preventDefault();
+                                             setActiveDrugSearchIdx(null);
+                                          }
+                                       }
+                                    }}
+                                    placeholder="e.g. G. Timolol"
+                                 />
+                                 {activeDrugSearchIdx === idx && (
+                                    <div className="va-dropdown-menu custom-scrollbar" style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, minWidth: '320px', zIndex: 1000, maxHeight: '200px', overflowY: 'auto' }}>
+                                       {filteredDrugs.length === 0 ? (
+                                          <div style={{ padding: '12px', fontSize: '12px', color: '#64748b', textAlign: 'center' }}>No matching drugs found</div>
+                                       ) : (
+                                          filteredDrugs.map((drug: any, dIdx: number) => (
+                                             <button
+                                                key={drug.id}
+                                                type="button"
+                                                onMouseDown={() => {
+                                                   updateMedication(idx, 'drug_name', drug.name);
+                                                   setActiveDrugSearchIdx(null);
+                                                }}
+                                                className={`va-dropdown-item ${dIdx === activeSelectionIndex ? 'active' : ''}`}
+                                                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', textTransform: 'none', background: dIdx === activeSelectionIndex ? '#eff6ff' : 'transparent' }}
+                                             >
+                                                <span style={{ fontWeight: 600 }}>{drug.name}</span>
+                                                <span style={{ fontSize: '11px', color: '#64748b', opacity: 0.8 }}>
+                                                   Stock: {drug.stock} | Price: ₦{drug.price.toLocaleString()}
+                                                </span>
+                                             </button>
+                                          ))
+                                       )}
+                                    </div>
+                                 )}
+                              </div>
+                           </ClinicalField>
+                           <ClinicalField label="Dose/Freq"><input className="clinical-input" value={med.dose} onChange={(e) => updateMedication(idx, 'dose', e.target.value)} placeholder="e.g. 1 drop BD" /></ClinicalField>
+                           <ClinicalField label="Duration"><input className="clinical-input" value={med.duration} onChange={(e) => updateMedication(idx, 'duration', e.target.value)} placeholder="e.g. 1 month" /></ClinicalField>
+                           <ClinicalField label="Route">
+                              <select className="clinical-input" value={med.route} onChange={(e) => updateMedication(idx, 'route', e.target.value)}>
+                                 <option>Topical</option><option>Oral</option><option>Injection</option>
+                              </select>
+                           </ClinicalField>
+                           <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                              <button onClick={() => removeMedication(idx)} style={{ height: '56px', width: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fef2f2', color: '#ef4444', border: '1px solid #fee2e2', borderRadius: '1rem', cursor: 'pointer' }}>
+                                 <Trash2 size={20} />
+                              </button>
+                           </div>
+                        </div>
+                      );
+                   })}
                 </div>
               </div>
 
@@ -911,36 +1770,10 @@ export const Consultations: React.FC = () => {
             </div>
           </div>
         );
-      case 'Notes':
+      case 'Surgery':
         return (
           <div className="animate-slide-up">
-            <SectionHeader title="Section K: Clinical Notes & Follow-up" icon={ClipboardList} onSave={() => handleSave(false)} isSaving={isSaving} />
-            <div className="clinical-section-card">
-              <div className="clinical-group-header">
-                <div className="clinical-group-title">Detailed Observations</div>
-              </div>
-              <div style={{ display: 'grid', gap: '32px' }}>
-                 <ClinicalField label="Internal Clinical Notes" fullWidth>
-                    <textarea className="clinical-textarea" name="notes_clinical" value={formData.notes_clinical} onChange={handleInputChange} placeholder="Internal observations, advice given, specialized test results..." style={{ height: '240px' }} />
-                 </ClinicalField>
-                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', padding: '24px', background: '#f8fafc', borderRadius: '1.5rem', border: '1px solid #e2e8f0' }}>
-                    <ClinicalField label="Follow-up Date">
-                      <input className="clinical-input" type="date" name="plan_followup_date" value={formData.plan_followup_date} onChange={handleInputChange} />
-                    </ClinicalField>
-                    <ClinicalField label="Clinic / Specialty">
-                       <select className="clinical-input" name="notes_followup_clinic" value={formData.notes_followup_clinic} onChange={handleInputChange}>
-                          <option>General Eye Clinic</option><option>Glaucoma Clinic</option><option>Retina Clinic</option><option>Pediatric Clinic</option><option>Cornea Clinic</option>
-                       </select>
-                    </ClinicalField>
-                 </div>
-              </div>
-            </div>
-          </div>
-        );
-      case 'Admission':
-        return (
-          <div className="animate-slide-up">
-            <SectionHeader title="Section L: Specialized Management" icon={Activity} onSave={() => handleSave(false)} isSaving={isSaving} />
+            <SectionHeader title="Section 10: Surgery & Admission" icon={Scissors} onSave={() => handleSave(false)} isSaving={isSaving} />
             
             <div style={{ display: 'grid', gap: '32px' }}>
               <div className="clinical-section-card" style={{ border: formData.surgery_advised ? '2px solid #ef4444' : '' }}>
@@ -1004,8 +1837,7 @@ export const Consultations: React.FC = () => {
   };
 
 
-   return (
-    <div className="consultations-page-container no-print">
+   return (<div className="consultations-page-container no-print">
       
       {/* ZONE 1: PATIENT CONTEXT BAR */}
       {selectedPatient && (
@@ -1095,7 +1927,7 @@ export const Consultations: React.FC = () => {
       )}
 
       {/* ZONE 3: TWO-PANEL WORKSPACE */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 20%) 1fr', flex: 1, overflow: 'hidden' }} className="no-print">
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 20%) 1fr', height: 'calc(100vh - 80px)', minHeight: '650px', overflow: 'hidden' }} className="no-print">
         
         {/* LEFT PANEL: NAVIGATION */}
         <div style={{ background: 'white', borderRight: '1px solid var(--leh-border-light)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -1209,7 +2041,7 @@ export const Consultations: React.FC = () => {
                 <p style={{ color: 'var(--leh-text-muted)', maxWidth: '400px', marginTop: '12px' }}>Choose a patient from the queue on the left to start their clinical consultation.</p>
               </div>
             ) : (
-               <div className="leh-table-card animate-slide-up" style={{ padding: '48px', maxWidth: '1800px', minWidth: '1400px', width: 'fit-content', margin: '0', minHeight: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.08)', borderRadius: '32px', border: '1px solid white', overflow: 'visible' }}>
+               <div className="leh-table-card animate-slide-up" style={{ padding: '48px', maxWidth: '1800px', minWidth: '100%', width: '100%', margin: '0', minHeight: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.08)', borderRadius: '32px', border: '1px solid white', overflow: 'visible' }}>
                 {isDirty && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '12px', marginBottom: '24px', color: '#92400e', fontSize: '12px', fontWeight: '700' }} className="animate-fade-in">
                     <AlertTriangle size={16} />
@@ -1256,170 +2088,392 @@ export const Consultations: React.FC = () => {
             {/* DOCUMENT BODY - SECTIONS A-L */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               
-              {/* Section A: History */}
+              {/* Section A: History & Complaint */}
               <div style={{ borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
-                <h3 style={{ fontSize: '13px', fontWeight: '900', margin: '0 0 8px 0', color: '#1e293b' }}>A. CHIEF COMPLAINT AND HISTORY</h3>
-                <div style={{ fontSize: '11px', lineHeight: '1.4' }}>
-                  <p><strong>Chief Complaint:</strong> {formData.complaint || 'N/A'}</p>
-                  {formData.hpi && <p><strong>HPI:</strong> {formData.hpi}</p>}
-                  {formData.ocular_history && <p><strong>Past Ocular:</strong> {formData.ocular_history}</p>}
-                  {formData.medical_history && <p><strong>Medical/Systemic:</strong> {formData.medical_history}</p>}
-                  {formData.allergies && <p style={{ color: '#dc2626' }}><strong>ALLERGIES:</strong> {formData.allergies}</p>}
+                <h3 style={{ fontSize: '13px', fontWeight: '900', margin: '0 0 8px 0', color: '#1e293b' }}>A. HISTORY & CHIEF COMPLAINT</h3>
+                <div style={{ fontSize: '10px', lineHeight: '1.4', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div style={{ gridColumn: '1 / -1' }}><strong>Chief Complaint:</strong> {formData.complaint || 'N/A'}</div>
+                  {formData.hpi && <div style={{ gridColumn: '1 / -1' }}><strong>History of Present Illness (HPI):</strong> {formData.hpi}</div>}
+                  {formData.ocular_history && <div><strong>Ocular History:</strong> {formData.ocular_history}</div>}
+                  {formData.medical_history && <div><strong>Medical/Systemic History:</strong> {formData.medical_history}</div>}
+                  {formData.drug_history && <div><strong>Drug History:</strong> {formData.drug_history}</div>}
+                  {formData.allergies && <div style={{ color: '#dc2626' }}><strong>Allergies:</strong> {formData.allergies}</div>}
+                  {formData.family_history && <div style={{ gridColumn: '1 / -1' }}><strong>Family History:</strong> {formData.family_history}</div>}
                 </div>
               </div>
 
-              {/* Section B: Vitals */}
+              {/* Section B: Vitals Review */}
               <div style={{ borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
-                <h3 style={{ fontSize: '13px', fontWeight: '900', margin: '0 0 8px 0', color: '#1e293b' }}>B. VITAL SIGNS</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px', fontSize: '11px' }}>
-                  <div><strong>BP:</strong> {formData.vitals_bp_systolic}/{formData.vitals_bp_diastolic}</div>
-                  <div><strong>Pulse:</strong> {formData.vitals_pulse} bpm</div>
-                  <div><strong>Temp:</strong> {formData.vitals_temp} °C</div>
-                  <div><strong>Weight:</strong> {formData.vitals_weight} kg</div>
+                <h3 style={{ fontSize: '13px', fontWeight: '900', margin: '0 0 8px 0', color: '#1e293b' }}>B. VITAL SIGNS REVIEW</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', fontSize: '10px' }}>
+                  <div><strong>Blood Pressure:</strong> {formData.vitals_bp_systolic || triageData?.bp_systolic || '--'}/{formData.vitals_bp_diastolic || triageData?.bp_diastolic || '--'} mmHg</div>
+                  <div><strong>Pulse Rate:</strong> {formData.vitals_pulse || triageData?.pulse_rate || '--'} bpm</div>
+                  <div><strong>Body Temp:</strong> {formData.vitals_temp || triageData?.temperature || '--'} °C</div>
+                  <div><strong>Body Weight:</strong> {formData.vitals_weight || triageData?.weight || '--'} kg</div>
+                  {formData.vitals_notes && <div style={{ gridColumn: '1 / -1', marginTop: '4px' }}><strong>Observation Notes:</strong> {formData.vitals_notes}</div>}
                 </div>
               </div>
 
               {/* Section C: Visual Acuity */}
               <div style={{ borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
-                <h3 style={{ fontSize: '13px', fontWeight: '900', margin: '0 0 8px 0', color: '#1e293b' }}>C. VISUAL ACUITY ({formData.va_method})</h3>
+                <h3 style={{ fontSize: '13px', fontWeight: '900', margin: '0 0 8px 0', color: '#1e293b' }}>C. 1. VISUAL ACUITY ({formData.va_method || 'Snellen Chart'})</h3>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
                   <thead>
                     <tr style={{ background: '#f8fafc' }}>
-                      <th style={{ border: '1px solid #e2e8f0', padding: '6px', textAlign: 'left' }}>EYE</th>
-                      <th style={{ border: '1px solid #e2e8f0', padding: '6px', textAlign: 'left' }}>UNAIDED (DV)</th>
-                      <th style={{ border: '1px solid #e2e8f0', padding: '6px', textAlign: 'left' }}>UNAIDED (NV)</th>
-                      <th style={{ border: '1px solid #e2e8f0', padding: '6px', textAlign: 'left' }}>PH</th>
-                      <th style={{ border: '1px solid #e2e8f0', padding: '6px', textAlign: 'left' }}>AIDED (DV)</th>
+                      <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left' }}>EYE</th>
+                      <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left' }}>DISTANCE (Unaided)</th>
+                      <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left' }}>NEAR (Unaided)</th>
+                      <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left' }}>PINHOLE (PH)</th>
+                      <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left' }}>AIDED (DV)</th>
+                      <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left' }}>AIDED (NV)</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td><strong>OD (Right)</strong></td>
-                      <td>{formData.va_od_unaided_dv}</td><td>{formData.va_od_unaided_nv}</td><td>{formData.va_od_ph}</td><td>{formData.va_od_aided_dv}</td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}><strong>OD (Right)</strong></td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.va_od_unaided_dv || '—'}</td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.va_od_unaided_nv || '—'}</td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.va_od_ph || '—'}</td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.va_od_aided_dv || '—'}</td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.va_od_aided_nv || '—'}</td>
                     </tr>
                     <tr>
-                      <td><strong>OS (Left)</strong></td>
-                      <td>{formData.va_os_unaided_dv}</td><td>{formData.va_os_unaided_nv}</td><td>{formData.va_os_ph}</td><td>{formData.va_os_aided_dv}</td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}><strong>OS (Left)</strong></td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.va_os_unaided_dv || '—'}</td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.va_os_unaided_nv || '—'}</td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.va_os_ph || '—'}</td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.va_os_aided_dv || '—'}</td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.va_os_aided_nv || '—'}</td>
                     </tr>
                   </tbody>
                 </table>
+                {formData.va_notes && <div style={{ fontSize: '10px', marginTop: '6px' }}><strong>VA Notes:</strong> {formData.va_notes}</div>}
               </div>
 
-              {/* Section D: IOP */}
+              {/* Section D: Ocular Examination */}
               <div style={{ borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
-                <h3 style={{ fontSize: '13px', fontWeight: '900', margin: '0 0 8px 0', color: '#1e293b' }}>D. IOP ({formData.iop_method})</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', fontSize: '11px' }}>
-                   <div><strong>OD:</strong> {formData.iop_od} mmHg</div>
-                   <div><strong>OS:</strong> {formData.iop_os} mmHg</div>
+                <h3 style={{ fontSize: '13px', fontWeight: '900', margin: '0 0 8px 0', color: '#1e293b' }}>D. 2. OCULAR EXAMINATION (Slit Lamp & IOP)</h3>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9px', marginBottom: '8px' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc' }}>
+                      <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left', width: '20%' }}>STRUCTURE</th>
+                      <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left', width: '40%' }}>RIGHT EYE (OD)</th>
+                      <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left', width: '40%' }}>LEFT EYE (OS)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}><strong>Lids & Adnexa</strong></td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.as_lids_od} {formData.as_lids_notes_od ? `— ${formData.as_lids_notes_od}` : ''}</td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.as_lids_os} {formData.as_lids_notes_os ? `— ${formData.as_lids_notes_os}` : ''}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}><strong>Conjunctiva / Sclera</strong></td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.as_conj_od} {formData.as_conj_notes_od ? `— ${formData.as_conj_notes_od}` : ''}</td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.as_conj_os} {formData.as_conj_notes_os ? `— ${formData.as_conj_notes_os}` : ''}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}><strong>Cornea / Tear Film</strong></td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.as_cornea_od} {formData.as_cornea_notes_od ? `— ${formData.as_cornea_notes_od}` : ''}</td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.as_cornea_os} {formData.as_cornea_notes_os ? `— ${formData.as_cornea_notes_os}` : ''}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}><strong>Anterior Chamber</strong></td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>
+                        Depth: {formData.as_ac_depth_od} | Cells: {formData.as_ac_cells_od} | Flare: {formData.as_ac_flare_od || 'None'}
+                      </td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>
+                        Depth: {formData.as_ac_depth_os} | Cells: {formData.as_ac_cells_os} | Flare: {formData.as_ac_flare_os || 'None'}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}><strong>Iris / Pupil</strong></td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.as_iris_od} {formData.as_iris_notes_od ? `— ${formData.as_iris_notes_od}` : ''}</td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.as_iris_os} {formData.as_iris_notes_os ? `— ${formData.as_iris_notes_os}` : ''}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}><strong>Lens</strong></td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.as_lens_od} {formData.as_lens_notes_od ? `— ${formData.as_lens_notes_od}` : ''}</td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.as_lens_os} {formData.as_lens_notes_os ? `— ${formData.as_lens_notes_os}` : ''}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}><strong>IOP ({formData.iop_method})</strong></td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.iop_od ? `${formData.iop_od} mmHg` : '—'} {formData.iop_time ? `@ ${formData.iop_time}` : ''}</td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.iop_os ? `${formData.iop_os} mmHg` : '—'} {formData.iop_time ? `@ ${formData.iop_time}` : ''}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}><strong>Gonioscopy</strong></td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.exam_gonioscopy_od || '—'}</td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.exam_gonioscopy_os || '—'}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}><strong>Undilated Fundus</strong></td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.exam_fundus_od || '—'}</td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.exam_fundus_os || '—'}</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div style={{ fontSize: '9px', lineHeight: '1.3' }}>
+                  {formData.iop_notes && <p style={{ margin: '2px 0' }}><strong>IOP Notes:</strong> {formData.iop_notes}</p>}
+                  {formData.exam_gonioscopy_notes && <p style={{ margin: '2px 0' }}><strong>Gonioscopy Notes:</strong> {formData.exam_gonioscopy_notes}</p>}
+                  {formData.exam_fundus_notes && <p style={{ margin: '2px 0' }}><strong>Undilated Fundus Notes:</strong> {formData.exam_fundus_notes}</p>}
+                  {formData.as_comments && <p style={{ margin: '2px 0' }}><strong>Slit Lamp Comments:</strong> {formData.as_comments}</p>}
                 </div>
               </div>
 
               {/* Section E: Refraction */}
               <div style={{ borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
-                <h3 style={{ fontSize: '13px', fontWeight: '900', margin: '0 0 8px 0', color: '#1e293b' }}>E. REFRACTION</h3>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
+                <h3 style={{ fontSize: '13px', fontWeight: '900', margin: '0 0 8px 0', color: '#1e293b' }}>E. 3. REFRACTION</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                  <div style={{ border: '1px solid #e2e8f0', padding: '6px', borderRadius: '4px' }}>
+                    <p style={{ fontSize: '10px', fontWeight: 'bold', margin: '0 0 4px 0', borderBottom: '1px solid #eee', paddingBottom: '2px' }}>Objective Refraction (AR/K)</p>
+                    <div style={{ fontSize: '9px', lineHeight: '1.4' }}>
+                      <p><strong>OD:</strong> {formData.ref_od_sph || '0.00'} / {formData.ref_od_cyl || '0.00'} x {formData.ref_od_axis || '0'}</p>
+                      <p><strong>OS:</strong> {formData.ref_os_sph || '0.00'} / {formData.ref_os_cyl || '0.00'} x {formData.ref_os_axis || '0'}</p>
+                    </div>
+                  </div>
+                  <div style={{ border: '1px solid #e2e8f0', padding: '6px', borderRadius: '4px' }}>
+                    <p style={{ fontSize: '10px', fontWeight: 'bold', margin: '0 0 4px 0', borderBottom: '1px solid #eee', paddingBottom: '2px' }}>Subjective Refraction (Best Corrected)</p>
+                    <div style={{ fontSize: '9px', lineHeight: '1.4' }}>
+                      <p><strong>OD:</strong> {formData.ref_od_subjective_dv || '—'} {formData.ref_od_va ? `(VA: ${formData.ref_od_va})` : ''} {formData.ref_od_near_add ? `[Near Add: ${formData.ref_od_near_add}]` : ''}</p>
+                      <p><strong>OS:</strong> {formData.ref_os_subjective_dv || '—'} {formData.ref_os_va ? `(VA: ${formData.ref_os_va})` : ''} {formData.ref_os_near_add ? `[Near Add: ${formData.ref_os_near_add}]` : ''}</p>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ fontSize: '9px', marginTop: '6px', display: 'flex', gap: '15px' }}>
+                  {formData.ref_pd && <div><strong>Pupillary Distance (PD):</strong> {formData.ref_pd} mm</div>}
+                  {formData.ref_notes && <div><strong>Refraction Notes:</strong> {formData.ref_notes}</div>}
+                </div>
+              </div>
+
+              {/* Section F: Dilated Funduscopy */}
+              <div style={{ borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
+                <h3 style={{ fontSize: '13px', fontWeight: '900', margin: '0 0 8px 0', color: '#1e293b' }}>F. 4. DILATED FUNDUSCOPY</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', fontSize: '9px', marginBottom: '8px', border: '1px solid #eee', padding: '6px', borderRadius: '4px' }}>
+                  <div><strong>Mydriatic Agent:</strong> {formData.dil_agent || '—'}</div>
+                  <div><strong>Time Administered:</strong> {formData.dil_time_od || '—'}</div>
+                  <div><strong>Adequacy:</strong> {formData.dil_adequate || 'Adequate'}</div>
+                  <div><strong>OD Dilated:</strong> {formData.dil_od || 'No'} {formData.dil_va_od ? `(Dilated VA: ${formData.dil_va_od})` : ''}</div>
+                  <div><strong>OS Dilated:</strong> {formData.dil_os || 'No'} {formData.dil_va_os ? `(Dilated VA: ${formData.dil_va_os})` : ''}</div>
+                  {formData.dil_notes && <div style={{ gridColumn: '1 / -1' }}><strong>Dilation Notes:</strong> {formData.dil_notes}</div>}
+                </div>
+                
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9px' }}>
                   <thead>
                     <tr style={{ background: '#f8fafc' }}>
-                      <th style={{ border: '1px solid #e2e8f0', padding: '6px' }}>EYE</th>
-                      <th style={{ border: '1px solid #e2e8f0', padding: '6px' }}>SPH</th>
-                      <th style={{ border: '1px solid #e2e8f0', padding: '6px' }}>CYL</th>
-                      <th style={{ border: '1px solid #e2e8f0', padding: '6px' }}>AXIS</th>
-                      <th style={{ border: '1px solid #e2e8f0', padding: '6px' }}>VA</th>
+                      <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left', width: '20%' }}>POSTERIOR SEGMENT ({formData.fs_method || 'Slit Lamp & 90D'})</th>
+                      <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left', width: '40%' }}>RIGHT EYE (OD)</th>
+                      <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left', width: '40%' }}>LEFT EYE (OS)</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td><strong>OD</strong></td><td>{formData.ref_od_sph}</td><td>{formData.ref_od_cyl}</td><td>{formData.ref_od_axis}</td><td>{formData.ref_od_va}</td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}><strong>Optic Disc (CDR)</strong></td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>CDR: {formData.fs_disc_cdr_od || '—'} | Margins: {formData.fs_disc_margins_od} | Color: {formData.fs_disc_color_od}</td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>CDR: {formData.fs_disc_cdr_os || '—'} | Margins: {formData.fs_disc_margins_os} | Color: {formData.fs_disc_color_os}</td>
                     </tr>
                     <tr>
-                      <td><strong>OS</strong></td><td>{formData.ref_os_sph}</td><td>{formData.ref_os_cyl}</td><td>{formData.ref_os_axis}</td><td>{formData.ref_os_va}</td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}><strong>Macula / Fovea</strong></td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.fs_macula_od} {formData.fs_macula_notes_od ? `— ${formData.fs_macula_notes_od}` : ''}</td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.fs_macula_os} {formData.fs_macula_notes_os ? `— ${formData.fs_macula_notes_os}` : ''}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}><strong>Retinal Vessels</strong></td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>A/V: {formData.fs_vessels_av_od || '—'} | Nipping: {formData.fs_vessels_nipping_od || '—'}</td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>A/V: {formData.fs_vessels_av_os || '—'} | Nipping: {formData.fs_vessels_nipping_os || '—'}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}><strong>Periphery</strong></td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.fs_periph_od} {formData.fs_periph_notes_od ? `— ${formData.fs_periph_notes_od}` : ''}</td>
+                      <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.fs_periph_os} {formData.fs_periph_notes_os ? `— ${formData.fs_periph_notes_os}` : ''}</td>
                     </tr>
                   </tbody>
                 </table>
+                {formData.fs_summary && <div style={{ fontSize: '9px', marginTop: '6px' }}><strong>Posterior Segment Summary:</strong> {formData.fs_summary}</div>}
               </div>
 
-              {/* Section F: Anterior Segment */}
+              {/* Section G: Confrontation Fields (CVF) */}
               <div style={{ borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
-                <h3 style={{ fontSize: '13px', fontWeight: '900', margin: '0 0 8px 0', color: '#1e293b' }}>F. ANTERIOR SEGMENT</h3>
+                <h3 style={{ fontSize: '13px', fontWeight: '900', margin: '0 0 8px 0', color: '#1e293b' }}>G. 5. CONFRONTATION VISUAL FIELD (CVF)</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', fontSize: '10px' }}>
-                  <div style={{ border: '1px solid #eee', padding: '8px' }}>
-                    <p><strong>OD:</strong> Lids: {formData.as_lids_od}, Conj: {formData.as_conj_od}, Cornea: {formData.as_cornea_od}, AC: {formData.as_ac_depth_od}, Iris: {formData.as_iris_od}, Lens: {formData.as_lens_od}</p>
-                  </div>
-                  <div style={{ border: '1px solid #eee', padding: '8px' }}>
-                    <p><strong>OS:</strong> Lids: {formData.as_lids_os}, Conj: {formData.as_conj_os}, Cornea: {formData.as_cornea_os}, AC: {formData.as_ac_depth_os}, Iris: {formData.as_iris_os}, Lens: {formData.as_lens_os}</p>
-                  </div>
+                   <div><strong>OD (Right Eye):</strong> {formData.cvf_od || 'Full'}</div>
+                   <div><strong>OS (Left Eye):</strong> {formData.cvf_os || 'Full'}</div>
+                   {formData.cvf_notes && <div style={{ gridColumn: '1 / -1', marginTop: '4px' }}><strong>CVF Clinical Notes:</strong> {formData.cvf_notes}</div>}
                 </div>
               </div>
 
-              {/* Section G: Dilation */}
+              {/* Section H: Pachymetry */}
               <div style={{ borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
-                <h3 style={{ fontSize: '13px', fontWeight: '900', margin: '0 0 8px 0', color: '#1e293b' }}>G. DILATION</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', fontSize: '11px' }}>
-                  <div><strong>Adequacy:</strong> {formData.dil_adequate}</div>
-                  <div><strong>OD Dilated:</strong> {formData.dil_od}</div>
-                  <div><strong>OS Dilated:</strong> {formData.dil_os}</div>
-                </div>
-                {formData.dil_agent && <p style={{ fontSize: '11px', margin: '5px 0' }}><strong>Agent:</strong> {formData.dil_agent} ({formData.dil_time})</p>}
-              </div>
-
-              {/* Section H: Fundoscopy / Posterior Segment */}
-              <div style={{ borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
-                <h3 style={{ fontSize: '13px', fontWeight: '900', margin: '0 0 8px 0', color: '#1e293b' }}>H. FUNDOSCOPY</h3>
+                <h3 style={{ fontSize: '13px', fontWeight: '900', margin: '0 0 8px 0', color: '#1e293b' }}>H. 6. CORNEAL PACHYMETRY</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', fontSize: '10px' }}>
-                  <div style={{ border: '1px solid #eee', padding: '8px' }}>
-                    <p><strong>OD:</strong> Disc: {formData.fs_disc_color_od}, CDR: {formData.fs_disc_cdr_od}, Margins: {formData.fs_disc_margins_od}, Macula: {formData.fs_macula_od}, Vessels: {formData.fs_vessels_nipping_od}, Periph: {formData.fs_periph_od}</p>
-                  </div>
-                  <div style={{ border: '1px solid #eee', padding: '8px' }}>
-                    <p><strong>OS:</strong> Disc: {formData.fs_disc_color_os}, CDR: {formData.fs_disc_cdr_os}, Margins: {formData.fs_disc_margins_os}, Macula: {formData.fs_macula_os}, Vessels: {formData.fs_vessels_nipping_os}, Periph: {formData.fs_periph_os}</p>
-                  </div>
+                   <div><strong>OD (Right Corneal Thickness):</strong> {formData.pachymetry_od ? `${formData.pachymetry_od} µm` : '—'}</div>
+                   <div><strong>OS (Left Corneal Thickness):</strong> {formData.pachymetry_os ? `${formData.pachymetry_os} µm` : '—'}</div>
+                   {formData.pachymetry_notes && <div style={{ gridColumn: '1 / -1', marginTop: '4px' }}><strong>Pachymetry Clinical Notes:</strong> {formData.pachymetry_notes}</div>}
                 </div>
               </div>
 
-              {/* Section I: Diagnosis */}
+              {/* Section I: Investigations */}
               <div style={{ borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
-                <h3 style={{ fontSize: '13px', fontWeight: '900', margin: '0 0 8px 0', color: '#1e293b' }}>I. DIAGNOSIS</h3>
-                <div style={{ fontSize: '11px' }}>
-                  <p><strong>OD:</strong> {formData.diag_od || 'N/A'}</p>
-                  <p><strong>OS:</strong> {formData.diag_os || 'N/A'}</p>
-                  <p><strong>Summary:</strong> {formData.diag_summary}</p>
+                <h3 style={{ fontSize: '13px', fontWeight: '900', margin: '0 0 8px 0', color: '#1e293b' }}>I. 7. INVESTIGATIONS & LABORATORY</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', fontSize: '10px', marginBottom: '8px', border: '1px solid #eee', padding: '6px', borderRadius: '4px' }}>
+                  <div><strong>FBS:</strong> {formData.investigations_fbs || '—'}</div>
+                  <div><strong>RBS:</strong> {formData.investigations_rbs || '—'}</div>
+                  <div><strong>HbA1c:</strong> {formData.investigations_hba1c || '—'}</div>
+                  <div><strong>RVS:</strong> {formData.investigations_rvs || 'Not Done'}</div>
                 </div>
-              </div>
-
-              {/* Section J: Treatment Plan */}
-              <div style={{ borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
-                <h3 style={{ fontSize: '13px', fontWeight: '900', margin: '0 0 8px 0', color: '#1e293b' }}>J. TREATMENT PLAN</h3>
-                <div style={{ fontSize: '11px' }}>
-                  {formData.plan_meds && formData.plan_meds.length > 0 && (
-                    <div style={{ marginBottom: '10px' }}>
-                      <p><strong>Prescribed Medications:</strong></p>
-                      {formData.plan_meds.map((m: any, i: number) => (
-                        <p key={i}>• {m.drug_name} {m.strength} - {m.dose} ({m.frequency}) for {m.duration}</p>
+                
+                {patientInvestigations && patientInvestigations.length > 0 ? (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9px' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc' }}>
+                        <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left' }}>TEST NAME</th>
+                        <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left' }}>STATUS</th>
+                        <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left' }}>RESULT</th>
+                        <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left' }}>CLINICIAN COMMENT</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {patientInvestigations.map((inv: any, idx: number) => (
+                        <tr key={idx}>
+                          <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{inv.test_name}</td>
+                          <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{inv.status} ({inv.billing_status})</td>
+                          <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{inv.test_value ? `${inv.test_value} ${inv.unit || ''}` : '—'}</td>
+                          <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{inv.medical_comments || '—'}</td>
+                        </tr>
                       ))}
-                    </div>
-                  )}
-                  {formData.plan_glasses && <p><strong>Glasses Prescription:</strong> {formData.plan_glasses}</p>}
-                </div>
+                    </tbody>
+                  </table>
+                ) : (
+                  <p style={{ fontSize: '9px', color: '#64748b', margin: '2px 0' }}>No laboratory investigations ordered for this visit.</p>
+                )}
+                {formData.investigations_notes && <div style={{ fontSize: '9px', marginTop: '6px' }}><strong>General Investigation Notes:</strong> {formData.investigations_notes}</div>}
               </div>
 
-              {/* Section K: Clinical Notes & Follow-up */}
+              {/* Section J: Clinical Diagnosis */}
               <div style={{ borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
-                <h3 style={{ fontSize: '13px', fontWeight: '900', margin: '0 0 8px 0', color: '#1e293b' }}>K. CLINICAL NOTES & FOLLOW-UP</h3>
-                <div style={{ fontSize: '11px' }}>
-                  <p><strong>Notes:</strong> {formData.clinical_notes || 'No additional notes.'}</p>
-                  <p><strong>Follow-up:</strong> {formData.follow_up_date ? `Review on ${formData.follow_up_date}` : 'As needed'}</p>
+                <h3 style={{ fontSize: '13px', fontWeight: '900', margin: '0 0 8px 0', color: '#1e293b' }}>J. 8. CLINICAL DIAGNOSIS</h3>
+                <div style={{ fontSize: '10px', lineHeight: '1.4' }}>
+                  <p><strong>Primary Diagnosis:</strong> {formData.diagnosis_primary || 'Pending'}</p>
+                  {formData.diagnosis_secondary && <p><strong>Secondary Diagnosis:</strong> {formData.diagnosis_secondary}</p>}
+                  {formData.diagnosis_notes && <p><strong>Diagnostic Notes (ICD-10/Staging):</strong> {formData.diagnosis_notes}</p>}
                 </div>
               </div>
 
-              {/* Section L: Surgery Flag */}
-              {formData.surgery_advised && (
-                <div style={{ border: '2px solid #dc2626', padding: '10px', borderRadius: '4px', background: '#fef2f2' }}>
-                  <h3 style={{ fontSize: '13px', fontWeight: '900', margin: '0 0 8px 0', color: '#dc2626' }}>L. SURGERY BOOKING</h3>
-                  <div style={{ fontSize: '11px' }}>
-                    <p><strong>Procedure:</strong> {formData.surgery_type} ({formData.surgery_side})</p>
-                    <p><strong>Urgency:</strong> {formData.surgery_urgency}</p>
+              {/* Section K: Treatment Plan */}
+              <div style={{ borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
+                <h3 style={{ fontSize: '13px', fontWeight: '900', margin: '0 0 8px 0', color: '#1e293b' }}>K. 9. TREATMENT PLAN</h3>
+                <div style={{ fontSize: '10px', lineHeight: '1.4' }}>
+                  {formData.plan_meds && formData.plan_meds.length > 0 ? (
+                    <div style={{ marginBottom: '8px' }}>
+                      <p style={{ fontWeight: 'bold', margin: '0 0 4px 0' }}>Prescribed Medications:</p>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9px', marginBottom: '8px' }}>
+                        <thead>
+                          <tr style={{ background: '#f8fafc' }}>
+                            <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left' }}>DRUG NAME</th>
+                            <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left' }}>STRENGTH</th>
+                            <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left' }}>DOSE & FREQ</th>
+                            <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left' }}>DURATION</th>
+                            <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left' }}>INSTRUCTIONS</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {formData.plan_meds.map((m: any, i: number) => (
+                            <tr key={i}>
+                              <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{m.drug_name}</td>
+                              <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{m.strength}</td>
+                              <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{m.dose} ({m.frequency})</td>
+                              <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{m.duration}</td>
+                              <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{m.instructions || 'As directed'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : null}
+
+                  {/* Glasses prescription */}
+                  {(formData.plan_glasses_od?.sph || formData.plan_glasses_os?.sph || formData.plan_glasses_od?.cyl || formData.plan_glasses_os?.cyl) ? (
+                    <div style={{ marginBottom: '8px' }}>
+                      <p style={{ fontWeight: 'bold', margin: '0 0 4px 0' }}>Spectacles Prescription:</p>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9px', marginBottom: '4px' }}>
+                        <thead>
+                          <tr style={{ background: '#f8fafc' }}>
+                            <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left' }}>EYE</th>
+                            <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left' }}>SPHERICAL</th>
+                            <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left' }}>CYLINDRICAL</th>
+                            <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left' }}>AXIS</th>
+                            <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left' }}>NEAR ADD</th>
+                            <th style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'left' }}>PRISM</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}><strong>OD (Right)</strong></td>
+                            <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.plan_glasses_od?.sph || '—'}</td>
+                            <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.plan_glasses_od?.cyl || '—'}</td>
+                            <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.plan_glasses_od?.axis || '—'}</td>
+                            <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.plan_glasses_od?.add || '—'}</td>
+                            <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.plan_glasses_od?.prism || '—'}</td>
+                          </tr>
+                          <tr>
+                            <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}><strong>OS (Left)</strong></td>
+                            <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.plan_glasses_os?.sph || '—'}</td>
+                            <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.plan_glasses_os?.cyl || '—'}</td>
+                            <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.plan_glasses_os?.axis || '—'}</td>
+                            <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.plan_glasses_os?.add || '—'}</td>
+                            <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{formData.plan_glasses_os?.prism || '—'}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', fontSize: '9px', marginTop: '4px' }}>
+                        <div><strong>PD:</strong> {formData.plan_glasses_pd || '—'} mm</div>
+                        <div><strong>Frame:</strong> {formData.plan_frame || '—'}</div>
+                        <div><strong>Lens Type:</strong> {formData.plan_lens_type || '—'}</div>
+                        <div><strong>Lens Material:</strong> {formData.plan_lens_material || '—'}</div>
+                        {formData.plan_special_instructions && <div style={{ gridColumn: '1 / -1' }}><strong>Dispensing Notes:</strong> {formData.plan_special_instructions}</div>}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '6px' }}>
+                    <div><strong>Follow-up Date:</strong> {formData.plan_followup_date ? formatDateStandard(formData.plan_followup_date) : 'As needed'}</div>
+                    <div><strong>Patient Instructions:</strong> {formData.plan_instructions || 'Follow prescribed treatment plan.'}</div>
                   </div>
                 </div>
-              )}
+              </div>
+
+              {/* Section L: Surgery & Admission */}
+              <div style={{ borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
+                <h3 style={{ fontSize: '13px', fontWeight: '900', margin: '0 0 8px 0', color: '#1e293b' }}>L. 10. SURGERY & ADMISSION</h3>
+                <div style={{ fontSize: '10px', lineHeight: '1.4' }}>
+                  {formData.surgery_advised ? (
+                    <div style={{ border: '1px solid #fca5a5', padding: '8px', borderRadius: '6px', background: '#fff5f5', marginBottom: '8px' }}>
+                      <p style={{ fontWeight: 'bold', color: '#dc2626', margin: '0 0 4px 0' }}>Surgery Advised:</p>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '9px' }}>
+                        <div><strong>Procedure:</strong> {formData.surgery_type}</div>
+                        <div><strong>Urgency:</strong> {formData.surgery_urgency}</div>
+                        <div><strong>Proposed Date:</strong> {formData.surgery_date ? formatDateStandard(formData.surgery_date) : 'TBD'}</div>
+                        <div><strong>Surgeon:</strong> {formData.surgery_surgeon || '—'}</div>
+                        <div style={{ gridColumn: '1 / -1' }}><strong>Pre-Op Prep / Counselor Notes:</strong> {formData.surgery_notes || '—'} {formData.surgery_counsel_notes ? `| Counsel Notes: ${formData.surgery_counsel_notes}` : ''}</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p style={{ margin: '0 0 4px 0' }}><strong>Surgery Advised:</strong> No</p>
+                  )}
+
+                  {formData.admission_advised ? (
+                    <div style={{ border: '1px solid #93c5fd', padding: '8px', borderRadius: '6px', background: '#eff6ff' }}>
+                      <p style={{ fontWeight: 'bold', color: '#2563eb', margin: '0 0 4px 0' }}>Admission Advised:</p>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '9px' }}>
+                        <div><strong>Reason:</strong> {formData.admission_reason}</div>
+                        <div><strong>Urgency:</strong> {formData.admission_urgency}</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p style={{ margin: '0' }}><strong>Admission Advised:</strong> No</p>
+                  )}
+                </div>
+              </div>
 
             </div>
 
@@ -1555,6 +2609,9 @@ export const Consultations: React.FC = () => {
                  </button>
               </div>
            </div>
+        </div>
+      )}
+
       {showHistoryModal && (
         <div className="leh-modal-overlay">
            <div className="leh-modal-content" style={{ maxWidth: '800px' }}>

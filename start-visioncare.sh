@@ -28,11 +28,11 @@ echo ""
 
 # Open browser (cross-platform)
 if command -v xdg-open > /dev/null; then
-  xdg-open "http://localhost:$PORT"
+  xdg-open "http://localhost:$PORT/login"
 elif command -v open > /dev/null; then
-  open "http://localhost:$PORT"
+  open "http://localhost:$PORT/login"
 else
-  echo "Please open http://localhost:$PORT in your browser."
+  echo "Please open http://localhost:$PORT/login in your browser."
 fi
 
 echo "Keep this terminal open while using the app."

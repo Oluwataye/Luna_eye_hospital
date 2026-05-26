@@ -39,7 +39,7 @@ echo.
 :: Launch Browsers
 timeout /t 5 /nobreak >nul
 start http://localhost:%PHARM_PORT%
-start http://localhost:%VISION_PORT%
+start http://localhost:%VISION_PORT%/login
 
 echo Keep the server windows open to maintain connections.
 pause >nul

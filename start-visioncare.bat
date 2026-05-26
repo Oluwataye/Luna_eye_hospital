@@ -30,7 +30,7 @@ echo VisionCare EMR is running at: http://localhost:%PORT%
 echo.
 
 :: Open browser
-start http://localhost:%PORT%
+start http://localhost:%PORT%/login
 
 echo Keep this window open while using the app.
 pause >nul

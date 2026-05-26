@@ -76,6 +76,7 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/auth/login" element={<Login />} />
             
             <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route index element={<Navigate to="/dashboard" replace />} />
@@ -99,6 +100,7 @@ function App() {
               <Route path="admin/reprint-management" element={<ProtectedRoute allowedRoles={['Admin']}><ReprintManagement /></ProtectedRoute>} />
               <Route path="settings" element={<ProtectedRoute allowedRoles={['Admin']}><Settings /></ProtectedRoute>} />
               <Route path="profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Route>
           </Routes>
         </BrowserRouter>

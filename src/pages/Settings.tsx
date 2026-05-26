@@ -37,7 +37,7 @@ export const Settings: React.FC = () => {
   const fetchData = async () => {
     try {
       const [stats, sets, baks, wrds, dscs, cats] = await Promise.all([
-        fetch(`${API_BASE_URL}/db-stats`).then(r => r.json()),
+        api.getDbStats(),
         api.getSettings(),
         api.getBackups(),
         api.getWards(),
@@ -224,7 +224,7 @@ export const Settings: React.FC = () => {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '13px', color: 'var(--leh-text-muted)' }}>Total Records</span>
-                  <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--leh-text-dark)' }}>{dbStats.tables.reduce((acc: number, t: any) => acc + t.rows, 0).toLocaleString()}</span>
+                  <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--leh-text-dark)' }}>{(dbStats.tables || []).reduce((acc: number, t: any) => acc + t.rows, 0).toLocaleString()}</span>
                 </div>
               </div>
             </div>
@@ -232,7 +232,7 @@ export const Settings: React.FC = () => {
         </div>
 
         {/* Tab Content */}
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           {activeTab === 'clinic' && (
             <div className="leh-table-card" style={{ padding: '32px' }}>
               <h3 className="leh-table-title" style={{ marginBottom: '32px' }}>Clinical Metadata Settings</h3>

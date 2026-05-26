@@ -9,7 +9,7 @@ WshShell.Run "cmd /c cd /d """ & strPath & "\server"" && node index.js", 0, Fals
 WScript.Sleep 3000
 
 ' 3. Open Browser
-WshShell.Run "http://localhost:3200", 9, False
+WshShell.Run "http://localhost:3200/login", 9, False
 
 Set WshShell = Nothing
 Set FSO = Nothing

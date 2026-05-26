@@ -8,9 +8,21 @@ const db = new sqlite3.Database(dbPath, (err) => {
     console.error('Error opening database', err.message);
   } else {
     console.log('Connected to the SQLite database.');
-    
-    // Enable foreign keys
+
+    // ── Performance & reliability PRAGMAs ──
+    // WAL mode: concurrent reads during writes, no blocking
+    db.run('PRAGMA journal_mode = WAL');
+    // Safer than FULL but still crash-safe; WAL makes this sufficient
+    db.run('PRAGMA synchronous = NORMAL');
+    // 16 MB page cache in memory
+    db.run('PRAGMA cache_size = -16000');
+    // Temp tables in RAM
+    db.run('PRAGMA temp_store = MEMORY');
+    // 128 MB memory-mapped I/O
+    db.run('PRAGMA mmap_size = 134217728');
+    // Enable foreign key enforcement
     db.run('PRAGMA foreign_keys = ON');
+    console.log('[DB] PRAGMAs set: WAL mode, 16 MB cache, memory temp store');
     
     // Create required tables
     db.serialize(() => {
@@ -66,8 +78,16 @@ const db = new sqlite3.Database(dbPath, (err) => {
         cost_price REAL,
         supplier TEXT,
         batch_number TEXT,
-        expiry_date TEXT
+        expiry_date TEXT,
+        attributes TEXT
       )`);
+
+      // Run column migration dynamically for existing databases
+      db.run("ALTER TABLE inventory ADD COLUMN attributes TEXT", (err) => {
+        if (err && !err.message.includes("duplicate column name")) {
+          console.error("Migration error (adding attributes column to inventory):", err.message);
+        }
+      });
 
       // Stock Movements table
       db.run(`CREATE TABLE IF NOT EXISTS stock_movements (
@@ -202,9 +222,15 @@ const db = new sqlite3.Database(dbPath, (err) => {
       db.run(`CREATE TABLE IF NOT EXISTS investigations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         patient_id TEXT,
+        inventory_id TEXT,
         test_name TEXT,
         status TEXT DEFAULT 'Pending', -- Pending, Completed
+        test_value TEXT,
+        unit TEXT,
+        reference_range TEXT,
         results_notes TEXT,
+        medical_comments TEXT,
+        billing_status TEXT DEFAULT 'Unpaid',
         requested_by TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         completed_at DATETIME,
@@ -287,8 +313,40 @@ const db = new sqlite3.Database(dbPath, (err) => {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT UNIQUE,
         description TEXT,
+        attribute_template TEXT DEFAULT 'NONE',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )`);
+
+      // Migration: Add attribute_template column to inventory_categories if it doesn't exist
+      db.run("ALTER TABLE inventory_categories ADD COLUMN attribute_template TEXT DEFAULT 'NONE'", (err) => {
+        if (err && !err.message.includes("duplicate column name")) {
+          console.error("Migration error (adding attribute_template column to inventory_categories):", err.message);
+        }
+      });
+
+      // Seed default categories if they do not exist
+      const defaultCategories = [
+        { name: 'Drugs', description: 'Medicines and pharmaceutical drugs', template: 'DRUGS' },
+        { name: 'Test', description: 'Diagnostic tests and procedures', template: 'TEST' },
+        { name: 'Laboratory', description: 'Laboratory tests, reagents, and equipment', template: 'LABORATORY' },
+        { name: 'Frames', description: 'Eyeglass frames', template: 'FRAMES' },
+        { name: 'Lenses', description: 'Eyeglass lenses', template: 'LENSES' }
+      ];
+      
+      defaultCategories.forEach(cat => {
+        db.get('SELECT * FROM inventory_categories WHERE name = ?', [cat.name], (err, row) => {
+          if (!err && !row) {
+            db.run('INSERT INTO inventory_categories (name, description, attribute_template) VALUES (?, ?, ?)', [cat.name, cat.description, cat.template], (err2) => {
+              if (!err2) {
+                console.log(`Migration: Seeded default category: ${cat.name}`);
+              }
+            });
+          } else if (!err && row && (!row.attribute_template || row.attribute_template === 'NONE')) {
+            // Update existing default categories to have their template set
+            db.run('UPDATE inventory_categories SET attribute_template = ? WHERE name = ?', [cat.template, cat.name]);
+          }
+        });
+      });
 
       // Expenses table
       db.run(`CREATE TABLE IF NOT EXISTS expenses (
@@ -400,6 +458,8 @@ const db = new sqlite3.Database(dbPath, (err) => {
           console.log('Default reprint settings initialized.');
         }
       });
+
+
 
       // Insert default Admin user if none exists
       db.get('SELECT * FROM users WHERE role = "Admin"', (err, row) => {
@@ -531,6 +591,25 @@ const db = new sqlite3.Database(dbPath, (err) => {
         });
       });
 
+      // Investigations Expansion Migration
+      const invCols = [
+        { name: 'inventory_id', type: 'TEXT' },
+        { name: 'test_value', type: 'TEXT' },
+        { name: 'unit', type: 'TEXT' },
+        { name: 'reference_range', type: 'TEXT' },
+        { name: 'medical_comments', type: 'TEXT' },
+        { name: 'billing_status', type: 'TEXT DEFAULT "Unpaid"' }
+      ];
+
+      invCols.forEach(col => {
+        db.all(`PRAGMA table_info(investigations)`, (err, columns) => {
+          if (!err && columns && !columns.some(c => c.name === col.name)) {
+            db.run(`ALTER TABLE investigations ADD COLUMN ${col.name} ${col.type}`);
+            console.log(`Migration: Added '${col.name}' column to investigations table.`);
+          }
+        });
+      });
+
       // Consultation Queue Expansion Migration
       const queueCols = [
         { name: 'started_at', type: 'DATETIME' },
@@ -547,6 +626,22 @@ const db = new sqlite3.Database(dbPath, (err) => {
       });
     });
   }
+});
+
+// ── Performance indexes (CREATE IF NOT EXISTS = safe to re-run) ──
+db.serialize(() => {
+  db.run('CREATE INDEX IF NOT EXISTS idx_inventory_category    ON inventory(category)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_inventory_name        ON inventory(name)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_patients_name         ON patients(full_name)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_visits_patient        ON visits(patient_id)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_visits_status         ON visits(status)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_notifications_role    ON notifications(user_role)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_stock_movements_item  ON stock_movements(item_id)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_audit_logs_user       ON audit_logs(user_id)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_audit_logs_created    ON audit_logs(created_at)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_transactions_patient  ON transactions(patient_id)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_transactions_date     ON transactions(created_at)');
+  console.log('[DB] Indexes ensured.');
 });
 
 module.exports = db;

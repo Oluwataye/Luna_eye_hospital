@@ -24,7 +24,7 @@ import { useAuth } from '../context/AuthContext';
 import { formatDateStandard } from '../utils/date';
 import { PatientStatus, StatusLabels } from '../constants/workflow';
 import { Modal } from '../components/Modal';
-import { FileText as FileIcon, Printer, ClipboardList, Info } from 'lucide-react';
+import { Printer, ClipboardList, Info } from 'lucide-react';
 
 interface PatientsProps {
   view?: 'list' | 'profile' | 'checkin';

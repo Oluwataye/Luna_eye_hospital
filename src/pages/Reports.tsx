@@ -291,10 +291,10 @@ export const Reports: React.FC = () => {
                           <>
                             <td style={{ paddingLeft: '32px' }}>
                                <p className="leh-table-bold" style={{ margin: 0 }}>{row.name}</p>
-                               <p className="leh-label" style={{ fontSize: '9px', margin: 0 }}>SKU: #{row.id.slice(0,8).toUpperCase()}</p>
+                               <p className="leh-label" style={{ fontSize: '9px', margin: 0 }}>SKU: #{String(row.id).slice(0,8).toUpperCase()}</p>
                             </td>
                             <td>
-                              <span className="leh-status-dot" style={{ background: '#f1f5f9', color: '#475569', fontWeight: '800' }}>{row.category.toUpperCase()}</span>
+                              <span className="leh-status-dot" style={{ background: '#f1f5f9', color: '#475569', fontWeight: '800' }}>{row.category?.toUpperCase() || 'GENERAL'}</span>
                             </td>
                             <td style={{ textAlign: 'center' }}>
                                <span className="leh-table-bold" style={{ fontSize: '15px' }}>{row.stock}</span>
@@ -309,14 +309,14 @@ export const Reports: React.FC = () => {
                         {activeTab === 'sales' && (
                           <>
                             <td style={{ paddingLeft: '32px' }}>
-                               <span className="leh-table-bold" style={{ color: 'var(--leh-primary)', fontSize: '12px', fontFamily: 'monospace' }}>{row.receipt_no || row.id.toUpperCase()}</span>
+                               <span className="leh-table-bold" style={{ color: 'var(--leh-primary)', fontSize: '12px', fontFamily: 'monospace' }}>{row.receipt_no || String(row.id).toUpperCase()}</span>
                             </td>
                             <td>
                                <p className="leh-table-bold" style={{ margin: 0 }}>{row.patient_name || 'EXTERNAL WALK-IN'}</p>
                                <p className="leh-label" style={{ fontSize: '9px', margin: 0 }}>FILE: {row.file_number || 'N/A'}</p>
                             </td>
                             <td style={{ textAlign: 'center' }}>
-                              <span className="leh-status-dot" style={{ background: '#ecfdf5', color: '#10b981', fontWeight: '900' }}>{row.payment_method.toUpperCase()}</span>
+                              <span className="leh-status-dot" style={{ background: '#ecfdf5', color: '#10b981', fontWeight: '900' }}>{row.payment_method?.toUpperCase() || 'N/A'}</span>
                             </td>
                             <td style={{ textAlign: 'right' }}>
                                <span className="leh-table-bold" style={{ fontSize: '16px' }}>₦{(row.total_amount || 0).toLocaleString()}</span>
@@ -337,13 +337,13 @@ export const Reports: React.FC = () => {
                           <>
                             <td style={{ paddingLeft: '32px' }}>
                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                  <div style={{ width: '28px', height: '28px', background: 'var(--leh-primary-light)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--leh-primary)', fontWeight: '900', fontSize: '11px' }}>{row.user_name.charAt(0)}</div>
+                                  <div style={{ width: '28px', height: '28px', background: 'var(--leh-primary-light)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--leh-primary)', fontWeight: '900', fontSize: '11px' }}>{row.user_name?.charAt(0) || 'U'}</div>
                                   <span className="leh-table-bold">{row.user_name}</span>
                                </div>
                             </td>
                             <td><span className="leh-label" style={{ fontSize: '11px', fontWeight: '900', color: '#64748b', textTransform: 'uppercase' }}>{row.action_type}</span></td>
                             <td>
-                              <span className="leh-status-dot" style={{ background: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0', fontWeight: '800' }}>{row.module.toUpperCase()}</span>
+                              <span className="leh-status-dot" style={{ background: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0', fontWeight: '800' }}>{row.module?.toUpperCase() || ''}</span>
                             </td>
                              <td style={{ textAlign: 'right', paddingRight: '32px' }}>
                                 <div className="leh-date-display" style={{ alignItems: 'flex-end' }}>
@@ -360,7 +360,7 @@ export const Reports: React.FC = () => {
                         {!['inventory', 'sales', 'audit_log'].includes(activeTab) && (
                           <>
                             <td style={{ paddingLeft: '32px' }}>
-                               <span className="leh-table-bold" style={{ color: 'var(--leh-primary)', fontSize: '12px', fontFamily: 'monospace' }}>#{row.id?.slice(0,10) || i+1}</span>
+                               <span className="leh-table-bold" style={{ color: 'var(--leh-primary)', fontSize: '12px', fontFamily: 'monospace' }}>#{row.id ? String(row.id).slice(0,10) : i+1}</span>
                             </td>
                             <td><span className="leh-table-bold">{row.name || row.description || 'Verified System Protocol'}</span></td>
                             <td style={{ textAlign: 'right', paddingRight: '32px' }}>

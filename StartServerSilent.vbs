@@ -12,8 +12,8 @@ Set FSO = CreateObject("Scripting.FileSystemObject")
 ' Absolute path to the server directory
 strServerPath = "C:\Users\HP\Documents\Luna Eyes Hospital\server"
 
-' --- Guard: Check if already running on port 80 ---
-Set objExec = WshShell.Exec("cmd /c netstat -ano | findstr :80")
+' --- Guard: Check if already running on port 3200 ---
+Set objExec = WshShell.Exec("cmd /c netstat -ano | findstr :3200")
 strOutput = objExec.StdOut.ReadAll
 Set objExec = Nothing
 

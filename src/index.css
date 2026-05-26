@@ -1394,3 +1394,81 @@ select.leh-input, select.clinical-input, select.leh-search-input {
   background: var(--leh-bg-light);
   color: var(--leh-primary);
 }
+
+/* Responsive adjustments for Enterprise Design System */
+.leh-stat-grid {
+  flex-wrap: wrap;
+}
+
+.leh-stat-card {
+  min-width: 250px;
+}
+
+@media (max-width: 1450px) {
+  .leh-page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  
+  .leh-header-actions {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .leh-search-box {
+    flex: 1;
+    min-width: 240px;
+  }
+}
+
+@media (max-width: 768px) {
+  .leh-page-container {
+    padding: 20px;
+  }
+  
+  .leh-header-actions {
+    gap: 12px;
+  }
+  
+  .leh-btn-primary, .leh-btn-outline {
+    padding: 0 20px;
+    height: 48px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 576px) {
+  .leh-page-container {
+    padding: 16px;
+  }
+
+  .leh-header-left {
+    gap: 12px;
+  }
+
+  .leh-header-icon-box {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+  }
+
+  .leh-header-icon-box svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .leh-page-title {
+    font-size: 24px;
+  }
+
+  .leh-header-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .leh-search-box {
+    width: 100% !important;
+  }
+}
+

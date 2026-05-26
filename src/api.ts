@@ -1,22 +1,109 @@
 // Luna Eye Hospital API Client
 export const API_BASE_URL = '/api';
 
-const request = async (endpoint: string, options: RequestInit = {}) => {
+// ── Request deduplication: identical in-flight GETs share one Promise ──
+const _pending = new Map<string, Promise<any>>();
+
+// ── Core request function ──
+// signal: optional AbortController signal (pass from useEffect cleanup)
+// _retry: internal retry counter — do not pass manually
+const request = async (
+  endpoint: string,
+  options: RequestInit & { signal?: AbortSignal } = {},
+  _retry = 0
+): Promise<any> => {
+  // Offline guard — fail fast without a network round-trip
+  if (!navigator.onLine) {
+    throw new Error('No internet connection. Please check your network and try again.');
+  }
+
+  const method = (options.method || 'GET').toUpperCase();
+  const isGet = method === 'GET';
+  const dedupeKey = `${method}:${endpoint}`;
+
+  // Deduplicate identical in-flight GET requests
+  if (isGet && _pending.has(dedupeKey)) {
+    return _pending.get(dedupeKey)!;
+  }
+
   const token = localStorage.getItem('token');
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
-    ...(token && token !== 'null' && token !== 'undefined' ? { 'Authorization': `Bearer ${token}` } : {}),
-    ...options.headers
+    ...(token && token !== 'null' && token !== 'undefined'
+      ? { 'Authorization': `Bearer ${token}` }
+      : {}),
+    ...options.headers,
   };
 
-  const res = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
-  
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.error || errorData.message || `Request failed: ${res.status}`);
+  const execRequest = async (): Promise<any> => {
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+    } catch (networkErr: any) {
+      // Network-level failure (ECONNREFUSED, DNS, etc.) — retry GETs only
+      if (isGet && _retry < 2) {
+        const delay = (_retry + 1) * 500; // 500ms, 1000ms
+        console.warn(`[API] Network error — retry ${_retry + 1} in ${delay}ms: ${endpoint}`);
+        await new Promise(r => setTimeout(r, delay));
+        return request(endpoint, options, _retry + 1);
+      }
+      throw new Error('Unable to reach the server. Please check your connection.');
+    }
+
+    // 401 — token expired or missing: clear session and redirect to login
+    if (res.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
+      }
+      throw new Error('Session expired. Please log in again.');
+    }
+
+    // 429 / 503 — rate limited or server overloaded: retry GETs with backoff
+    if ((res.status === 429 || res.status === 503) && isGet && _retry < 2) {
+      const retryAfter = parseInt(res.headers.get('Retry-After') || '0', 10);
+      const delay = retryAfter > 0 ? retryAfter * 1000 : (_retry + 1) * 1000;
+      console.warn(`[API] ${res.status} — retry ${_retry + 1} in ${delay}ms: ${endpoint}`);
+      await new Promise(r => setTimeout(r, delay));
+      return request(endpoint, options, _retry + 1);
+    }
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || errorData.message || `Request failed: ${res.status}`);
+    }
+
+    return res.json();
+  };
+
+  if (isGet) {
+    const promise = execRequest().finally(() => _pending.delete(dedupeKey));
+    _pending.set(dedupeKey, promise);
+    return promise;
   }
 
-  return res.json();
+  return execRequest();
+};
+
+// ── Convenience: create an AbortController tied to a React useEffect ──
+// Usage: const { signal, abort } = apiAbort();
+// Pass signal to api methods that accept it; call abort() in useEffect cleanup.
+export const apiAbort = () => {
+  const controller = new AbortController();
+  return { signal: controller.signal, abort: () => controller.abort() };
+};
+
+const cleanParams = (params: any) => {
+  const clean: any = {};
+  if (!params) return clean;
+  Object.keys(params).forEach(k => {
+    const val = params[k];
+    if (val !== undefined && val !== null && val !== '') {
+      clean[k] = val;
+    }
+  });
+  return clean;
 };
 
 export const api = {
@@ -112,6 +199,13 @@ export const api = {
     });
   },
 
+  async updateInventoryItem(id: string, itemData: any) {
+    return request(`/inventory/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(itemData)
+    });
+  },
+
   async updateInventoryStock(id: string, data: { quantity_change: number, reason?: string, type?: string, performed_by?: string, reference_id?: string }) {
     return request(`/inventory/${id}/stock`, {
       method: 'PUT',
@@ -145,10 +239,10 @@ export const api = {
     });
   },
 
-  async dischargePatient(id: string, summary: string) {
-    return request(`/admissions/${id}/discharge`, {
+  async dischargePatient(id: string | number, summary: string) {
+    return request(`/admissions/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ summary })
+      body: JSON.stringify({ status: 'Discharged', notes: summary })
     });
   },
 
@@ -196,22 +290,23 @@ export const api = {
     });
   },
 
-  async getInvestigations(patientId?: string, status?: string) {
+  async getInvestigations(patientId?: string, status?: string, billing_status?: string) {
     let url = '/investigations?';
     if (patientId) url += `patient_id=${patientId}&`;
-    if (status) url += `status=${status}`;
+    if (status) url += `status=${status}&`;
+    if (billing_status) url += `billing_status=${billing_status}`;
     const data = await request(url);
     return Array.isArray(data) ? data : [];
   },
 
-  async requestInvestigation(data: {patient_id: string, test_name: string, requested_by: string}) {
+  async requestInvestigation(data: {patient_id: string, test_name: string, requested_by: string, inventory_id?: string, unit?: string, reference_range?: string}) {
     return request('/investigations', {
       method: 'POST',
       body: JSON.stringify(data)
     });
   },
 
-  async updateInvestigationResult(id: number, data: { results_notes?: string, status?: string }) {
+  async updateInvestigationResult(id: number, data: { results_notes?: string, status?: string, test_value?: string, medical_comments?: string, billing_status?: string }) {
     return request(`/investigations/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
@@ -377,12 +472,15 @@ export const api = {
 
   // Audit Logs
   async getAuditLogs(params: { user_id?: number, action_type?: string, start_date?: string, end_date?: string }) {
-    const query = new URLSearchParams(params as any).toString();
+    const query = new URLSearchParams(cleanParams(params)).toString();
     const data = await request(`/audit-logs?${query}`);
     return Array.isArray(data) ? data : [];
   },
 
   // Settings API
+  async getDbStats() {
+    return request('/db-stats');
+  },
   async getSettings() {
     return request('/settings');
   },
@@ -536,7 +634,7 @@ export const api = {
   },
 
   async getReprintLogs(params: any = {}) {
-    const query = new URLSearchParams(params).toString();
+    const query = new URLSearchParams(cleanParams(params)).toString();
     const data = await request(`/reprints?${query}`);
     return Array.isArray(data) ? data : [];
   },
@@ -579,9 +677,12 @@ export const api = {
     });
   },
 
+  async searchReceiptsForReprint(params: { search?: string, start_date?: string, end_date?: string } = {}) {
+    const query = new URLSearchParams(cleanParams(params)).toString();
+    return request(`/reprints/search-receipts?${query}`);
+  },
+
   async getReceiptForReprint(receiptNumber: string) {
     return request(`/billing/receipts/${encodeURIComponent(receiptNumber)}`);
   },
-
-
 };

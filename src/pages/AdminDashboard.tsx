@@ -33,10 +33,9 @@ export const AdminDashboard: React.FC = () => {
   const fetchDashboardData = async () => {
     setIsRefreshing(true);
     try {
-      const [queue, admissions, payments, inventory, sales, backups, logs, users] = await Promise.all([
+      const [queue, admissions, inventory, sales, backups, logs, users] = await Promise.all([
         api.getQueue(),
         api.getAdmissions('Active'),
-        api.getAwaitingPaymentQueue(),
         api.getInventory(),
         api.getSalesSummary(),
         api.getBackups(),
@@ -59,10 +58,10 @@ export const AdminDashboard: React.FC = () => {
       setMetrics({
         patientsToday: queue.total_today || 0,
         admittedCount: admissions.length,
-        pendingPayments: payments.length,
+        pendingPayments: sales.outstandingDebts || 0,
         lowStock: lowStockItems.length,
         expiringSoon: expiringItems.length,
-        salesToday: sales.total_sales_today || 0,
+        salesToday: sales.todaySales || 0,
         backupStatus: isBackupOk ? 'HEALTHY' : 'PENDING',
         recentLogs: (logs || []).slice(0, 6),
         activeUsers: (users || []).length
@@ -117,7 +116,7 @@ export const AdminDashboard: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '40px' }}>
           <StatCard title="TOTAL PATIENTS" value={metrics.patientsToday} icon={Users} colorClass="blue" path="/patients" subtitle="Today's registered" />
           <StatCard title="ADMITTED" value={metrics.admittedCount} icon={ClipboardList} colorClass="amber" path="/admissions" subtitle="Currently in ward" />
-          <StatCard title="PENDING BILLS" value={metrics.pendingPayments} icon={NairaIcon} colorClass="red" path="/billing" subtitle="Revenue awaiting clearing" />
+          <StatCard title="PENDING BILLS" value={`₦${metrics.pendingPayments.toLocaleString()}`} icon={NairaIcon} colorClass="red" path="/billing" subtitle="Revenue awaiting clearing" />
           <StatCard title="LOW STOCK" value={metrics.lowStock} icon={ShieldAlert} colorClass="amber" path="/inventory" subtitle="Items below threshold" />
           <StatCard title="EXPIRING SOON" value={metrics.expiringSoon} icon={AlertTriangle} colorClass="red" path="/inventory" subtitle="Inventory expiring < 30d" />
           <StatCard title="TOTAL SALES" value={`₦${metrics.salesToday.toLocaleString()}`} icon={NairaIcon} colorClass="green" path="/reports" subtitle="Gross revenue today" />

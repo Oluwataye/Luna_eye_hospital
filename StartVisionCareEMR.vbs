@@ -4,7 +4,7 @@ Set FSO = CreateObject("Scripting.FileSystemObject")
 ' Get the absolute path of the directory where this script is located
 strPath = FSO.GetParentFolderName(WScript.ScriptFullName)
 strDBPath = strPath & "\server\luna_eye_hospital.db"
-strURL = "http://localhost:3200"
+strURL = "http://localhost:3200/login"
 
 On Error Resume Next
 

@@ -51,9 +51,32 @@ export const AuditLogs: React.FC = () => {
   }, [filters]);
 
   const actionTypes = [
-    'LOGIN', 'LOGIN_FAILED', 'LOGOUT', 'PATIENT_EDIT', 
-    'CLINICAL_EDIT', 'BILLING_CREATE', 'BILLING_VOID', 
-    'STOCK_ADJUST', 'SUPPLIER_CREATE', 'BACKUP', 'USER_CREATE', 'USER_UPDATE'
+    // Auth
+    'LOGIN', 'LOGIN_FAILED', 'LOGOUT',
+    // Legacy mixed-case (existing DB records)
+    'Login', 'Login Failed',
+    // Patients
+    'PATIENT_CREATE', 'PATIENT_EDIT', 'Patient Edit',
+    // Clinical
+    'TRIAGE', 'TRIAGE_SAVE', 'TRIAGE_COMPLETE',
+    'CONSULTATION_SAVE', 'CONSULTATION_FINALIZE', 'CLINICAL_EDIT',
+    // Billing & Finance
+    'BILLING_CREATE', 'BILLING_PAYMENT', 'BILLING_VOID',
+    'Payment', 'Billing Void',
+    // Receipts
+    'Receipt Reprint',
+    // Stock & Inventory
+    'STOCK_ADJUST',
+    // Check-in
+    'CHECK_IN', 'CHECK_IN_NEW_VISIT', 'VISIT_STATUS_CHANGE',
+    // Users
+    'USER_CREATE', 'USER_UPDATE', 'USER_DEACTIVATE',
+    // Procurement
+    'SUPPLIER_CREATE',
+    // Admin
+    'SETTINGS_UPDATE', 'BACKUP', 'BACKUP_CREATE',
+    // Admissions
+    'ADMISSION_CREATE', 'ADMISSION_DISCHARGE', 'ADMISSION_UPDATE',
   ];
 
   const handleExport = () => {
@@ -69,7 +92,7 @@ export const AuditLogs: React.FC = () => {
         `"${new Date(log.created_at).toLocaleString()}"`,
         `"${log.user_name}"`,
         `"${log.action_type}"`,
-        `"${log.description.replace(/"/g, '""')}"`
+        `"${(log.details || '').replace(/"/g, '""')}"`
       ].join(','))
     ].join('\n');
 
@@ -302,7 +325,7 @@ export const AuditLogs: React.FC = () => {
                     </span>
                   </td>
                   <td style={{ paddingRight: '32px' }}>
-                    <p style={{ fontSize: '13px', color: '#1e293b', fontWeight: '500', fontStyle: 'italic', margin: 0 }}>"{log.description}"</p>
+                    <p style={{ fontSize: '13px', color: '#1e293b', fontWeight: '500', fontStyle: 'italic', margin: 0 }}>"{log.details || '—'}"</p>
                   </td>
                 </tr>
               ))}

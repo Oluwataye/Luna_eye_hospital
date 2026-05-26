@@ -24,7 +24,7 @@ const ReprintManagement: React.FC = () => {
   const navigate = useNavigate();
   const { notify, confirm } = useNotification();
 
-  const [activeTab, setActiveTab] = useState<'all' | 'restricted'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'restricted' | 'control'>('all');
   const [logs, setLogs] = useState<any[]>([]);
   const [restrictions, setRestrictions] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
@@ -49,6 +49,29 @@ const ReprintManagement: React.FC = () => {
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [threshold, setThreshold] = useState(5);
 
+  // Reprint Control States
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchStartDate, setSearchStartDate] = useState('');
+  const [searchEndDate, setSearchEndDate] = useState('');
+  const [searching, setSearching] = useState(false);
+
+  const handleSearchReceipts = async () => {
+    try {
+      setSearching(true);
+      const data = await api.searchReceiptsForReprint({
+        search: searchQuery,
+        start_date: searchStartDate,
+        end_date: searchEndDate
+      });
+      setSearchResults(data || []);
+    } catch (error) {
+      notify('error', 'Failed to search receipts database');
+    } finally {
+      setSearching(false);
+    }
+  };
+
   useEffect(() => {
     if (user && user.role !== 'Admin') {
       notify('error', 'Access denied. Administrator privileges required.');
@@ -70,9 +93,11 @@ const ReprintManagement: React.FC = () => {
       if (activeTab === 'all') {
         const data = await api.getReprintLogs({ ...filters, page, limit: 10 });
         setLogs(data || []);
-      } else {
+      } else if (activeTab === 'restricted') {
         const data = await api.getAllReprintRestrictions();
         setRestrictions(data || []);
+      } else if (activeTab === 'control') {
+        handleSearchReceipts();
       }
     } catch (error) {
       notify('error', 'Failed to fetch reprint data');
@@ -240,6 +265,12 @@ const ReprintManagement: React.FC = () => {
             <History size={18} /> FULL AUDIT TRAIL
           </button>
           <button 
+            onClick={() => { setActiveTab('control'); setPage(1); }}
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '14px', border: 'none', background: activeTab === 'control' ? 'var(--leh-primary-light)' : 'transparent', color: activeTab === 'control' ? 'var(--leh-primary)' : 'var(--leh-text-grey)', borderRadius: '12px', cursor: 'pointer', fontWeight: activeTab === 'control' ? '800' : '600', fontSize: '14px', transition: 'all 0.2s' }}
+          >
+            <Printer size={18} /> REPRINT CONTROL UNIT
+          </button>
+          <button 
             onClick={() => { setActiveTab('restricted'); setPage(1); }}
             style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '14px', border: 'none', background: activeTab === 'restricted' ? 'var(--leh-primary-light)' : 'transparent', color: activeTab === 'restricted' ? 'var(--leh-primary)' : 'var(--leh-text-grey)', borderRadius: '12px', cursor: 'pointer', fontWeight: activeTab === 'restricted' ? '800' : '600', fontSize: '14px', transition: 'all 0.2s' }}
           >
@@ -248,7 +279,7 @@ const ReprintManagement: React.FC = () => {
         </div>
       </div>
 
-      {activeTab === 'all' ? (
+      {activeTab === 'all' && (
         <div className="leh-table-card">
           <div style={{ padding: '24px', borderBottom: '1px solid var(--leh-border-light)', display: 'flex', gap: '16px', alignItems: 'center' }}>
             <div style={{ flex: 1 }}>
@@ -325,7 +356,7 @@ const ReprintManagement: React.FC = () => {
                            </span>
                           <span className="leh-date-sub">
                             {new Date(log.reprint_timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                         </span>
+                          </span>
                        </div>
                     </td>
                     <td>
@@ -348,7 +379,153 @@ const ReprintManagement: React.FC = () => {
             </table>
           </div>
         </div>
-      ) : (
+      )}
+
+      {activeTab === 'control' && (
+        <div className="leh-table-card">
+          <div style={{ padding: '24px', borderBottom: '1px solid var(--leh-border-light)', display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
+            <div style={{ flex: 1, minWidth: '280px' }}>
+              <div className="leh-search-box">
+                <Search size={18} className="leh-search-icon" />
+                <input 
+                  type="text" 
+                  placeholder="Enter Receipt No, Patient Name or Patient ID..." 
+                  value={searchQuery} 
+                  onChange={e => setSearchQuery(e.target.value)} 
+                  onKeyDown={e => { if (e.key === 'Enter') handleSearchReceipts(); }}
+                  spellCheck={false}
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} className="leh-search-clear" type="button">
+                    <span style={{ fontSize: '14px', fontWeight: 'bold' }}>&times;</span>
+                  </button>
+                )}
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Calendar size={14} style={{ color: 'var(--leh-primary)' }} />
+                <input 
+                  type="date" 
+                  className="leh-date-input" 
+                  style={{ width: '140px', height: '36px', fontSize: '12px' }} 
+                  value={searchStartDate} 
+                  onChange={e => setSearchStartDate(e.target.value)} 
+                />
+                <span style={{ fontSize: '12px', color: 'var(--leh-text-muted)' }}>to</span>
+                <input 
+                  type="date" 
+                  className="leh-date-input" 
+                  style={{ width: '140px', height: '36px', fontSize: '12px' }} 
+                  value={searchEndDate} 
+                  onChange={e => setSearchEndDate(e.target.value)} 
+                />
+              </div>
+
+              <button 
+                onClick={handleSearchReceipts}
+                className="leh-btn-primary"
+                style={{ height: '42px', padding: '0 20px', fontSize: '13px' }}
+                disabled={searching}
+              >
+                {searching ? 'SEARCHING...' : 'SEARCH DATABASE'}
+              </button>
+
+              <button 
+                onClick={() => {
+                  setSearchQuery('');
+                  setSearchStartDate('');
+                  setSearchEndDate('');
+                  setSearchResults([]);
+                }} 
+                className="leh-btn-outline"
+                style={{ height: '42px', fontSize: '12px', fontWeight: 'bold' }}
+              >
+                <RefreshCcw size={14} /> RESET
+              </button>
+            </div>
+          </div>
+
+          <div className="leh-table-wrapper">
+            <table className="leh-table">
+              <thead>
+                <tr>
+                  <th style={{ paddingLeft: '32px' }}>Transaction Date</th>
+                  <th>Receipt Number</th>
+                  <th>Patient Name & ID</th>
+                  <th>Invoice Value</th>
+                  <th>Paid Status</th>
+                  <th style={{ textAlign: 'right', paddingRight: '32px' }}>Override Control</th>
+                </tr>
+              </thead>
+              <tbody>
+                {searchResults.length > 0 ? (
+                  searchResults.map(tx => {
+                    const balance = tx.total_amount - tx.amount_paid - (tx.discount || 0);
+                    const isPaidFull = balance <= 0;
+                    return (
+                      <tr key={tx.id}>
+                        <td style={{ paddingLeft: '32px' }}>
+                          <div className="leh-date-display">
+                            <span className="leh-date-main">
+                              {formatDateStandard(tx.created_at)}
+                            </span>
+                            <span className="leh-date-sub">
+                              {new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="leh-table-bold" style={{ color: 'var(--leh-primary)', fontFamily: 'monospace' }}>
+                            {tx.receipt_no}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span className="leh-table-bold">{tx.patient_name}</span>
+                            <span style={{ fontSize: '11px', color: 'var(--leh-text-muted)' }}>ID: {tx.patient_id}</span>
+                          </div>
+                        </td>
+                        <td className="leh-table-bold">
+                          ₦{tx.total_amount?.toLocaleString()}
+                        </td>
+                        <td>
+                          <span className={`leh-status-badge ${isPaidFull ? 'green' : 'amber'}`} style={{ fontSize: '10px' }}>
+                            {isPaidFull ? 'PAID FULL' : `BAL: ₦${balance.toLocaleString()}`}
+                          </span>
+                        </td>
+                        <td style={{ paddingRight: '32px', textAlign: 'right' }}>
+                          <button 
+                            onClick={() => setReprintReceiptNo(tx.receipt_no)} 
+                            className="leh-btn-primary" 
+                            style={{ height: '32px', padding: '0 12px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                            title="Initiate Administrative Reprint"
+                          >
+                            <Printer size={12} /> INITIATE REPRINT
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '48px 0', color: 'var(--leh-text-muted)' }}>
+                      <div style={{ maxWidth: '320px', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                        <Printer size={36} style={{ opacity: 0.3, color: 'var(--leh-primary)' }} />
+                        <span style={{ fontSize: '14px', fontWeight: '600' }}>No Transactions Loaded</span>
+                        <span style={{ fontSize: '12px', opacity: 0.7 }}>Enter a search query above to locate historical receipts across any period.</span>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'restricted' && (
         <div className="leh-table-card">
           <div className="leh-table-header"><h3 className="leh-table-title">Active Independent Reprint Restrictions</h3></div>
           <div className="leh-table-wrapper">

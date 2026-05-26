@@ -48,6 +48,7 @@ export const Billing: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'POS' | 'Transfer' | 'Mixed'>('Cash');
   const [mixedBreakdown, setMixedBreakdown] = useState({ cash: 0, bank: 0 });
   const [isProcessing, setIsProcessing] = useState(false);
+  const [pendingInvestigations, setPendingInvestigations] = useState<any[]>([]);
   
   // History State
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -114,6 +115,21 @@ export const Billing: React.FC = () => {
       setPatientResults([]);
     }
   }, [patientSearchQuery, patients]);
+
+  // Fetch pending investigations when patient is selected
+  useEffect(() => {
+    if (selectedPatient) {
+      api.getInvestigations(selectedPatient.id, undefined, 'Unpaid')
+        .then(data => {
+          setPendingInvestigations(data);
+        })
+        .catch(err => {
+          console.error('[Billing] Failed to fetch pending investigations:', err);
+        });
+    } else {
+      setPendingInvestigations([]);
+    }
+  }, [selectedPatient]);
 
   // Live Catalog Search
   useEffect(() => {
@@ -439,7 +455,45 @@ export const Billing: React.FC = () => {
                     </div>
                  </div>
               </div>
-           </div>
+
+               {selectedPatient && pendingInvestigations.length > 0 && (
+                  <div className="billing-panel" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', marginTop: '16px' }}>
+                     <div className="panel-header" style={{ padding: '16px 16px 8px 16px' }}>
+                        <h3 className="panel-title" style={{ color: '#166534', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                           <Layers size={16} />
+                           Pending Investigations ({pendingInvestigations.length})
+                        </h3>
+                     </div>
+                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '0 16px 16px 16px' }}>
+                        {pendingInvestigations.map(inv => (
+                          <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                             <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontWeight: '700', fontSize: '12px', color: '#0f172a' }}>{inv.test_name}</span>
+                                <span style={{ fontSize: '10px', color: '#64748b' }}>₦{(inv.price || 0).toLocaleString()}</span>
+                             </div>
+                             <button 
+                                className="leh-btn-icon" 
+                                style={{ padding: '4px 8px', fontSize: '10px', background: 'var(--leh-primary)', color: 'white', borderRadius: '4px', fontWeight: '800', border: 'none', cursor: 'pointer' }}
+                                onClick={() => {
+                                  addToCart({
+                                    identifier: inv.inventory_id,
+                                    type: 'product',
+                                    name: inv.test_name,
+                                    price: inv.price || 0,
+                                    category: 'Laboratory'
+                                  });
+                                  setPendingInvestigations(prev => prev.filter(p => p.id !== inv.id));
+                                  notify('success', `Added ${inv.test_name} to cart`);
+                                }}
+                             >
+                                ADD
+                             </button>
+                          </div>
+                        ))}
+                     </div>
+                  </div>
+               )}
+            </div>
 
            {/* RIGHT PANEL */}
            <div className="billing-right-panel">
