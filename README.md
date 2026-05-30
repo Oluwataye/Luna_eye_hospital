@@ -55,6 +55,37 @@ Windows sometimes blocks other computers from talking to each other.
 
 ---
 
+## 🏷️ How to type "http://lunaeyehospital" instead of numbers
+Typing numbers like `192.168.1.15:3200` can be hard to remember. If you want to type **`http://lunaeyehospital:3200`** instead, you can easily set it up by following these simple steps:
+
+> [!NOTE]
+> You will need to do this on **each computer** in the hospital that needs to use the friendly name.
+
+### Step A: Open the computer's secret "Address Book"
+1. Click the Windows **Start Button** (usually in the bottom-left corner of your screen).
+2. Type **Notepad** in the search bar.
+3. **Right-click** on the Notepad icon and click **"Run as administrator"**. Click "Yes" if a pop-up asks for permission.
+4. In Notepad, click **File** (top left) and click **Open...**
+5. At the bottom of the window that pops up, change the setting that says **"Text Documents (*.txt)"** to **"All Files (*.*)"**.
+6. Copy and paste this exact line into the "File name" box at the bottom and click **Open**:
+   `C:\Windows\System32\drivers\etc\hosts`
+
+### Step B: Add the hospital website name
+1. Scroll all the way to the very bottom of the document.
+2. Press Enter to start a new line, and type:
+   ```text
+   192.168.1.15       lunaeyehospital
+   ```
+   *(Important: Replace `192.168.1.15` with the **Parent computer's IP address** that you wrote down in Step 1. If you are doing this setup on the **Parent computer itself**, just type `127.0.0.1       lunaeyehospital` instead).*
+
+### Step C: Save and you are done!
+1. Click **File** and click **Save** (or press **Ctrl + S** on your keyboard). You can now close Notepad.
+2. Open your web browser (Chrome or Edge) and type:
+   `http://lunaeyehospital:3200`
+3. Press Enter, and you are ready to log in!
+
+---
+
 ## 🛠️ Troubleshooting (When things go wrong)
 
 ### "The page says 'Site cannot be reached'!"

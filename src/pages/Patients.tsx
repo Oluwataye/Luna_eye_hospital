@@ -8,7 +8,6 @@ import {
   CheckCircle,
   Phone,
   MapPin,
-  Calendar,
   History,
   FileText,
   User as UserIcon,
@@ -32,7 +31,8 @@ interface PatientsProps {
 
 export const Patients: React.FC<PatientsProps> = ({ view: initialView = 'list' }) => {
   const navigate = useNavigate();
-  const { id: urlId } = useParams();
+  const params = useParams();
+  const urlId = params.id || params['*'];
   const { notify } = useNotification();
   const { user } = useAuth();
   
@@ -169,37 +169,119 @@ export const Patients: React.FC<PatientsProps> = ({ view: initialView = 'list' }
         </header>
 
         <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '32px', alignItems: 'start' }}>
-          <aside className="leh-table-card" style={{ padding: '32px' }}>
-            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+          <aside className="leh-table-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ textAlign: 'center', marginBottom: '8px' }}>
               <div style={{ width: '80px', height: '80px', background: 'var(--leh-primary-light)', color: 'var(--leh-primary)', borderRadius: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
                 <UserIcon size={40} />
               </div>
-              <h2 style={{ fontSize: '18px', fontWeight: '900', margin: '0 0 8px 0' }}>{p.full_name}</h2>
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: '900', margin: '0 0 8px 0', wordBreak: 'break-word' }}>{p.full_name}</h2>
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
                 <span className="leh-status-badge blue">{p.gender}</span>
                 <span className="leh-status-badge grey">{calculateAge(p.dob)} YRS</span>
               </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingTop: '20px', borderTop: '1px solid #f1f5f9' }}>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                <Phone size={15} style={{ color: 'var(--leh-primary)', marginTop: '2px', flexShrink: 0 }} />
-                <span style={{ fontWeight: '700', fontSize: '13px' }}>{p.phone || 'N/A'}</span>
-              </div>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                <MapPin size={15} style={{ color: 'var(--leh-primary)', marginTop: '2px', flexShrink: 0 }} />
-                <span style={{ fontSize: '12px', color: 'var(--leh-text-muted)', lineHeight: '1.5' }}>{p.address || 'N/A'}</span>
-              </div>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                <Calendar size={15} style={{ color: 'var(--leh-primary)', marginTop: '2px', flexShrink: 0 }} />
-                <span style={{ fontSize: '12px', color: 'var(--leh-text-muted)' }}>DOB: {p.dob ? formatDateStandard(p.dob) : 'N/A'}</span>
+
+            {/* Demographics & General Info */}
+            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+              <h4 style={{ fontSize: '11px', fontWeight: '800', color: 'var(--leh-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>General Information</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                  <span className="leh-label">Marital Status</span>
+                  <span style={{ fontWeight: '700' }}>{p.marital_status || '—'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                  <span className="leh-label">Occupation</span>
+                  <span style={{ fontWeight: '700', textAlign: 'right' }}>{p.occupation || '—'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                  <span className="leh-label">DOB</span>
+                  <span style={{ fontWeight: '700' }}>{p.dob ? formatDateStandard(p.dob) : '—'}</span>
+                </div>
               </div>
             </div>
-            {(p.blood_group || p.allergies) && (
-              <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {p.blood_group && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span className="leh-label">Blood Group</span><span style={{ fontWeight: '900', color: '#ef4444' }}>{p.blood_group}</span></div>}
-                {p.allergies && <div><span className="leh-label" style={{ display: 'block', marginBottom: '4px' }}>Allergies</span><span style={{ fontSize: '12px', color: '#ef4444', fontWeight: '700' }}>{p.allergies}</span></div>}
+
+            {/* Contact Details */}
+            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+              <h4 style={{ fontSize: '11px', fontWeight: '800', color: 'var(--leh-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Contact Information</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', fontSize: '13px' }}>
+                  <Phone size={14} style={{ color: 'var(--leh-primary)', marginTop: '2px', flexShrink: 0 }} />
+                  <div>
+                    <span style={{ fontWeight: '700', display: 'block' }}>{p.phone || 'N/A'}</span>
+                    {p.alternate_phone && (
+                      <span style={{ fontSize: '11px', color: 'var(--leh-text-muted)', display: 'block', marginTop: '2px' }}>
+                        Alt: {p.alternate_phone}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', fontSize: '13px' }}>
+                  <MapPin size={14} style={{ color: 'var(--leh-primary)', marginTop: '2px', flexShrink: 0 }} />
+                  <span style={{ fontSize: '12px', color: 'var(--leh-text-muted)', lineHeight: '1.4' }}>{p.address || 'N/A'}</span>
+                </div>
               </div>
-            )}
+            </div>
+
+            {/* Emergency Contact */}
+            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+              <h4 style={{ fontSize: '11px', fontWeight: '800', color: 'var(--leh-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Next of Kin</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                  <span className="leh-label">Contact Name</span>
+                  <span style={{ fontWeight: '700', textAlign: 'right' }}>{p.next_of_kin || '—'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                  <span className="leh-label">Contact Phone</span>
+                  <span style={{ fontWeight: '700' }}>{p.next_of_kin_phone || '—'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Account Details */}
+            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+              <h4 style={{ fontSize: '11px', fontWeight: '800', color: 'var(--leh-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Account Details</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                  <span className="leh-label">Payment Mode</span>
+                  <span className="leh-status-badge purple" style={{ fontSize: '10px', padding: '2px 8px' }}>{p.payment_category || 'Standard'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                  <span className="leh-label">Department</span>
+                  <span style={{ fontWeight: '700' }}>{p.department || 'General'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Clinical baseline */}
+            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+              <h4 style={{ fontSize: '11px', fontWeight: '800', color: 'var(--leh-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Clinical baseline</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                  <span className="leh-label">Blood Group</span>
+                  <span style={{ fontWeight: '900', color: p.blood_group ? '#ef4444' : 'inherit' }}>{p.blood_group || '—'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                  <span className="leh-label">Genotype</span>
+                  <span style={{ fontWeight: '700' }}>{p.genotype || '—'}</span>
+                </div>
+                {p.allergies && (
+                  <div>
+                    <span className="leh-label" style={{ display: 'block', marginBottom: '4px', fontSize: '11px' }}>Allergies</span>
+                    <span style={{ fontSize: '12px', color: '#ef4444', fontWeight: '700', wordBreak: 'break-word', display: 'block', background: '#fef2f2', padding: '6px 12px', borderRadius: '8px', border: '1px solid #fee2e2' }}>
+                      {p.allergies}
+                    </span>
+                  </div>
+                )}
+                {p.medical_alerts && (
+                  <div>
+                    <span className="leh-label" style={{ display: 'block', marginBottom: '4px', fontSize: '11px' }}>Medical Alerts / History</span>
+                    <span style={{ fontSize: '12px', color: '#ef4444', fontWeight: '700', wordBreak: 'break-word', display: 'block', background: '#fffbeb', padding: '6px 12px', borderRadius: '8px', border: '1px solid #fef3c7' }}>
+                      {p.medical_alerts}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
           </aside>
 
           <main className="leh-table-card">

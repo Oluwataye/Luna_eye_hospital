@@ -420,10 +420,11 @@ input[type="checkbox"].clinical-checkbox:focus {
 
 /* Print Optimization for Clinical Reports */
 @media print {
-  body * {
+  .consultations-page-container * {
     visibility: hidden;
   }
-  #print-area, #print-area * {
+  .consultations-page-container #print-area, 
+  .consultations-page-container #print-area * {
     visibility: visible;
   }
   #print-area {

@@ -1837,16 +1837,16 @@ export const Consultations: React.FC = () => {
   };
 
 
-   return (<div className="consultations-page-container no-print">
+   return (<div className="consultations-page-container">
       
       {/* ZONE 1: PATIENT CONTEXT BAR */}
       {selectedPatient && (
         <div style={{ background: 'white', borderBottom: '1px solid var(--leh-border-light)', padding: '12px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }} className="no-print">
            <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                 <span style={{ fontSize: '18px', fontWeight: '900', color: 'var(--leh-text-dark)' }}>{selectedPatient.full_name.toUpperCase()}</span>
+                 <span style={{ fontSize: '18px', fontWeight: '900', color: 'var(--leh-text-dark)' }}>{(selectedPatient.full_name || '').toUpperCase()}</span>
                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '2px' }}>
-                    <span className={`leh-status-badge ${selectedPatient.gender === 'Male' ? 'blue' : 'red'}`} style={{ fontSize: '10px' }}>{selectedPatient.gender.toUpperCase()}</span>
+                    <span className={`leh-status-badge ${selectedPatient.gender === 'Male' ? 'blue' : 'red'}`} style={{ fontSize: '10px' }}>{(selectedPatient.gender || '').toUpperCase()}</span>
                     <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--leh-text-muted)' }}>FILE: #{selectedPatient.id}</span>
                  </div>
               </div>
@@ -2501,7 +2501,7 @@ export const Consultations: React.FC = () => {
       {/* MODALS */}
       {showTriageModal && (
         <div className="leh-modal-overlay">
-           <div className="leh-modal-content" style={{ maxWidth: '600px' }}>
+           <div className="leh-modal-content" style={{ maxWidth: '800px' }}>
               <div className="leh-modal-header">
                  <div className="leh-modal-title">
                     <Activity size={28} />
@@ -2515,7 +2515,7 @@ export const Consultations: React.FC = () => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
                        <div>
                           <div className="leh-form-section-title" style={{ marginBottom: '24px' }}>Physiological Vitals</div>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
                              <div className="eye-card" style={{ padding: '20px' }}>
                                 <p style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>Blood Pressure</p>
                                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
@@ -2546,6 +2546,70 @@ export const Consultations: React.FC = () => {
                              </div>
                           </div>
                        </div>
+
+                       <div>
+                          <div className="leh-form-section-title" style={{ marginBottom: '24px' }}>Visual Acuity (Triage)</div>
+                          <div className="leh-table-wrapper" style={{ border: '1px solid var(--leh-border-light)', borderRadius: '16px', overflow: 'hidden' }}>
+                             <table className="leh-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                   <tr style={{ background: 'var(--leh-bg-light)' }}>
+                                      <th style={{ padding: '12px 20px', textAlign: 'left', fontSize: '11px', fontWeight: '800', color: 'var(--leh-text-muted)', textTransform: 'uppercase' }}>Eye</th>
+                                      <th style={{ padding: '12px 20px', textAlign: 'left', fontSize: '11px', fontWeight: '800', color: 'var(--leh-text-muted)', textTransform: 'uppercase' }}>Unaided (Distance)</th>
+                                      <th style={{ padding: '12px 20px', textAlign: 'left', fontSize: '11px', fontWeight: '800', color: 'var(--leh-text-muted)', textTransform: 'uppercase' }}>Aided (Distance)</th>
+                                      <th style={{ padding: '12px 20px', textAlign: 'left', fontSize: '11px', fontWeight: '800', color: 'var(--leh-text-muted)', textTransform: 'uppercase' }}>Pinhole</th>
+                                      <th style={{ padding: '12px 20px', textAlign: 'left', fontSize: '11px', fontWeight: '800', color: 'var(--leh-text-muted)', textTransform: 'uppercase' }}>Near Unaided</th>
+                                      <th style={{ padding: '12px 20px', textAlign: 'left', fontSize: '11px', fontWeight: '800', color: 'var(--leh-text-muted)', textTransform: 'uppercase' }}>Near Aided</th>
+                                   </tr>
+                                </thead>
+                                <tbody>
+                                   <tr style={{ borderBottom: '1px solid var(--leh-border-light)' }}>
+                                      <td style={{ padding: '16px 20px', fontWeight: '800', color: 'var(--leh-primary)' }}>Right Eye (OD)</td>
+                                      <td style={{ padding: '16px 20px', fontWeight: '700' }}>{triageData.va_od_unaided || '—'}</td>
+                                      <td style={{ padding: '16px 20px', fontWeight: '700' }}>{triageData.va_od_aided || '—'}</td>
+                                      <td style={{ padding: '16px 20px', fontWeight: '700' }}>{triageData.va_od_pinhole || '—'}</td>
+                                      <td style={{ padding: '16px 20px', fontWeight: '700' }}>{triageData.va_od_near_unaided || '—'}</td>
+                                      <td style={{ padding: '16px 20px', fontWeight: '700' }}>{triageData.va_od_near_aided || '—'}</td>
+                                   </tr>
+                                   <tr>
+                                      <td style={{ padding: '16px 20px', fontWeight: '800', color: 'var(--leh-primary)' }}>Left Eye (OS)</td>
+                                      <td style={{ padding: '16px 20px', fontWeight: '700' }}>{triageData.va_os_unaided || '—'}</td>
+                                      <td style={{ padding: '16px 20px', fontWeight: '700' }}>{triageData.va_os_aided || '—'}</td>
+                                      <td style={{ padding: '16px 20px', fontWeight: '700' }}>{triageData.va_os_pinhole || '—'}</td>
+                                      <td style={{ padding: '16px 20px', fontWeight: '700' }}>{triageData.va_os_near_unaided || '—'}</td>
+                                      <td style={{ padding: '16px 20px', fontWeight: '700' }}>{triageData.va_os_near_aided || '—'}</td>
+                                   </tr>
+                                </tbody>
+                             </table>
+                          </div>
+                       </div>
+
+                       {(triageData.iop_od || triageData.iop_os) && (
+                          <div>
+                             <div className="leh-form-section-title" style={{ marginBottom: '24px' }}>Intraocular Pressure (IOP)</div>
+                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
+                                <div className="eye-card" style={{ padding: '20px' }}>
+                                   <p style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>IOP - Right Eye (OD)</p>
+                                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                                      <span style={{ fontSize: '24px', fontWeight: '900', color: '#1e293b' }}>{triageData.iop_od || '—'}</span>
+                                      {triageData.iop_od && <span style={{ fontSize: '13px', fontWeight: '700', color: '#94a3b8' }}>mmHg</span>}
+                                   </div>
+                                </div>
+                                <div className="eye-card" style={{ padding: '20px' }}>
+                                   <p style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>IOP - Left Eye (OS)</p>
+                                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                                      <span style={{ fontSize: '24px', fontWeight: '900', color: '#1e293b' }}>{triageData.iop_os || '—'}</span>
+                                      {triageData.iop_os && <span style={{ fontSize: '13px', fontWeight: '700', color: '#94a3b8' }}>mmHg</span>}
+                                   </div>
+                                </div>
+                                <div className="eye-card" style={{ padding: '20px' }}>
+                                   <p style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>Measurement Method</p>
+                                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                                      <span style={{ fontSize: '18px', fontWeight: '900', color: '#1e293b', marginTop: '6px' }}>{triageData.iop_method || '—'}</span>
+                                   </div>
+                                </div>
+                             </div>
+                          </div>
+                       )}
 
                        <div style={{ padding: '24px', background: triageData.allergies ? '#fff1f2' : '#f8fafc', borderRadius: '20px', border: triageData.allergies ? '2px solid #fda4af' : '1px solid #e2e8f0' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>

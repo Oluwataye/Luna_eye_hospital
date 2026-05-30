@@ -44,7 +44,7 @@ export const AdminDashboard: React.FC = () => {
       ]);
 
       // Calculate stock alerts
-      const lowStockItems = inventory.filter((i: any) => i.quantity <= i.min_stock_level);
+      const lowStockItems = inventory.filter((i: any) => i.stock <= i.reorder_level);
       const expiringItems = inventory.filter((i: any) => {
         if (!i.expiry_date) return false;
         const days = (new Date(i.expiry_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24);
@@ -116,7 +116,7 @@ export const AdminDashboard: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '40px' }}>
           <StatCard title="TOTAL PATIENTS" value={metrics.patientsToday} icon={Users} colorClass="blue" path="/patients" subtitle="Today's registered" />
           <StatCard title="ADMITTED" value={metrics.admittedCount} icon={ClipboardList} colorClass="amber" path="/admissions" subtitle="Currently in ward" />
-          <StatCard title="PENDING BILLS" value={`₦${metrics.pendingPayments.toLocaleString()}`} icon={NairaIcon} colorClass="red" path="/billing" subtitle="Revenue awaiting clearing" />
+          <StatCard title="PENDING BILLS" value={`₦${metrics.pendingPayments.toLocaleString()}`} icon={NairaIcon} colorClass="red" path="/billing?tab=pending" subtitle="Revenue awaiting clearing" />
           <StatCard title="LOW STOCK" value={metrics.lowStock} icon={ShieldAlert} colorClass="amber" path="/inventory" subtitle="Items below threshold" />
           <StatCard title="EXPIRING SOON" value={metrics.expiringSoon} icon={AlertTriangle} colorClass="red" path="/inventory" subtitle="Inventory expiring < 30d" />
           <StatCard title="TOTAL SALES" value={`₦${metrics.salesToday.toLocaleString()}`} icon={NairaIcon} colorClass="green" path="/reports" subtitle="Gross revenue today" />

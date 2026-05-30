@@ -1,4 +1,25 @@
-const API_BASE_URL = 'http://127.0.0.1/api';
+const API_BASE_URL = 'http://127.0.0.1:3200/api';
+
+const nativeFetch = globalThis.fetch;
+let token = '';
+async function login() {
+  const res = await nativeFetch(`${API_BASE_URL}/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'admin', password: 'admin' })
+  });
+  const data = await res.json();
+  token = data.token;
+}
+
+async function fetchWithAuth(url, options = {}) {
+  if (!token) await login();
+  options.headers = {
+    ...options.headers,
+    'Authorization': `Bearer ${token}`
+  };
+  return nativeFetch(url, options);
+}
 
 async function simulateBilling() {
   console.log("--- Phase 4: Billing Simulation ---");
@@ -28,7 +49,7 @@ async function simulateBilling() {
     items: items
   };
 
-  const res = await fetch(`${API_BASE_URL}/transactions`, {
+  const res = await fetchWithAuth(`${API_BASE_URL}/transactions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -46,7 +67,7 @@ async function simulateBilling() {
 
   // 3. Verify Inventory Stock Reduction
   console.log("3. Verifying inventory stock reduction for 'CR39 Single Vision'...");
-  const invRes = await fetch(`${API_BASE_URL}/inventory`);
+  const invRes = await fetchWithAuth(`${API_BASE_URL}/inventory`);
   const inventory = await invRes.json();
   const lensItem = inventory.find(i => i.id === 'INV-1777896626068');
   

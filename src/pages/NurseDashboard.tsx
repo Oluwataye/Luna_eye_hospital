@@ -16,7 +16,8 @@ export const NurseDashboard: React.FC = () => {
   const [queue, setQueue] = useState<any>({
     waiting: [],
     triaged_today: [],
-    total_today: 0
+    total_today: 0,
+    vital_alerts: 0
   });
   const [loading, setLoading] = useState(true);
 
@@ -26,7 +27,8 @@ export const NurseDashboard: React.FC = () => {
       setQueue({
         waiting: Array.isArray(qRes?.waiting) ? qRes.waiting : [],
         triaged_today: Array.isArray(qRes?.waiting_for_consultation) ? qRes.waiting_for_consultation : [],
-        total_today: qRes?.total_today || 0
+        total_today: qRes?.total_today || 0,
+        vital_alerts: qRes?.vital_alerts || 0
       });
     } catch (error) {
       notify('error', 'Nurse Terminal: Sync failure with clinical node');
@@ -94,7 +96,7 @@ export const NurseDashboard: React.FC = () => {
            <StatCard title="AWAITING TRIAGE" value={queue.waiting.length} icon={Clock} colorClass="amber" path="/triage" subtitle="Patients in queue" />
            <StatCard title="TRIAGED TODAY" value={queue.triaged_today.length} icon={CheckCircle} colorClass="green" path="/reports" subtitle="Completed assessments" />
            <StatCard title="TOTAL REGISTERED" value={queue.total_today} icon={Users} colorClass="blue" path="/patients" subtitle="Hospital throughput" />
-           <StatCard title="VITAL ALERTS" value={0} icon={Zap} colorClass="red" path="/triage" subtitle="Critical readings" />
+           <StatCard title="VITAL ALERTS" value={queue.vital_alerts} icon={Zap} colorClass="red" path="/triage" subtitle="Critical readings" />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">

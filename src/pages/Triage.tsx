@@ -266,7 +266,7 @@ export const Triage: React.FC = () => {
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
                            <span style={{ fontWeight: '800', color: selectedVisit?.id === visit.id ? 'var(--leh-primary)' : 'var(--leh-text-dark)', fontSize: '14px' }}>
-                              {visit.patient_name.toUpperCase()}
+                              {(visit.patient_name || '').toUpperCase()}
                            </span>
                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
                               <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--leh-text-light)' }}>

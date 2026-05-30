@@ -1,10 +1,31 @@
-const API_BASE_URL = 'http://127.0.0.1/api';
+const API_BASE_URL = 'http://127.0.0.1:3200/api';
+
+const nativeFetch = globalThis.fetch;
+let token = '';
+async function login() {
+  const res = await nativeFetch(`${API_BASE_URL}/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'admin', password: 'admin' })
+  });
+  const data = await res.json();
+  token = data.token;
+}
+
+async function fetchWithAuth(url, options = {}) {
+  if (!token) await login();
+  options.headers = {
+    ...options.headers,
+    'Authorization': `Bearer ${token}`
+  };
+  return nativeFetch(url, options);
+}
 
 async function runStage3() {
   console.log("--- STAGE 3: TRIAGE SIMULATION ---");
 
-  const patientId = "0010/26/LEH";
-  const visitId = 10; // From Stage 2 output
+  const patientId = process.env.PATIENT_ID || "0010/26/LEH";
+  const visitId = parseInt(process.env.VISIT_ID) || 10; // From Stage 2 output
 
   const triageData = {
     patient_id: patientId,
@@ -33,7 +54,7 @@ async function runStage3() {
 
   // Action 3.5: Save triage record
   console.log("\nAction 3.5: Saving triage record for Amina Bello...");
-  const triageRes = await fetch(`${API_BASE_URL}/triage`, {
+  const triageRes = await fetchWithAuth(`${API_BASE_URL}/triage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(triageData)
@@ -52,7 +73,7 @@ async function runStage3() {
   console.log("\nAction 3.6: Verifying patient status update...");
   
   // Check triage queue (should be gone)
-  const triageQueueRes = await fetch(`${API_BASE_URL}/triage-queue`);
+  const triageQueueRes = await fetchWithAuth(`${API_BASE_URL}/triage-queue`);
   const triageQueue = await triageQueueRes.json();
   const stillInTriage = triageQueue.find(v => v.visit_id === visitId);
   
@@ -63,7 +84,7 @@ async function runStage3() {
   }
 
   // Check general queue for 'Waiting for Consultation' status
-  const queueRes = await fetch(`${API_BASE_URL}/queue`);
+  const queueRes = await fetchWithAuth(`${API_BASE_URL}/queue`);
   const queue = await queueRes.json();
   
   const waitingForDoc = queue.waiting_for_consultation.find(v => v.patient_id === patientId);
@@ -73,7 +94,7 @@ async function runStage3() {
   } else {
     console.log("FAILED: Patient NOT found in Consultation Queue.");
     // Let's check all visits to see what happened
-    const allVisitsRes = await fetch(`${API_BASE_URL}/queue`); // This returns stats, let's look at raw data if possible
+    const allVisitsRes = await fetchWithAuth(`${API_BASE_URL}/queue`); // This returns stats, let's look at raw data if possible
     console.log("Current stats:", JSON.stringify(queue, null, 2));
   }
 

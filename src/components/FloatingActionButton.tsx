@@ -24,7 +24,7 @@ export const FloatingActionButton: React.FC = () => {
   ];
 
   return (
-    <div className={`fab-container ${isOpen ? 'active' : ''}`}>
+    <div className={`fab-container no-print ${isOpen ? 'active' : ''}`}>
       <div className="fab-menu">
         {actions.map((action, i) => (
           <Link 

@@ -276,7 +276,7 @@ export const Admissions: React.FC = () => {
                       value={newAdmission.ward_name} 
                       onChange={e => setNewAdmission({...newAdmission, ward_name: e.target.value})}
                     >
-                      {wards.map(w => <option key={w.id} value={w.name}>{w.name.toUpperCase()} (Capacity: {w.capacity || 'N/A'})</option>)}
+                      {wards.map(w => <option key={w.id} value={w.name}>{(w.name || '').toUpperCase()} (Capacity: {w.capacity || 'N/A'})</option>)}
                     </select>
                   </div>
                   <div className="leh-form-group">
@@ -334,7 +334,7 @@ export const Admissions: React.FC = () => {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <span className="leh-label" style={{ fontWeight: '800' }}>ID: {selectedAdmission.patient_id}</span>
                         <span style={{ color: 'var(--leh-border)' }}>|</span>
-                        <span className={`leh-badge ${selectedAdmission.status === 'Admitted' ? 'leh-badge-green' : 'leh-badge-blue'}`}>{selectedAdmission.status.toUpperCase()}</span>
+                        <span className={`leh-badge ${selectedAdmission.status === 'Admitted' ? 'leh-badge-green' : 'leh-badge-blue'}`}>{(selectedAdmission.status || '').toUpperCase()}</span>
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '12px' }}>

@@ -8,7 +8,7 @@ const puppeteer = require('puppeteer');
 
   try {
     log('1. Navigating to login...');
-    await page.goto('http://127.0.0.1/');
+    await page.goto('http://127.0.0.1:3200/');
     await page.waitForSelector('input[placeholder*="Username"]');
 
     log('2. Attempting login as admin...');

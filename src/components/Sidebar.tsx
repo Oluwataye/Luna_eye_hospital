@@ -71,7 +71,7 @@ export const Sidebar: React.FC = () => {
   };
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar no-print">
       <div className="sidebar-brand">
         <div className="sidebar-brand-container">
           <div className="sidebar-logo">

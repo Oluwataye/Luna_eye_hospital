@@ -38,3 +38,21 @@ dist-ssr
 # Production
 dist/
 build/
+
+# Local Debug and Scratch files
+cmd_err.txt
+cmd_out.txt
+err.txt
+node_err.txt
+node_out.txt
+out.txt
+scratch/
+test_query.cjs
+test_query.js
+server/check_*.cjs
+server/get_*.cjs
+server/list_*.cjs
+server/read_*.cjs
+server/search_*.cjs
+server/test_*.cjs
+server/test_verify.js

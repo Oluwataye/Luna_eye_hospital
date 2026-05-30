@@ -1,11 +1,32 @@
-const API_BASE_URL = 'http://127.0.0.1/api';
+const API_BASE_URL = 'http://127.0.0.1:3200/api';
+
+const nativeFetch = globalThis.fetch;
+let token = '';
+async function login() {
+  const res = await nativeFetch(`${API_BASE_URL}/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'admin', password: 'admin' })
+  });
+  const data = await res.json();
+  token = data.token;
+}
+
+async function fetchWithAuth(url, options = {}) {
+  if (!token) await login();
+  options.headers = {
+    ...options.headers,
+    'Authorization': `Bearer ${token}`
+  };
+  return nativeFetch(url, options);
+}
 
 async function simulateConsultation() {
   console.log("--- Phase 3: Consultation Simulation ---");
   
   // 1. Fetch Queue to confirm Amaka is there
   console.log("1. Fetching queue for Consultation...");
-  const queueRes = await fetch(`${API_BASE_URL}/queue`);
+  const queueRes = await fetchWithAuth(`${API_BASE_URL}/queue`);
   const queue = await queueRes.json();
   const amakaInQueue = queue.waiting_for_consultation.find(p => p.patient_id === '0009/26/LEH');
   
@@ -36,7 +57,7 @@ async function simulateConsultation() {
     finalize: true
   };
 
-  const consultRes = await fetch(`${API_BASE_URL}/consultations`, {
+  const consultRes = await fetchWithAuth(`${API_BASE_URL}/consultations`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(consultData)
@@ -53,7 +74,7 @@ async function simulateConsultation() {
 
   // 3. Verify Visit Status is 'Completed'
   console.log("3. Verifying visit status after consultation...");
-  const statusRes = await fetch(`${API_BASE_URL}/queue`);
+  const statusRes = await fetchWithAuth(`${API_BASE_URL}/queue`);
   const updatedQueue = await statusRes.json();
   // Since she is finalized, she should not be in waiting_for_consultation
   const stillWaiting = updatedQueue.waiting_for_consultation.find(p => p.patient_id === '0009/26/LEH');

@@ -26,19 +26,19 @@ const request = async (
     return _pending.get(dedupeKey)!;
   }
 
-  const token = localStorage.getItem('token');
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
-    ...(token && token !== 'null' && token !== 'undefined'
-      ? { 'Authorization': `Bearer ${token}` }
-      : {}),
     ...options.headers,
   };
 
   const execRequest = async (): Promise<any> => {
     let res: Response;
     try {
-      res = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+      res = await fetch(`${API_BASE_URL}${endpoint}`, { 
+        ...options, 
+        headers,
+        credentials: 'include' // Enforce cookies transmission (crucial for JWT session cookie)
+      });
     } catch (networkErr: any) {
       // Network-level failure (ECONNREFUSED, DNS, etc.) — retry GETs only
       if (isGet && _retry < 2) {
@@ -52,7 +52,6 @@ const request = async (
 
     // 401 — token expired or missing: clear session and redirect to login
     if (res.status === 401) {
-      localStorage.removeItem('token');
       localStorage.removeItem('user');
       if (!window.location.pathname.includes('/login')) {
         window.location.href = '/login';
@@ -119,13 +118,18 @@ export const api = {
     const res = await fetch(`${API_BASE_URL}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(credentials)
+      body: JSON.stringify(credentials),
+      credentials: 'include' // Send cookies (session)
     });
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
       throw new Error(errorData.error || 'Login failed');
     }
     return res.json();
+  },
+
+  async logout() {
+    return request('/logout', { method: 'POST' });
   },
 
   async getPatients() {
@@ -306,7 +310,7 @@ export const api = {
     });
   },
 
-  async updateInvestigationResult(id: number, data: { results_notes?: string, status?: string, test_value?: string, medical_comments?: string, billing_status?: string }) {
+  async updateInvestigationResult(id: number, data: { results_notes?: string, status?: string, test_value?: string, medical_comments?: string, billing_status?: string, unit?: string | null, reference_range?: string | null }) {
     return request(`/investigations/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
@@ -516,15 +520,12 @@ export const api = {
     });
   },
   async restoreBackup(file: File) {
-    const token = localStorage.getItem('token');
     const formData = new FormData();
     formData.append('backup', file);
     const res = await fetch(`${API_BASE_URL}/restore`, {
       method: 'POST',
-      headers: {
-        ...(token && token !== 'null' && token !== 'undefined' ? { 'Authorization': `Bearer ${token}` } : {}),
-      },
-      body: formData
+      body: formData,
+      credentials: 'include' // Include session cookie
     });
     return res.json();
   },
@@ -625,6 +626,18 @@ export const api = {
     });
   },
 
+  async deleteNotification(id: number) {
+    return request(`/notifications/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  async clearNotifications(role: string) {
+    return request(`/notifications?role=${encodeURIComponent(role)}`, {
+      method: 'DELETE'
+    });
+  },
+
   // Reprint Management API
   async logReprint(data: { receipt_number: string, bill_id: number, patient_id: string, reprinted_by_user_id: number }) {
     return request('/reprints/log', {
@@ -684,5 +697,26 @@ export const api = {
 
   async getReceiptForReprint(receiptNumber: string) {
     return request(`/billing/receipts/${encodeURIComponent(receiptNumber)}`);
+  },
+
+  // Investigation Templates Management
+  async getInvestigationTemplates() {
+    const data = await request('/settings/investigations/templates');
+    return Array.isArray(data) ? data : [];
+  },
+  async createInvestigationTemplate(data: any) {
+    return request('/settings/investigations/templates', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+  async updateInvestigationTemplate(id: number, data: any) {
+    return request(`/settings/investigations/templates/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+  async deleteInvestigationTemplate(id: number) {
+    return request(`/settings/investigations/templates/${id}`, { method: 'DELETE' });
   },
 };

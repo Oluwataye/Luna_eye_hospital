@@ -1,10 +1,31 @@
-const API_BASE_URL = 'http://127.0.0.1/api';
+const API_BASE_URL = 'http://127.0.0.1:3200/api';
+
+const nativeFetch = globalThis.fetch;
+let token = '';
+async function login() {
+  const res = await nativeFetch(`${API_BASE_URL}/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'admin', password: 'admin' })
+  });
+  const data = await res.json();
+  token = data.token;
+}
+
+async function fetchWithAuth(url, options = {}) {
+  if (!token) await login();
+  options.headers = {
+    ...options.headers,
+    'Authorization': `Bearer ${token}`
+  };
+  return nativeFetch(url, options);
+}
 
 async function runStage4() {
   console.log("--- STAGE 4: CONSULTATION SIMULATION ---");
 
-  const patientId = "0010/26/LEH";
-  const visitId = 10;
+  const patientId = process.env.PATIENT_ID || "0010/26/LEH";
+  const visitId = parseInt(process.env.VISIT_ID) || 10;
   const consultantName = "Dr. Luna";
 
   // Simulation of Section-by-Section Saving (Action 4.14)
@@ -85,7 +106,7 @@ async function runStage4() {
 
   // Action 4.14/4.15: Save & Finalize
   console.log("\nAction 4.14/4.15: Saving and Finalizing Consultation...");
-  const consRes = await fetch(`${API_BASE_URL}/consultations`, {
+  const consRes = await fetchWithAuth(`${API_BASE_URL}/consultations`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(fullConsultationData)
@@ -102,7 +123,7 @@ async function runStage4() {
 
   // Verify status update in queue
   console.log("\nAction 4.15: Verifying patient status in main queue...");
-  const queueRes = await fetch(`${API_BASE_URL}/queue`);
+  const queueRes = await fetchWithAuth(`${API_BASE_URL}/queue`);
   const queue = await queueRes.json();
   
   // Note: In server/index.js line 947, status becomes 'Completed' on finalize
@@ -110,7 +131,7 @@ async function runStage4() {
   
   // Action 4.16: Verification of data in database
   console.log("\nAction 4.16: Verifying data persistence in database...");
-  const verifyRes = await fetch(`${API_BASE_URL}/consultations?patient_id=${patientId}`);
+  const verifyRes = await fetchWithAuth(`${API_BASE_URL}/consultations?patient_id=${patientId}`);
   const consultations = await verifyRes.json();
   const latest = consultations[0];
 

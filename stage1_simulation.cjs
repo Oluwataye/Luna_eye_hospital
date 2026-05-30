@@ -1,4 +1,25 @@
-const API_BASE_URL = 'http://127.0.0.1/api';
+const API_BASE_URL = 'http://127.0.0.1:3200/api';
+
+const nativeFetch = globalThis.fetch;
+let token = '';
+async function login() {
+  const res = await nativeFetch(`${API_BASE_URL}/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'admin', password: 'admin' })
+  });
+  const data = await res.json();
+  token = data.token;
+}
+
+async function fetchWithAuth(url, options = {}) {
+  if (!token) await login();
+  options.headers = {
+    ...options.headers,
+    'Authorization': `Bearer ${token}`
+  };
+  return nativeFetch(url, options);
+}
 
 async function runStage1() {
   console.log("--- STAGE 1: PATIENT REGISTRATION SIMULATION ---");
@@ -25,7 +46,7 @@ async function runStage1() {
   // Action 1.2: Test duplicate detection (Before)
   // Simulation: Frontend would call api.getPatients() and filter
   console.log("\nAction 1.2: Testing duplicate detection before registration...");
-  const patientsBeforeRes = await fetch(`${API_BASE_URL}/patients`);
+  const patientsBeforeRes = await fetchWithAuth(`${API_BASE_URL}/patients`);
   const patientsBefore = await patientsBeforeRes.json();
   const duplicateBefore = patientsBefore.find(p => p.phone === aminaDetails.phone);
   
@@ -37,7 +58,7 @@ async function runStage1() {
 
   // Action 1.3: Fill and submit the registration form
   console.log("\nAction 1.3: Registering Amina Bello...");
-  const regRes = await fetch(`${API_BASE_URL}/patients`, {
+  const regRes = await fetchWithAuth(`${API_BASE_URL}/patients`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(aminaDetails)
@@ -55,7 +76,7 @@ async function runStage1() {
 
   // Action 1.4: Test duplicate detection after registration (Backend check)
   console.log("\nAction 1.4: Testing duplicate detection after registration (POST check)...");
-  const dupRes = await fetch(`${API_BASE_URL}/patients`, {
+  const dupRes = await fetchWithAuth(`${API_BASE_URL}/patients`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(aminaDetails)
@@ -70,7 +91,7 @@ async function runStage1() {
 
   // Action 1.5: Verify patient appears in search
   console.log("\nAction 1.5: Verifying patient appears in search (simulating LiveSearch)...");
-  const patientsAfterRes = await fetch(`${API_BASE_URL}/patients`);
+  const patientsAfterRes = await fetchWithAuth(`${API_BASE_URL}/patients`);
   const patientsAfter = await patientsAfterRes.json();
   
   // Simulate typing "Ami"

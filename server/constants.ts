@@ -1,4 +1,4 @@
-const PatientStatus = {
+export const PatientStatus = {
   REGISTERED: 'Registered',
   WAITING_FOR_TRIAGE: 'Waiting for Triage',
   IN_TRIAGE: 'In Triage',
@@ -13,6 +13,6 @@ const PatientStatus = {
   SCHEDULED_FOR_FOLLOW_UP: 'Scheduled for Follow-Up',
   DISCHARGED: 'Discharged',
   CANCELLED: 'Cancelled'
-};
+} as const;
 
-module.exports = { PatientStatus };
+export type PatientStatusType = typeof PatientStatus[keyof typeof PatientStatus];

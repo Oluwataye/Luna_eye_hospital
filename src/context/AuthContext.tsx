@@ -12,9 +12,9 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
+  token: string | null; // Kept for type compatibility (always null)
   login: (credentials: any) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   updateUserLocally: (updatedFields: Partial<User>) => void;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -24,34 +24,46 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Load auth state from localStorage on init
-    const storedToken = localStorage.getItem('token');
+    // Load user metadata from localStorage on init and verify session on server
     const storedUser = localStorage.getItem('user');
     
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+    if (storedUser) {
+      const parsedUser = JSON.parse(storedUser);
+      api.getProfile(parsedUser.id)
+        .then((profile) => {
+          setUser(profile);
+        })
+        .catch((err) => {
+          console.warn('[AUTH] Session verification failed on startup:', err.message);
+          setUser(null);
+          localStorage.removeItem('user');
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    } else {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, []);
 
   const login = async (credentials: any) => {
     const data = await api.login(credentials);
-    setToken(data.token);
     setUser(data.user);
-    localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
   };
 
-  const logout = () => {
-    setToken(null);
-    setUser(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+  const logout = async () => {
+    try {
+      await api.logout();
+    } catch (err: any) {
+      console.error('[AUTH] Server logout call failed:', err.message);
+    } finally {
+      setUser(null);
+      localStorage.removeItem('user');
+    }
   };
 
   const updateUserLocally = (updatedFields: Partial<User>) => {
@@ -63,7 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, updateUserLocally, isAuthenticated: !!user, isLoading }}>
+    <AuthContext.Provider value={{ user, token: null, login, logout, updateUserLocally, isAuthenticated: !!user, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

@@ -150,7 +150,7 @@ export const Profile: React.FC = () => {
               </div>
             </div>
             <h2 className="leh-page-title" style={{ fontSize: '24px', margin: '0 0 4px' }}>{user?.full_name}</h2>
-            <p className="leh-status-dot" style={{ background: '#f5f3ff', color: '#7c3aed', fontWeight: '900', fontSize: '11px' }}>{user?.role.toUpperCase()}</p>
+            <p className="leh-status-dot" style={{ background: '#f5f3ff', color: '#7c3aed', fontWeight: '900', fontSize: '11px' }}>{(user?.role || '').toUpperCase()}</p>
             <p className="leh-label" style={{ fontSize: '13px', marginTop: '12px' }}>@{user?.username}</p>
           </div>
 

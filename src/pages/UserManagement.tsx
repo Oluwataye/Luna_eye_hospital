@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  UserPlus, ShieldCheck, Key, Edit3, Search, Users, Shield, RefreshCcw, X, Trash2
+  UserPlus, ShieldCheck, Key, Edit3, Search, Users, Shield, RefreshCcw, X, Trash2, Eye, EyeOff
 } from 'lucide-react';
 import { api } from '../api';
 import { useNotification } from '../context/NotificationContext';
@@ -13,6 +13,8 @@ export const UserManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
+  const [isResetOnly, setIsResetOnly] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -54,7 +56,9 @@ export const UserManagement: React.FC = () => {
     u.role?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleOpenModal = (user: any = null) => {
+  const handleOpenModal = (user: any = null, resetOnly: boolean = false) => {
+    setIsResetOnly(resetOnly);
+    setShowPassword(false);
     if (user) {
       setEditingUser(user);
       setFormData({
@@ -81,13 +85,22 @@ export const UserManagement: React.FC = () => {
     e.preventDefault();
     try {
       if (editingUser) {
-        const { password, ...rest } = formData;
-        const payload: any = { ...rest };
-        if (password) {
-          payload.password = password;
+        if (isResetOnly) {
+          if (!formData.password) {
+            notify('error', 'Password cannot be empty');
+            return;
+          }
+          await api.updateUser(editingUser.id, { password: formData.password });
+          notify('success', 'User password reset successfully');
+        } else {
+          const { password, ...rest } = formData;
+          const payload: any = { ...rest };
+          if (password) {
+            payload.password = password;
+          }
+          await api.updateUser(editingUser.id, payload);
+          notify('success', 'User account updated successfully');
         }
-        await api.updateUser(editingUser.id, payload);
-        notify('success', 'User account updated successfully');
       } else {
         await api.createUser(formData);
         notify('success', 'New user account provisioned successfully');
@@ -229,6 +242,14 @@ export const UserManagement: React.FC = () => {
                         <Edit3 size={16} />
                       </button>
                       <button 
+                        className="leh-icon-btn" 
+                        title="Reset Password"
+                        style={{ color: 'var(--leh-amber)' }}
+                        onClick={() => handleOpenModal(userAccount, true)}
+                      >
+                        <Key size={16} />
+                      </button>
+                      <button 
                         className="leh-icon-btn red" 
                         title="Deactivate Account"
                         onClick={() => handleDeactivate(userAccount.id, userAccount.full_name)}
@@ -250,8 +271,12 @@ export const UserManagement: React.FC = () => {
           <div className="leh-modal-content" style={{ maxWidth: '520px' }}>
             <div className="leh-modal-header">
               <div className="leh-modal-title">
-                <ShieldCheck style={{ color: 'var(--leh-primary)' }} />
-                <span>{editingUser ? 'Update Staff Identity' : 'Provision System Identity'}</span>
+                {isResetOnly ? (
+                  <Key style={{ color: 'var(--leh-amber)' }} size={24} />
+                ) : (
+                  <ShieldCheck style={{ color: 'var(--leh-primary)' }} />
+                )}
+                <span>{isResetOnly ? 'Reset Staff Password' : editingUser ? 'Update Staff Identity' : 'Provision System Identity'}</span>
               </div>
               <button className="leh-modal-close" onClick={() => setIsModalOpen(false)}>
                 <X size={20} />
@@ -260,75 +285,122 @@ export const UserManagement: React.FC = () => {
             
             <div className="leh-modal-body">
               <form onSubmit={handleSubmit}>
-                <div className="leh-form-section">
-                  <h4 className="leh-form-section-title">
-                    <UserPlus size={14} /> Personnel Details
-                  </h4>
-                  <div className="leh-form-grid">
-                    <div className="leh-form-group full-width">
-                      <label className="leh-label">LEGAL FULL NAME</label>
-                      <input
-                        className="leh-input"
-                        required
-                        placeholder="e.g. Dr. Aminu Bello"
-                        value={formData.full_name}
-                        onChange={e => setFormData({...formData, full_name: e.target.value})}
-                      />
-                    </div>
-                    <div className="leh-form-group">
-                      <label className="leh-label">AUTHORIZATION ROLE</label>
-                      <select
-                        className="leh-select"
-                        value={formData.role}
-                        onChange={e => setFormData({...formData, role: e.target.value})}
-                      >
-                        <option value="Admin">System Administrator</option>
-                        <option value="Optometrist">Optometrist</option>
-                        <option value="Consultant">Consultant Ophth.</option>
-                        <option value="Nurse">Ophthalmic Nurse</option>
-                        <option value="Receptionist">Medical Records</option>
-                      </select>
-                    </div>
-                    <div className="leh-form-group">
-                      <label className="leh-label">OPERATIONAL UNIT</label>
-                      <input
-                        className="leh-input"
-                        placeholder="e.g. Clinical"
-                        value={formData.department}
-                        onChange={e => setFormData({...formData, department: e.target.value})}
-                      />
+                {isResetOnly && (
+                  <div style={{ 
+                    marginBottom: '24px', 
+                    padding: '16px', 
+                    background: 'var(--leh-primary-light)', 
+                    borderRadius: '12px', 
+                    border: '1.5px solid rgba(37, 99, 235, 0.15)' 
+                  }}>
+                    <p style={{ fontSize: '13px', color: 'var(--leh-text-dark)', fontWeight: '600', margin: 0 }}>
+                      Resetting access credentials for:
+                    </p>
+                    <p style={{ fontSize: '15px', color: 'var(--leh-primary)', fontWeight: '800', margin: '4px 0 0 0' }}>
+                      {editingUser?.full_name} ({editingUser?.username})
+                    </p>
+                  </div>
+                )}
+
+                {!isResetOnly && (
+                  <div className="leh-form-section">
+                    <h4 className="leh-form-section-title">
+                      <UserPlus size={14} /> Personnel Details
+                    </h4>
+                    <div className="leh-form-grid">
+                      <div className="leh-form-group full-width">
+                        <label className="leh-label">LEGAL FULL NAME</label>
+                        <input
+                          className="leh-input"
+                          required
+                          placeholder="e.g. Dr. Aminu Bello"
+                          value={formData.full_name}
+                          onChange={e => setFormData({...formData, full_name: e.target.value})}
+                        />
+                      </div>
+                      <div className="leh-form-group">
+                        <label className="leh-label">AUTHORIZATION ROLE</label>
+                        <select
+                          className="leh-select"
+                          value={formData.role}
+                          onChange={e => setFormData({...formData, role: e.target.value})}
+                        >
+                          <option value="Admin">System Administrator</option>
+                          <option value="Optometrist">Optometrist</option>
+                          <option value="Consultant">Consultant Ophth.</option>
+                          <option value="Nurse">Ophthalmic Nurse</option>
+                          <option value="Receptionist">Medical Records</option>
+                          <option value="Doctor">Medical Doctor</option>
+                          <option value="Pharmacist">Pharmacist</option>
+                        </select>
+                      </div>
+                      <div className="leh-form-group">
+                        <label className="leh-label">OPERATIONAL UNIT</label>
+                        <input
+                          className="leh-input"
+                          placeholder="e.g. Clinical"
+                          value={formData.department}
+                          onChange={e => setFormData({...formData, department: e.target.value})}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 <div className="leh-form-section">
                   <h4 className="leh-form-section-title">
-                    <Key size={14} /> Access Credentials
+                    <Key size={14} /> {isResetOnly ? 'Access Code' : 'Access Credentials'}
                   </h4>
                   <div className="leh-form-grid">
-                    <div className="leh-form-group full-width">
-                      <label className="leh-label">SYSTEM USERNAME</label>
-                      <input
-                        className="leh-input"
-                        required
-                        autoComplete="off"
-                        placeholder="e.g. abello.clinical"
-                        value={formData.username}
-                        onChange={e => setFormData({...formData, username: e.target.value})}
-                      />
-                    </div>
+                    {!isResetOnly && (
+                      <div className="leh-form-group full-width">
+                        <label className="leh-label">SYSTEM USERNAME</label>
+                        <input
+                          className="leh-input"
+                          required
+                          autoComplete="off"
+                          placeholder="e.g. abello.clinical"
+                          value={formData.username}
+                          onChange={e => setFormData({...formData, username: e.target.value})}
+                        />
+                      </div>
+                    )}
                     <div className="leh-form-group full-width">
                       <label className="leh-label">
-                        {editingUser ? 'RESET PASSWORD (LEAVE BLANK TO KEEP UNCHANGED)' : 'TEMPORARY PASSWORD'}
+                        {isResetOnly ? 'NEW TEMPORARY PASSWORD' : editingUser ? 'RESET PASSWORD (LEAVE BLANK TO KEEP UNCHANGED)' : 'TEMPORARY PASSWORD'}
                       </label>
-                      <input
-                        type="password"
-                        className="leh-input"
-                        required={!editingUser}
-                        placeholder={editingUser ? 'Leave blank to keep current password' : '••••••••'}
-                        value={formData.password}
-                        onChange={e => setFormData({...formData, password: e.target.value})}
-                      />
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          className="leh-input"
+                          style={{ paddingRight: '48px' }}
+                          required={!editingUser || isResetOnly}
+                          placeholder={isResetOnly ? '••••••••' : editingUser ? 'Leave blank to keep current password' : '••••••••'}
+                          value={formData.password}
+                          onChange={e => setFormData({...formData, password: e.target.value})}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          style={{
+                            position: 'absolute',
+                            right: '16px',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'var(--leh-text-muted)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: 0
+                          }}
+                        >
+                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
+                      <p style={{ fontSize: '11px', color: 'var(--leh-text-muted)', marginTop: '4px', fontWeight: '500' }}>
+                        Password must be at least 4 characters long.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -337,7 +409,7 @@ export const UserManagement: React.FC = () => {
                   <button type="button" className="leh-btn-outline" style={{ flex: 1, height: '52px' }} onClick={() => setIsModalOpen(false)}>CANCEL</button>
                   <button type="submit" className="leh-btn-primary" style={{ flex: 2, height: '52px' }}>
                     <ShieldCheck size={18} />
-                    <span>{editingUser ? 'SAVE IDENTITY' : 'AUTHORIZE ACCOUNT'}</span>
+                    <span>{isResetOnly ? 'RESET PASSWORD' : editingUser ? 'SAVE IDENTITY' : 'AUTHORIZE ACCOUNT'}</span>
                   </button>
                 </div>
               </form>

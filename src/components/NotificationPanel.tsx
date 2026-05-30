@@ -1,6 +1,6 @@
 import React, { useLayoutEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Bell, Package, Receipt, ClipboardCheck, UserPlus, Clock, CheckCircle2 } from 'lucide-react';
+import { Bell, Package, Receipt, ClipboardCheck, UserPlus, Clock, CheckCircle2, X } from 'lucide-react';
 
 interface Notification {
   id: number;
@@ -13,6 +13,8 @@ interface Notification {
 interface NotificationPanelProps {
   notifications: Notification[];
   onMarkRead: (id: number) => void;
+  onDelete: (id: number) => void;
+  onClearAll: () => void;
   onClose: () => void;
   anchorRef: React.RefObject<HTMLDivElement | null>;
 }
@@ -20,6 +22,8 @@ interface NotificationPanelProps {
 export const NotificationPanel: React.FC<NotificationPanelProps> = ({ 
   notifications, 
   onMarkRead, 
+  onDelete,
+  onClearAll,
   onClose,
   anchorRef
 }) => {
@@ -97,7 +101,22 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
             </span>
           )}
         </div>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '11px', fontWeight: '800', color: 'var(--leh-text-muted)', cursor: 'pointer' }}>DISMISS</button>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          {notifications.length > 0 && (
+            <button 
+              onClick={onClearAll} 
+              style={{ background: 'none', border: 'none', fontSize: '11px', fontWeight: '800', color: '#ef4444', cursor: 'pointer' }}
+            >
+              CLEAR ALL
+            </button>
+          )}
+          <button 
+            onClick={onClose} 
+            style={{ background: 'none', border: 'none', fontSize: '11px', fontWeight: '800', color: 'var(--leh-text-muted)', cursor: 'pointer' }}
+          >
+            CLOSE
+          </button>
+        </div>
       </div>
 
       <div style={{ maxHeight: '480px', overflowY: 'auto' }}>
@@ -138,7 +157,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
                 }}>
                   {getIcon(n.module)}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0, flex: 1 }}>
                   <p style={{ 
                      fontSize: '13px', 
                      lineHeight: '1.4', 
@@ -154,11 +173,32 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
                     <span style={{ color: 'var(--leh-primary)' }}>{n.module}</span>
                   </div>
                 </div>
-                {!n.is_read && (
-                   <div style={{ marginLeft: 'auto', alignSelf: 'center' }}>
-                      <CheckCircle2 size={16} style={{ color: '#10b981' }} />
-                   </div>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: 'auto', alignSelf: 'center', flexShrink: 0 }}>
+                  {!n.is_read && (
+                    <CheckCircle2 size={16} style={{ color: '#10b981' }} />
+                  )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(n.id);
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--leh-text-light)',
+                      cursor: 'pointer',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: '50%',
+                      transition: 'background 0.2s, color 0.2s'
+                    }}
+                    title="Delete notification"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>

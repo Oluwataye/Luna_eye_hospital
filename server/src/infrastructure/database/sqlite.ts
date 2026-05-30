@@ -1,0 +1,698 @@
+import sqlite3 from 'sqlite3';
+import path from 'path';
+import bcrypt from 'bcryptjs';
+
+const sqlite = sqlite3.verbose();
+
+const findRootDir = () => {
+  let current = __dirname;
+  // Walk up to find the server folder
+  while (!current.endsWith('server') && path.dirname(current) !== current) {
+    current = path.dirname(current);
+  }
+  return current;
+};
+
+const serverRootDir = findRootDir();
+const dbPath = path.resolve(serverRootDir, 'luna_eye_hospital.db');
+
+const db = new sqlite.Database(dbPath, (err: Error | null) => {
+  if (err) {
+    console.error('Error opening database', err.message);
+  } else {
+    console.log('Connected to the SQLite database (Clean Architecture).');
+
+    // ── Performance & reliability PRAGMAs ──
+    db.run('PRAGMA journal_mode = WAL');
+    db.run('PRAGMA synchronous = NORMAL');
+    db.run('PRAGMA cache_size = -16000');
+    db.run('PRAGMA temp_store = MEMORY');
+    db.run('PRAGMA mmap_size = 134217728');
+    db.run('PRAGMA foreign_keys = ON');
+    db.run('PRAGMA busy_timeout = 10000');
+    console.log('[DB] PRAGMAs set: WAL mode, 16 MB cache, memory temp store, busy timeout 10s');
+    
+    // Create required tables
+    db.serialize(() => {
+      // Token blacklist table (invalidated sessions)
+      db.run(`CREATE TABLE IF NOT EXISTS token_blacklist (
+        token TEXT PRIMARY KEY,
+        expires_at INTEGER
+      )`);
+
+      // Users table
+      db.run(`CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE,
+        password TEXT,
+        full_name TEXT,
+        role TEXT,
+        department TEXT
+      )`);
+
+      // Patients table
+      db.run(`CREATE TABLE IF NOT EXISTS patients (
+        id TEXT PRIMARY KEY, -- Format: 0001/26/LEH
+        full_name TEXT,
+        gender TEXT,
+        dob TEXT,
+        phone TEXT,
+        alternate_phone TEXT,
+        address TEXT,
+        occupation TEXT,
+        next_of_kin TEXT,
+        next_of_kin_phone TEXT,
+        marital_status TEXT,
+        blood_group TEXT,
+        genotype TEXT,
+        allergies TEXT,
+        medical_alerts TEXT,
+        payment_category TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`);
+
+      // Visits table
+      db.run(`CREATE TABLE IF NOT EXISTS visits (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        patient_id TEXT,
+        visit_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+        status TEXT, -- Waiting, In Consultation, Admitted, Discharged
+        department TEXT,
+        FOREIGN KEY(patient_id) REFERENCES patients(id)
+      )`);
+
+      // Inventory table
+      db.run(`CREATE TABLE IF NOT EXISTS inventory (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        category TEXT, -- Drugs, Lenses, Frames, Consumables
+        stock INTEGER,
+        reorder_level INTEGER,
+        price REAL,
+        cost_price REAL,
+        supplier TEXT,
+        batch_number TEXT,
+        expiry_date TEXT,
+        attributes TEXT
+      )`);
+
+      // Run column migration dynamically for existing databases
+      db.run("ALTER TABLE inventory ADD COLUMN attributes TEXT", (err: Error | null) => {
+        if (err && !err.message.includes("duplicate column name")) {
+          console.error("Migration error (adding attributes column to inventory):", err.message);
+        }
+      });
+
+      // Stock Movements table
+      db.run(`CREATE TABLE IF NOT EXISTS stock_movements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        item_id TEXT,
+        type TEXT,
+        quantity INTEGER,
+        reason TEXT,
+        performed_by TEXT,
+        reference_id TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(item_id) REFERENCES inventory(id)
+      )`);
+
+      // Transactions table for Billing
+      db.run(`CREATE TABLE IF NOT EXISTS transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        receipt_no TEXT UNIQUE,
+        patient_id TEXT,
+        visit_id INTEGER,
+        total_amount REAL DEFAULT 0,
+        amount_paid REAL DEFAULT 0,
+        discount REAL DEFAULT 0,
+        balance REAL DEFAULT 0,
+        payment_method TEXT,
+        payment_details TEXT, -- JSON
+        cashier TEXT, -- Cashier name
+        status TEXT, -- Paid, Unpaid, Partial, Voided
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(patient_id) REFERENCES patients(id),
+        FOREIGN KEY(visit_id) REFERENCES visits(id)
+      )`);
+
+      // Transaction items table
+      db.run(`CREATE TABLE IF NOT EXISTS transaction_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        transaction_id INTEGER,
+        inventory_id TEXT,
+        description TEXT,
+        qty INTEGER,
+        unit_price REAL,
+        FOREIGN KEY(transaction_id) REFERENCES transactions(id),
+        FOREIGN KEY(inventory_id) REFERENCES inventory(id)
+      )`);
+
+      // Triage table - vitals recorded by Nurse
+      db.run(`CREATE TABLE IF NOT EXISTS triage (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        patient_id TEXT,
+        visit_id INTEGER,
+        bp_systolic TEXT,
+        bp_diastolic TEXT,
+        pulse_rate TEXT,
+        temperature TEXT,
+        weight TEXT,
+        va_od_unaided TEXT,
+        va_od_aided TEXT,
+        va_od_pinhole TEXT,
+        va_od_near_unaided TEXT,
+        va_od_near_aided TEXT,
+        va_os_unaided TEXT,
+        va_os_aided TEXT,
+        va_os_pinhole TEXT,
+        va_os_near_unaided TEXT,
+        va_os_near_aided TEXT,
+        iop_od TEXT,
+        iop_os TEXT,
+        iop_method TEXT,
+        complaint TEXT,
+        triaged_by TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(patient_id) REFERENCES patients(id)
+      )`);
+
+      // Consultations table
+      db.run(`CREATE TABLE IF NOT EXISTS consultations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        patient_id TEXT,
+        visit_id INTEGER,
+        consultant_name TEXT,
+        bp TEXT,
+        complaint TEXT,
+        va_od_unaided TEXT, va_od_pinhole TEXT, va_od_near TEXT,
+        va_os_unaided TEXT, va_os_pinhole TEXT, va_os_near TEXT,
+        iop_od TEXT, iop_os TEXT,
+        ref_od_sph TEXT, ref_od_cyl TEXT, ref_od_axis TEXT,
+        ref_os_sph TEXT, ref_os_cyl TEXT, ref_os_axis TEXT,
+        anterior_segment TEXT,
+        pupils_dilated INTEGER,
+        dilation_agent TEXT,
+        posterior_segment TEXT,
+        primary_diagnosis TEXT,
+        diagnosis_notes TEXT,
+        additional_notes TEXT,
+        management_plan TEXT,
+        clinical_data TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(patient_id) REFERENCES patients(id),
+        FOREIGN KEY(visit_id) REFERENCES visits(id)
+      )`);
+
+      db.run(`CREATE TABLE IF NOT EXISTS triage_queue (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        patient_id TEXT,
+        patient_name TEXT,
+        file_number TEXT,
+        visit_id INTEGER,
+        status TEXT,
+        checkin_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        checkin_by TEXT,
+        FOREIGN KEY(patient_id) REFERENCES patients(id),
+        FOREIGN KEY(visit_id) REFERENCES visits(id)
+      )`);
+
+      // Consultation Queue table
+      db.run(`CREATE TABLE IF NOT EXISTS consultation_queue (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        patient_id TEXT,
+        patient_name TEXT,
+        file_number TEXT,
+        visit_id INTEGER,
+        status TEXT,
+        checkin_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        checkin_by TEXT,
+        started_at DATETIME,
+        consultant_name TEXT,
+        FOREIGN KEY(patient_id) REFERENCES patients(id),
+        FOREIGN KEY(visit_id) REFERENCES visits(id)
+      )`);
+
+      // Investigations/Results table
+      db.run(`CREATE TABLE IF NOT EXISTS investigations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        patient_id TEXT,
+        inventory_id TEXT,
+        test_name TEXT,
+        status TEXT DEFAULT 'Pending', -- Pending, Completed
+        test_value TEXT,
+        unit TEXT,
+        reference_range TEXT,
+        results_notes TEXT,
+        medical_comments TEXT,
+        billing_status TEXT DEFAULT 'Unpaid',
+        requested_by TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        completed_at DATETIME,
+        FOREIGN KEY(patient_id) REFERENCES patients(id)
+      )`);
+
+      // Admissions table
+      db.run(`CREATE TABLE IF NOT EXISTS admissions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        patient_id TEXT,
+        visit_id INTEGER,
+        ward_name TEXT,
+        bed_number TEXT,
+        admitting_doctor TEXT,
+        reason TEXT,
+        status TEXT DEFAULT 'Admitted', -- Admitted, Discharged
+        notes TEXT,
+        admission_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+        discharge_date DATETIME,
+        FOREIGN KEY(patient_id) REFERENCES patients(id),
+        FOREIGN KEY(visit_id) REFERENCES visits(id)
+      )`);
+
+      // Suppliers table
+      db.run(`CREATE TABLE IF NOT EXISTS suppliers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE,
+        contact_person TEXT,
+        phone TEXT,
+        email TEXT,
+        address TEXT,
+        balance REAL DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`);
+
+      // Purchase Orders table
+      db.run(`CREATE TABLE IF NOT EXISTS purchase_orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        po_number TEXT UNIQUE,
+        supplier_id INTEGER,
+        total_amount REAL DEFAULT 0,
+        amount_paid REAL DEFAULT 0,
+        balance REAL DEFAULT 0,
+        status TEXT DEFAULT 'Draft', -- Draft, Partial, Received, Paid
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(supplier_id) REFERENCES suppliers(id)
+      )`);
+
+      // Purchase Order Items table
+      db.run(`CREATE TABLE IF NOT EXISTS purchase_order_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        po_id INTEGER,
+        inventory_id TEXT,
+        description TEXT,
+        qty INTEGER,
+        unit_cost REAL,
+        received_qty INTEGER DEFAULT 0,
+        FOREIGN KEY(po_id) REFERENCES purchase_orders(id)
+      )`);
+
+      // New Management Tables
+      db.run(`CREATE TABLE IF NOT EXISTS wards (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE,
+        description TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`);
+
+      db.run(`CREATE TABLE IF NOT EXISTS discounts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE,
+        value REAL,
+        type TEXT, -- fixed, percentage
+        requires_auth INTEGER DEFAULT 0, -- 0 for no, 1 for yes
+        is_active INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`);
+
+      db.run(`CREATE TABLE IF NOT EXISTS inventory_categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE,
+        description TEXT,
+        attribute_template TEXT DEFAULT 'NONE',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`);
+
+      // Migration: Add attribute_template column to inventory_categories if it doesn't exist
+      db.run("ALTER TABLE inventory_categories ADD COLUMN attribute_template TEXT DEFAULT 'NONE'", (err: Error | null) => {
+        if (err && !err.message.includes("duplicate column name")) {
+          console.error("Migration error (adding attribute_template column to inventory_categories):", err.message);
+        }
+      });
+
+      // Seed default categories if they do not exist
+      const defaultCategories = [
+        { name: 'Drugs', description: 'Medicines and pharmaceutical drugs', template: 'DRUGS' },
+        { name: 'Test', description: 'Diagnostic tests and procedures', template: 'TEST' },
+        { name: 'Laboratory', description: 'Laboratory tests, reagents, and equipment', template: 'LABORATORY' },
+        { name: 'Frames', description: 'Eyeglass frames', template: 'FRAMES' },
+        { name: 'Lenses', description: 'Eyeglass lenses', template: 'LENSES' }
+      ];
+      
+      defaultCategories.forEach(cat => {
+        db.get('SELECT * FROM inventory_categories WHERE name = ?', [cat.name], (err: Error | null, row: any) => {
+          if (!err && !row) {
+            db.run('INSERT INTO inventory_categories (name, description, attribute_template) VALUES (?, ?, ?)', [cat.name, cat.description, cat.template], (err2: Error | null) => {
+              if (!err2) {
+                console.log(`Migration: Seeded default category: ${cat.name}`);
+              }
+            });
+          } else if (!err && row && (!row.attribute_template || row.attribute_template === 'NONE')) {
+            db.run('UPDATE inventory_categories SET attribute_template = ? WHERE name = ?', [cat.template, cat.name]);
+          }
+        });
+      });
+
+      // Expenses table
+      db.run(`CREATE TABLE IF NOT EXISTS expenses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date DATETIME DEFAULT CURRENT_TIMESTAMP,
+        category TEXT, -- Salary, Utility, Medical, Admin, Other
+        description TEXT,
+        amount REAL,
+        recorded_by TEXT,
+        notes TEXT
+      )`);
+
+      // Audit Logs table
+      db.run(`CREATE TABLE IF NOT EXISTS audit_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT,
+        user_name TEXT,
+        user_role TEXT,
+        action_type TEXT,
+        module TEXT,
+        details TEXT,
+        status TEXT, -- Critical, Standard, Financial
+        ip_address TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`);
+
+      // Procurement table
+      db.run(`CREATE TABLE IF NOT EXISTS procurement (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        supplier_id INTEGER,
+        item_name TEXT,
+        quantity_received INTEGER,
+        unit_cost REAL,
+        total_cost REAL,
+        invoice_number TEXT,
+        amount_paid REAL DEFAULT 0,
+        balance REAL DEFAULT 0,
+        status TEXT, -- Paid, Partial, Unpaid
+        purchase_date TEXT,
+        received_by TEXT,
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(supplier_id) REFERENCES suppliers(id)
+      )`);
+
+      // Notifications table
+      db.run(`CREATE TABLE IF NOT EXISTS notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_role TEXT, -- Role intended for
+        message TEXT,
+        module TEXT,
+        is_read INTEGER DEFAULT 0,
+        patient_id TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`);
+
+      // Migration: Add patient_id column to notifications dynamically
+      db.run("ALTER TABLE notifications ADD COLUMN patient_id TEXT", (err: Error | null) => {
+        if (err && !err.message.includes("duplicate column name")) {
+          console.error("Migration error (adding patient_id to notifications):", err.message);
+        } else {
+          db.run("CREATE INDEX IF NOT EXISTS idx_notifications_patient_id ON notifications (patient_id)");
+        }
+      });
+
+      // Reprint Logs table
+      db.run(`CREATE TABLE IF NOT EXISTS reprint_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        receipt_number TEXT,
+        bill_id INTEGER,
+        patient_id TEXT,
+        patient_name TEXT,
+        file_number TEXT,
+        original_transaction_date DATETIME,
+        original_amount REAL,
+        reprinted_by_user_id INTEGER,
+        reprinted_by_name TEXT,
+        reprinted_by_role TEXT,
+        reprint_date DATE,
+        reprint_time TIME,
+        reprint_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_flagged INTEGER DEFAULT 0,
+        flag_reason TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(bill_id) REFERENCES transactions(id),
+        FOREIGN KEY(patient_id) REFERENCES patients(id),
+        FOREIGN KEY(reprinted_by_user_id) REFERENCES users(id)
+      )`);
+
+      // Reprint Restrictions table
+      db.run(`CREATE TABLE IF NOT EXISTS reprint_restrictions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        user_name TEXT,
+        restricted_by_admin_id INTEGER,
+        restricted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        restriction_reason TEXT,
+        is_active INTEGER DEFAULT 1,
+        lifted_at DATETIME,
+        FOREIGN KEY(user_id) REFERENCES users(id),
+        FOREIGN KEY(restricted_by_admin_id) REFERENCES users(id)
+      )`);
+
+      // Reprint Settings table
+      db.run(`CREATE TABLE IF NOT EXISTS reprint_settings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        daily_reprint_threshold INTEGER DEFAULT 5,
+        updated_by INTEGER,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(updated_by) REFERENCES users(id)
+      )`);
+
+      // Initialize default reprint settings
+      db.get('SELECT COUNT(*) as count FROM reprint_settings', (err: Error | null, row: any) => {
+        if (!err && row && row.count === 0) {
+          db.run('INSERT INTO reprint_settings (daily_reprint_threshold) VALUES (5)');
+          console.log('Default reprint settings initialized.');
+        }
+      });
+
+      // Investigation Templates table
+      db.run(`CREATE TABLE IF NOT EXISTS investigation_templates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        test_name TEXT UNIQUE,
+        default_unit TEXT,
+        default_reference_range TEXT,
+        template_content TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`);
+
+      // Seed default templates for RBS & FBS
+      const defaultTemplates = [
+        {
+          test_name: 'Random Blood Sugar',
+          default_unit: 'mmol/L',
+          default_reference_range: '< 7.8',
+          template_content: 'RANDOM BLOOD SUGAR (RBS) REPORT\n--------------------------------\nTime of Last Meal: ________ hours ago\nMethodology: Enzymatic Glucose Oxidase\n\nClinical Interpretation:\n[ ] Normal (< 7.8 mmol/L / < 140 mg/dL)\n[ ] Pre-diabetic (7.8 - 11.0 mmol/L / 140 - 199 mg/dL)\n[ ] Diabetic (>= 11.1 mmol/L / >= 200 mg/dL)\n\nQuality Control: Pass'
+        },
+        {
+          test_name: 'RBS',
+          default_unit: 'mmol/L',
+          default_reference_range: '< 7.8',
+          template_content: 'RANDOM BLOOD SUGAR (RBS) REPORT\n--------------------------------\nTime of Last Meal: ________ hours ago\nMethodology: Enzymatic Glucose Oxidase\n\nClinical Interpretation:\n[ ] Normal (< 7.8 mmol/L / < 140 mg/dL)\n[ ] Pre-diabetic (7.8 - 11.0 mmol/L / 140 - 199 mg/dL)\n[ ] Diabetic (>= 11.1 mmol/L / >= 200 mg/dL)\n\nQuality Control: Pass'
+        },
+        {
+          test_name: 'Fasting Blood Sugar',
+          default_unit: 'mmol/L',
+          default_reference_range: '3.9 - 5.6',
+          template_content: 'FASTING BLOOD SUGAR (FBS) REPORT\n--------------------------------\nPatient State: Fasting (8-12 hours)\nMethodology: Enzymatic Glucose Oxidase\n\nClinical Interpretation:\n[ ] Normal (< 5.6 mmol/L / < 100 mg/dL)\n[ ] Impaired Fasting Glucose (5.6 - 6.9 mmol/L / 100 - 125 mg/dL)\n[ ] Diabetic (>= 7.0 mmol/L / >= 126 mg/dL)\n\nQuality Control: Pass'
+        },
+        {
+          test_name: 'FBS',
+          default_unit: 'mmol/L',
+          default_reference_range: '3.9 - 5.6',
+          template_content: 'FASTING BLOOD SUGAR (FBS) REPORT\n--------------------------------\nPatient State: Fasting (8-12 hours)\nMethodology: Enzymatic Glucose Oxidase\n\nClinical Interpretation:\n[ ] Normal (< 5.6 mmol/L / < 100 mg/dL)\n[ ] Impaired Fasting Glucose (5.6 - 6.9 mmol/L / 100 - 125 mg/dL)\n[ ] Diabetic (>= 7.0 mmol/L / >= 126 mg/dL)\n\nQuality Control: Pass'
+        }
+      ];
+
+      defaultTemplates.forEach(tpl => {
+        db.get('SELECT id FROM investigation_templates WHERE test_name = ?', [tpl.test_name], (err, row) => {
+          if (!err && !row) {
+            db.run('INSERT INTO investigation_templates (test_name, default_unit, default_reference_range, template_content) VALUES (?, ?, ?, ?)',
+              [tpl.test_name, tpl.default_unit, tpl.default_reference_range, tpl.template_content],
+              (err2) => {
+                if (err2) console.error('Error seeding default template:', tpl.test_name, err2.message);
+                else console.log('Seeded default investigation template:', tpl.test_name);
+              }
+            );
+          }
+        });
+      });
+
+      // Insert default Admin user if none exists
+      db.get('SELECT * FROM users WHERE role = "Admin"', (err: Error | null, row: any) => {
+        if (!err && !row) {
+          const hashedPassword = bcrypt.hashSync('admin', 10);
+          const stmt = db.prepare('INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)');
+          stmt.run('admin', hashedPassword, 'System Administrator', 'Admin');
+          stmt.finalize();
+          console.log('Default admin user created (hashed).');
+        }
+      });
+
+      // Migration: Hash any legacy plain text passwords in the database
+      db.all('SELECT id, username, password FROM users', [], (err: Error | null, rows: any[]) => {
+        if (!err && rows) {
+          const bcryptRegex = /^\$2[ayb]\$[0-9]{2}\$[./A-Za-z0-9]{53}$/;
+          rows.forEach(row => {
+            if (!bcryptRegex.test(row.password)) {
+              const hashedPassword = bcrypt.hashSync(row.password, 10);
+              db.run('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, row.id], (err2: Error | null) => {
+                if (!err2) {
+                  console.log(`Migration: Hashed legacy password for user: ${row.username}`);
+                }
+              });
+            }
+          });
+        }
+      });
+
+      // PRAGMA column updates
+      db.all("PRAGMA table_info(users)", (err: Error | null, columns: any[]) => {
+        if (err || !columns) return;
+        const hasPhone = columns.some(c => c.name === 'phone_number');
+        const hasCreatedAt = columns.some(c => c.name === 'created_at');
+        
+        if (!hasPhone) db.run("ALTER TABLE users ADD COLUMN phone_number TEXT");
+        if (!hasCreatedAt) db.run("ALTER TABLE users ADD COLUMN created_at DATETIME");
+        
+        const hasDepartment = columns.some(c => c.name === 'department');
+        const hasStatus = columns.some(c => c.name === 'status');
+        if (!hasDepartment) db.run("ALTER TABLE users ADD COLUMN department TEXT DEFAULT 'General'");
+        if (!hasStatus) db.run("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'Active'");
+      });
+
+      db.all("PRAGMA table_info(purchase_orders)", (err: Error | null, columns: any[]) => {
+        if (err || !columns) return;
+        if (!columns.some(c => c.name === 'amount_paid')) db.run("ALTER TABLE purchase_orders ADD COLUMN amount_paid REAL DEFAULT 0");
+        if (!columns.some(c => c.name === 'balance')) db.run("ALTER TABLE purchase_orders ADD COLUMN balance REAL DEFAULT 0");
+      });
+
+      db.all("PRAGMA table_info(visits)", (err: Error | null, columns: any[]) => {
+        if (err || !columns) return;
+        if (!columns.some(c => c.name === 'department')) db.run("ALTER TABLE visits ADD COLUMN department TEXT DEFAULT 'General'");
+      });
+
+      db.all("PRAGMA table_info(inventory)", (err: Error | null, cols: any[]) => {
+        if (err || !cols) return;
+        if (!cols.some(c => c.name === 'cost_price')) db.run("ALTER TABLE inventory ADD COLUMN cost_price REAL");
+        if (!cols.some(c => c.name === 'supplier')) db.run("ALTER TABLE inventory ADD COLUMN supplier TEXT");
+        if (!cols.some(c => c.name === 'batch_number')) db.run("ALTER TABLE inventory ADD COLUMN batch_number TEXT");
+      });
+
+      db.all("PRAGMA table_info(transaction_items)", (err: Error | null, cols: any[]) => {
+        if (err || !cols) return;
+        if (!cols.some(c => c.name === 'inventory_id')) db.run("ALTER TABLE transaction_items ADD COLUMN inventory_id TEXT");
+      });
+
+      db.all("PRAGMA table_info(consultations)", (err: Error | null, cols: any[]) => {
+        if (err || !cols) return;
+        if (!cols.some(c => c.name === 'visit_id')) db.run("ALTER TABLE consultations ADD COLUMN visit_id INTEGER");
+        if (!cols.some(c => c.name === 'consultant_name')) db.run("ALTER TABLE consultations ADD COLUMN consultant_name TEXT");
+        if (!cols.some(c => c.name === 'clinical_data')) db.run("ALTER TABLE consultations ADD COLUMN clinical_data TEXT");
+        if (!cols.some(c => c.name === 'additional_notes')) db.run("ALTER TABLE consultations ADD COLUMN additional_notes TEXT");
+      });
+
+      db.all("PRAGMA table_info(triage)", (err: Error | null, cols: any[]) => {
+        if (err || !cols) return;
+        if (!cols.some(c => c.name === 'iop_od')) db.run("ALTER TABLE triage ADD COLUMN iop_od TEXT");
+        if (!cols.some(c => c.name === 'iop_os')) db.run("ALTER TABLE triage ADD COLUMN iop_os TEXT");
+        if (!cols.some(c => c.name === 'iop_method')) db.run("ALTER TABLE triage ADD COLUMN iop_method TEXT");
+      });
+
+      db.all("PRAGMA table_info(admissions)", (err: Error | null, cols: any[]) => {
+        if (err || !cols) return;
+        if (!cols.some(c => c.name === 'visit_id')) db.run("ALTER TABLE admissions ADD COLUMN visit_id INTEGER");
+      });
+      
+      // Create Indexes
+      db.run("CREATE INDEX IF NOT EXISTS idx_patients_name ON patients(full_name)");
+      db.run("CREATE INDEX IF NOT EXISTS idx_patients_phone ON patients(phone)");
+      db.run("CREATE INDEX IF NOT EXISTS idx_visits_date ON visits(visit_date)");
+      db.run("CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(created_at)");
+      db.run("CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at)");
+      
+      // Patient Table Expansion Migration
+      const patientCols = [
+        { name: 'alternate_phone', type: 'TEXT' },
+        { name: 'occupation', type: 'TEXT' },
+        { name: 'next_of_kin_phone', type: 'TEXT' },
+        { name: 'marital_status', type: 'TEXT' },
+        { name: 'genotype', type: 'TEXT' },
+        { name: 'medical_alerts', type: 'TEXT' },
+        { name: 'payment_category', type: 'TEXT' }
+      ];
+
+      patientCols.forEach(col => {
+        db.all(`PRAGMA table_info(patients)`, (err: Error | null, columns: any[]) => {
+          if (!err && columns && !columns.some(c => c.name === col.name)) {
+            db.run(`ALTER TABLE patients ADD COLUMN ${col.name} ${col.type}`);
+          }
+        });
+      });
+
+      // Investigations Expansion Migration
+      const invCols = [
+        { name: 'inventory_id', type: 'TEXT' },
+        { name: 'test_value', type: 'TEXT' },
+        { name: 'unit', type: 'TEXT' },
+        { name: 'reference_range', type: 'TEXT' },
+        { name: 'medical_comments', type: 'TEXT' },
+        { name: 'billing_status', type: 'TEXT DEFAULT "Unpaid"' }
+      ];
+
+      invCols.forEach(col => {
+        db.all(`PRAGMA table_info(investigations)`, (err: Error | null, columns: any[]) => {
+          if (!err && columns && !columns.some(c => c.name === col.name)) {
+            db.run(`ALTER TABLE investigations ADD COLUMN ${col.name} ${col.type}`);
+          }
+        });
+      });
+
+      // Consultation Queue Expansion Migration
+      const queueCols = [
+        { name: 'started_at', type: 'DATETIME' },
+        { name: 'consultant_name', type: 'TEXT' }
+      ];
+
+      queueCols.forEach(col => {
+        db.all(`PRAGMA table_info(consultation_queue)`, (err: Error | null, columns: any[]) => {
+          if (!err && columns && !columns.some(c => c.name === col.name)) {
+            db.run(`ALTER TABLE consultation_queue ADD COLUMN ${col.name} ${col.type}`);
+          }
+        });
+      });
+    });
+  }
+});
+
+// Performance indexes
+db.serialize(() => {
+  db.run('CREATE INDEX IF NOT EXISTS idx_inventory_category    ON inventory(category)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_inventory_name        ON inventory(name)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_patients_name         ON patients(full_name)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_visits_patient        ON visits(patient_id)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_visits_status         ON visits(status)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_notifications_role    ON notifications(user_role)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_stock_movements_item  ON stock_movements(item_id)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_audit_logs_user       ON audit_logs(user_id)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_audit_logs_created    ON audit_logs(created_at)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_transactions_patient  ON transactions(patient_id)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_transactions_date     ON transactions(created_at)');
+  console.log('[DB] Indexes ensured (Clean Architecture).');
+});
+
+export default db;

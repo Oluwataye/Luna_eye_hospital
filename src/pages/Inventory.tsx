@@ -9,10 +9,13 @@ import { api } from '../api';
 import { useNotification } from '../context/NotificationContext';
 import { formatDateStandard } from '../utils/date';
 import { StatCard } from '../components/StatCard';
+import { useAuth } from '../context/AuthContext';
 
 export const Inventory: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { notify } = useNotification();
+  const { user } = useAuth();
+  const isAdmin = user?.role?.toLowerCase() === 'admin';
   const [activeCategory, setActiveCategory] = useState(searchParams.get('category') || '');
   const [items, setItems] = useState<any[]>([]);
   const [allItems, setAllItems] = useState<any[]>([]);
@@ -736,24 +739,28 @@ export const Inventory: React.FC = () => {
           >
             <RefreshCcw size={18} className={loading ? 'animate-spin' : ''} />
           </button>
-          <button 
-            className="leh-btn-outline" 
-            style={{ height: '48px', display: 'flex', alignItems: 'center', gap: '8px', padding: '0 16px' }}
-            onClick={() => {
-              setNewCategoryName('');
-              setNewCategoryDesc('');
-              setEditingCategory(null);
-              setIsCategoryModalOpen(true);
-            }}
-            data-tooltip="Manage inventory categories"
-          >
-            <Box size={20} />
-            <span>MANAGE CATEGORIES</span>
-          </button>
-          <button className="leh-btn-primary" onClick={() => handleOpenModal()} data-tooltip="Register new asset record">
-            <Plus size={20} />
-            <span>ADD NEW ITEM</span>
-          </button>
+          {isAdmin && (
+            <>
+              <button 
+                className="leh-btn-outline" 
+                style={{ height: '48px', display: 'flex', alignItems: 'center', gap: '8px', padding: '0 16px' }}
+                onClick={() => {
+                  setNewCategoryName('');
+                  setNewCategoryDesc('');
+                  setEditingCategory(null);
+                  setIsCategoryModalOpen(true);
+                }}
+                data-tooltip="Manage inventory categories"
+              >
+                <Box size={20} />
+                <span>MANAGE CATEGORIES</span>
+              </button>
+              <button className="leh-btn-primary" onClick={() => handleOpenModal()} data-tooltip="Register new asset record">
+                <Plus size={20} />
+                <span>ADD NEW ITEM</span>
+              </button>
+            </>
+          )}
         </div>
       </header>
 
@@ -902,16 +909,29 @@ export const Inventory: React.FC = () => {
                   </td>
                   <td>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                      <button 
-                        className="leh-btn-primary" 
-                        style={{ height: '36px', padding: '0 12px' }}
-                        onClick={() => handleOpenModal(item)}
-                        data-tooltip="Modify asset details"
-                        aria-label="Edit item"
-                      >
-                        <Edit3 size={14} style={{ marginRight: '6px' }} />
-                        <span>UPDATE</span>
-                      </button>
+                      {isAdmin ? (
+                        <button 
+                          className="leh-btn-primary" 
+                          style={{ height: '36px', padding: '0 12px' }}
+                          onClick={() => handleOpenModal(item)}
+                          data-tooltip="Modify asset details"
+                          aria-label="Edit item"
+                        >
+                          <Edit3 size={14} style={{ marginRight: '6px' }} />
+                          <span>UPDATE</span>
+                        </button>
+                      ) : (
+                        <button 
+                          className="leh-btn-outline" 
+                          style={{ height: '36px', padding: '0 12px' }}
+                          onClick={() => handleOpenModal(item)}
+                          data-tooltip="View asset details"
+                          aria-label="View item"
+                        >
+                          <Search size={14} style={{ marginRight: '6px' }} />
+                          <span>VIEW</span>
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -928,7 +948,7 @@ export const Inventory: React.FC = () => {
             <div className="leh-modal-header">
                <div className="leh-modal-title">
                  <Package size={24} style={{ color: 'var(--leh-primary)' }} />
-                 <span>{editingItem ? 'Update Asset Record' : 'Register New Asset'}</span>
+                 <span>{editingItem ? (isAdmin ? 'Update Asset Record' : 'View Asset Details') : 'Register New Asset'}</span>
                </div>
                <button className="leh-modal-close" onClick={() => setIsModalOpen(false)}>
                   <X size={20} />
@@ -942,8 +962,8 @@ export const Inventory: React.FC = () => {
                 padding: '0 32px', background: 'var(--leh-bg-light)'
               }}>
                 {[
-                  { key: 'details', label: 'Edit Details', icon: <Edit3 size={14} /> },
-                  ...(getCategoryTemplate(formData.category) !== 'TEST'
+                  { key: 'details', label: isAdmin ? 'Edit Details' : 'View Details', icon: <Edit3 size={14} /> },
+                  ...(isAdmin && getCategoryTemplate(formData.category) !== 'TEST'
                     ? [{ key: 'stock', label: 'Stock Adjustment', icon: <TrendingUp size={14} /> }]
                     : [])
                 ].map(tab => (
@@ -971,7 +991,8 @@ export const Inventory: React.FC = () => {
               {/* ── DETAILS TAB / CREATE FORM ── */}
               {(modalTab === 'details') && (
                 <form onSubmit={handleSubmit}>
-                  <div className="leh-form-section" style={{ marginBottom: '32px' }}>
+                  <fieldset disabled={!isAdmin} style={{ border: 'none', padding: 0, margin: 0 }}>
+                    <div className="leh-form-section" style={{ marginBottom: '32px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
                       <Box size={16} style={{ color: 'var(--leh-primary)' }} />
                       <h4 style={{ fontSize: '13px', fontWeight: '900', color: 'var(--leh-text-dark)', margin: 0, letterSpacing: '0.05em' }}>
@@ -1116,10 +1137,11 @@ export const Inventory: React.FC = () => {
                       )}
                     </div>
                   </div>
+                  </fieldset>
 
                   {/* Footer */}
                   <div style={{ display: 'flex', gap: '12px', marginTop: '40px', alignItems: 'center' }}>
-                    {editingItem && (
+                    {isAdmin && editingItem && (
                       deleteConfirm ? (
                         <div style={{
                           display: 'flex', alignItems: 'center', gap: '8px',
@@ -1154,11 +1176,13 @@ export const Inventory: React.FC = () => {
                     <button type="button" className="leh-btn-outline"
                       onClick={() => setIsModalOpen(false)}
                       style={{ height: '52px', flex: 1 }}>
-                      CANCEL
+                      {isAdmin ? 'CANCEL' : 'CLOSE'}
                     </button>
-                    <button type="submit" className="leh-btn-primary" style={{ height: '52px', flex: 2 }}>
-                      {editingItem ? 'SAVE CHANGES' : 'FINALIZE REGISTRATION'}
-                    </button>
+                    {isAdmin && (
+                      <button type="submit" className="leh-btn-primary" style={{ height: '52px', flex: 2 }}>
+                        {editingItem ? 'SAVE CHANGES' : 'FINALIZE REGISTRATION'}
+                      </button>
+                    )}
                   </div>
                 </form>
               )}

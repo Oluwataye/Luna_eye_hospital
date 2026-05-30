@@ -25,7 +25,17 @@ export const Billing: React.FC = () => {
   const [searchParams] = useSearchParams();
   
   // Tabs State
-  const [activeTab, setActiveTab] = useState<'inventory' | 'history'>('inventory');
+  const [activeTab, setActiveTab] = useState<'inventory' | 'pending' | 'history'>('inventory');
+  
+  // Pending State
+  const [pendingBills, setPendingBills] = useState<any[]>([]);
+  const [pendingSearch, setPendingSearch] = useState('');
+  const [loadingPending, setLoadingPending] = useState(false);
+  const [showReconcileModal, setShowReconcileModal] = useState(false);
+  const [reconcileTx, setReconcileTx] = useState<any>(null);
+  const [reconcileAmount, setReconcileAmount] = useState<number>(0);
+  const [reconcilePaymentMethod, setReconcilePaymentMethod] = useState<'Cash' | 'POS' | 'Transfer' | 'Mixed'>('Cash');
+  const [reconcileMixedBreakdown, setReconcileMixedBreakdown] = useState({ cash: 0, bank: 0 });
   
   // Patient Context State
   const [patients, setPatients] = useState<any[]>([]);
@@ -109,7 +119,9 @@ export const Billing: React.FC = () => {
     if (patientSearchQuery.length >= 2) {
       const q = patientSearchQuery.toLowerCase();
       setPatientResults(patients.filter(p => 
-        p.full_name?.toLowerCase().includes(q) || p.id?.toString().includes(q)
+        p.full_name?.toLowerCase().includes(q) || 
+        p.id?.toString().toLowerCase().includes(q) ||
+        (p.phone && p.phone.toString().includes(q))
       ));
     } else {
       setPatientResults([]);
@@ -145,6 +157,18 @@ export const Billing: React.FC = () => {
     }
   }, [catalogSearch, catalog]);
 
+  // Synchronize Tab from URL parameters
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'pending') {
+      setActiveTab('pending');
+    } else if (tab === 'history') {
+      setActiveTab('history');
+    } else if (tab === 'inventory') {
+      setActiveTab('inventory');
+    }
+  }, [searchParams]);
+
   // Load History
   useEffect(() => {
     if (activeTab === 'history') {
@@ -153,6 +177,89 @@ export const Billing: React.FC = () => {
         .finally(() => {});
     }
   }, [activeTab]);
+
+  const fetchPendingBills = async () => {
+    setLoadingPending(true);
+    try {
+      const data = await api.getDebtorsReport();
+      setPendingBills(Array.isArray(data) ? data : []);
+    } catch (err) {
+      notify('error', 'Failed to fetch pending bills');
+    } finally {
+      setLoadingPending(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'pending') {
+      fetchPendingBills();
+    }
+  }, [activeTab]);
+
+  const handleOpenReconcile = (tx: any) => {
+    setReconcileTx(tx);
+    setReconcileAmount(tx.balance_due);
+    setReconcilePaymentMethod('Cash');
+    setReconcileMixedBreakdown({ cash: tx.balance_due, bank: 0 });
+    setShowReconcileModal(true);
+  };
+
+  const handleCloseReconcile = () => {
+    setShowReconcileModal(false);
+    setReconcileTx(null);
+    setReconcileAmount(0);
+  };
+
+  const handleReconcileSubmit = async () => {
+    if (!reconcileTx) return;
+    if (reconcileAmount <= 0 || reconcileAmount > reconcileTx.balance_due) {
+      return notify('error', 'Invalid payment amount');
+    }
+
+    setIsProcessing(true);
+    try {
+      const paymentData = {
+        amount_paid: reconcileAmount,
+        payment_method: reconcilePaymentMethod,
+        payment_details: reconcilePaymentMethod === 'Mixed' ? reconcileMixedBreakdown : {},
+        cashier: user?.full_name || 'System'
+      };
+
+      await api.recordPayment(reconcileTx.transaction_id, paymentData);
+      notify('success', 'Payment recorded successfully!');
+
+      // Fetch transaction details and items to print updated receipt
+      try {
+        const items = await api.getTransactionItems(reconcileTx.transaction_id);
+        if (window.confirm('Payment recorded successfully. Print updated receipt?')) {
+          const receiptHtml = buildReceiptHtml({
+            receipt_no: reconcileTx.receipt_no,
+            created_at: new Date(reconcileTx.visit_date),
+            patient_id: reconcileTx.file_no,
+            patient_name: reconcileTx.patient_name,
+            total_amount: reconcileTx.total_amount,
+            discount: reconcileTx.discount,
+            amount_paid: reconcileTx.amount_paid + reconcileAmount,
+            balance: reconcileTx.balance_due - reconcileAmount,
+            payment_method: reconcilePaymentMethod,
+            payment_details: reconcilePaymentMethod === 'Mixed' ? reconcileMixedBreakdown : {},
+            cashier: user?.full_name || 'System',
+            items: items
+          }, user);
+          printReceiptContent(receiptHtml);
+        }
+      } catch (errPrint) {
+        console.error('Failed to auto-print receipt:', errPrint);
+      }
+
+      handleCloseReconcile();
+      fetchPendingBills();
+    } catch (err: any) {
+      notify('error', err.message || 'Failed to record payment');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handlePatientSelect = (p: any, visitId: string | null = null) => {
     setSelectedPatient(p);
@@ -326,6 +433,160 @@ export const Billing: React.FC = () => {
         </div>
       )}
 
+      {/* RECONCILE PAYMENT MODAL */}
+      {showReconcileModal && reconcileTx && (
+        <div className="leh-modal-overlay">
+          <div className="leh-modal-content" style={{ maxWidth: '520px' }}>
+            <div className="leh-modal-header">
+              <div className="leh-modal-title">
+                <Banknote style={{ color: 'var(--leh-primary)' }} />
+                <span>Reconcile Pending Bill</span>
+              </div>
+              <button className="leh-modal-close" onClick={handleCloseReconcile}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="leh-modal-body" style={{ padding: '24px' }}>
+              <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: '#64748b' }}>PATIENT NAME</span>
+                  <span style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a' }}>{reconcileTx.patient_name}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: '#64748b' }}>FILE NUMBER</span>
+                  <span style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a' }}>{reconcileTx.file_no}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: '#64748b' }}>RECEIPT NUMBER</span>
+                  <span style={{ fontSize: '13px', fontWeight: '800', color: '#3b82f6', fontFamily: 'monospace' }}>{reconcileTx.receipt_no || `TX-${reconcileTx.transaction_id}`}</span>
+                </div>
+                <div style={{ borderTop: '1px dashed #cbd5e1', margin: '12px 0' }}></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: '#64748b' }}>TOTAL AMOUNT</span>
+                  <span style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>₦{reconcileTx.total_amount?.toLocaleString()}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: '#64748b' }}>AMOUNT PAID YET</span>
+                  <span style={{ fontSize: '13px', fontWeight: '700', color: '#10b981' }}>₦{reconcileTx.amount_paid?.toLocaleString()}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '14px', fontWeight: '800', color: '#ef4444' }}>BALANCE DUE</span>
+                  <span style={{ fontSize: '16px', fontWeight: '900', color: '#ef4444' }}>₦{reconcileTx.balance_due?.toLocaleString()}</span>
+                </div>
+              </div>
+
+              <div className="amount-tendred-section" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+                <label className="discount-label" style={{ fontSize: '12px', color: '#475569' }}>
+                   AMOUNT TO RECORD (₦)
+                </label>
+                <input 
+                  type="number" 
+                  step="any"
+                  className="billing-search-input" 
+                  style={{ paddingLeft: '16px', height: '48px', fontSize: '18px', fontWeight: '900' }}
+                  value={reconcileAmount}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    setReconcileAmount(val);
+                    if (reconcilePaymentMethod === 'Mixed') {
+                      setReconcileMixedBreakdown({ cash: val, bank: 0 });
+                    }
+                  }}
+                />
+              </div>
+
+              <label className="discount-label" style={{ fontSize: '12px', color: '#475569', marginBottom: '8px', display: 'block' }}>
+                 PAYMENT CHANNEL
+              </label>
+              <div className="payment-mode-grid" style={{ marginBottom: '20px' }}>
+                {[
+                  { id: 'Cash', label: 'Cash' },
+                  { id: 'POS', label: 'POS' },
+                  { id: 'Transfer', label: 'Transfer' },
+                  { id: 'Mixed', label: 'Mixed' }
+                ].map(m => (
+                  <button 
+                    key={m.id}
+                    type="button"
+                    className={`mode-btn ${reconcilePaymentMethod === m.id ? 'active' : ''}`} 
+                    onClick={() => {
+                      setReconcilePaymentMethod(m.id as any);
+                      if (m.id === 'Mixed') {
+                        setReconcileMixedBreakdown({ cash: reconcileAmount, bank: 0 });
+                      }
+                    }}
+                  >
+                    <span>{m.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              {reconcilePaymentMethod === 'Mixed' && (
+                <div style={{ background: '#fafafa', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '10px', fontWeight: '800', color: '#64748b' }}>CASH AMOUNT</label>
+                      <input 
+                        type="number"
+                        className="leh-input" 
+                        style={{ height: '36px', fontSize: '13px' }}
+                        value={reconcileMixedBreakdown.cash}
+                        onChange={(e) => {
+                          const cashVal = parseFloat(e.target.value) || 0;
+                          setReconcileMixedBreakdown({ ...reconcileMixedBreakdown, cash: cashVal, bank: Math.max(0, reconcileAmount - cashVal) });
+                        }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '10px', fontWeight: '800', color: '#64748b' }}>BANK / POS AMOUNT</label>
+                      <input 
+                        type="number"
+                        className="leh-input" 
+                        style={{ height: '36px', fontSize: '13px' }}
+                        value={reconcileMixedBreakdown.bank}
+                        onChange={(e) => {
+                          const bankVal = parseFloat(e.target.value) || 0;
+                          setReconcileMixedBreakdown({ ...reconcileMixedBreakdown, bank: bankVal, cash: Math.max(0, reconcileAmount - bankVal) });
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ marginTop: '8px', textAlign: 'right' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '800', color: Math.abs((reconcileMixedBreakdown.cash + reconcileMixedBreakdown.bank) - reconcileAmount) < 0.01 ? 'var(--leh-green)' : 'var(--leh-red)' }}>
+                      Total Mixed: ₦{(reconcileMixedBreakdown.cash + reconcileMixedBreakdown.bank).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '16px', marginTop: '24px' }}>
+                <button 
+                  type="button"
+                  className="btn-cancel-session" 
+                  style={{ flex: 1, height: '48px', borderRadius: '12px', border: '1px solid #e2e8f0' }}
+                  onClick={handleCloseReconcile}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button"
+                  className="btn-finalize" 
+                  style={{ flex: 2, height: '48px', borderRadius: '12px', marginTop: 0, padding: '0 20px', animation: 'none' }}
+                  disabled={isProcessing || reconcileAmount <= 0 || reconcileAmount > reconcileTx.balance_due || (reconcilePaymentMethod === 'Mixed' && Math.abs((reconcileMixedBreakdown.cash + reconcileMixedBreakdown.bank) - reconcileAmount) > 0.01)}
+                  onClick={handleReconcileSubmit}
+                >
+                  <div className="btn-finalize-inner">
+                    {isProcessing ? <RefreshCcw className="animate-spin" size={18} /> : <ShieldCheck size={18} />}
+                    <span>Finalize Settlement</span>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="billing-header">
         <div className="billing-title-section">
           <h1>New Billing</h1>
@@ -361,8 +622,11 @@ export const Billing: React.FC = () => {
         <button className={`billing-tab ${activeTab === 'inventory' ? 'active' : ''}`} onClick={() => setActiveTab('inventory')}>
           STANDARD BILLING
         </button>
+        <button className={`billing-tab ${activeTab === 'pending' ? 'active' : ''}`} onClick={() => setActiveTab('pending')}>
+          PENDING BILLS / DEBTS
+        </button>
         <button className={`billing-tab ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
-          CORPORATE / HMO BILLING
+          BILLING HISTORY
         </button>
       </div>
 
@@ -439,9 +703,12 @@ export const Billing: React.FC = () => {
                     {patientResults.length > 0 && (
                       <div className="search-results-popover">
                          {patientResults.map(p => (
-                           <div key={p.id} className="search-result-item" onClick={() => handlePatientSelect(p)}>
-                              <span style={{ fontWeight: '800' }}>{p.full_name}</span>
-                              <span style={{ color: '#3b82f6', fontSize: '11px' }}>#{p.id}</span>
+                           <div key={p.id} className="search-result-item" onClick={() => handlePatientSelect(p)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                 <span style={{ fontWeight: '800' }}>{p.full_name}</span>
+                                 {p.phone && <span style={{ color: '#64748b', fontSize: '10px', marginTop: '2px' }}>Tel: {p.phone}</span>}
+                              </div>
+                              <span style={{ color: '#3b82f6', fontSize: '11px', fontWeight: '800', whiteSpace: 'nowrap' }}>#{p.id}</span>
                            </div>
                          ))}
                       </div>
@@ -503,9 +770,9 @@ export const Billing: React.FC = () => {
                        <h3 className="panel-title" style={{ background: '#e2e8f0', padding: '4px 8px', borderRadius: '4px' }}>
                           <ShoppingCart size={16} /> Current Billing
                        </h3>
-                       {selectedPatient && (
-                          <span className="patient-pill">{selectedPatient.full_name.toUpperCase()}</span>
-                       )}
+                        {selectedPatient && (
+                           <span className="patient-pill">{(selectedPatient.full_name || '').toUpperCase()}</span>
+                        )}
                     </div>
                  </div>
                  
@@ -693,15 +960,108 @@ export const Billing: React.FC = () => {
                              </div>
                            )}
                         </button>
-                    </div>
+                     </div>
+                  </div>
+               </div>
+            </div>
+         </div>
+       ) : activeTab === 'pending' ? (
+         <div className="billing-main-grid" style={{ gridTemplateColumns: '1fr' }}>
+            <div className="billing-panel">
+               <div className="panel-header">
+                  <h3 className="panel-title"><Banknote size={18} /> Pending Bills & Debtors</h3>
+                  <span className="panel-badge">AWAITING SETTLEMENT</span>
+               </div>
+               
+               <div style={{ position: 'relative', marginBottom: '20px' }}>
+                  <Search style={{ position: 'absolute', left: '16px', top: '14px', color: '#9ca3af' }} size={18} />
+                  <input 
+                    type="text" 
+                    placeholder="Search pending bills by patient name, file number, or receipt..." 
+                    className="billing-search-input"
+                    style={{ paddingLeft: '48px', height: '48px', fontSize: '14px', width: '100%', boxSizing: 'border-box' }}
+                    value={pendingSearch}
+                    onChange={(e) => setPendingSearch(e.target.value)}
+                  />
+               </div>
+
+               {loadingPending ? (
+                 <div style={{ padding: '60px 0', textAlign: 'center' }}>
+                   <RefreshCcw className="animate-spin" size={32} style={{ margin: '0 auto 12px', color: 'var(--leh-primary)' }} />
+                   <p className="leh-label" style={{ fontWeight: '800' }}>Loading pending transactions...</p>
                  </div>
-              </div>
-           </div>
-        </div>
-      ) : (
-        <div className="billing-main-grid">
-           <div className="billing-panel" style={{ gridColumn: 'span 2' }}>
-              <h3 className="panel-title" style={{ marginBottom: '24px' }}>Corporate / HMO History</h3>
+               ) : (
+                 <div className="cart-table-container" style={{ maxHeight: '550px' }}>
+                   <table className="cart-table">
+                      <thead>
+                         <tr>
+                            <th>RECEIPT</th>
+                            <th>PATIENT</th>
+                            <th>FILE NUMBER</th>
+                            <th style={{ textAlign: 'center' }}>OUTSTANDING</th>
+                            <th>TOTAL BILLED</th>
+                            <th>PAID</th>
+                            <th>BALANCE DUE</th>
+                            <th style={{ textAlign: 'center' }}>ACTION</th>
+                         </tr>
+                      </thead>
+                      <tbody>
+                         {pendingBills
+                           .filter(tx => {
+                             const q = pendingSearch.toLowerCase();
+                             return (
+                               (tx.patient_name || '').toLowerCase().includes(q) ||
+                               (tx.file_no || '').toLowerCase().includes(q) ||
+                               (tx.receipt_no || '').toLowerCase().includes(q)
+                             );
+                           })
+                           .map(tx => (
+                             <tr key={tx.transaction_id}>
+                                <td style={{ fontWeight: '800', color: '#3b82f6' }}>{tx.receipt_no || `TX-${tx.transaction_id}`}</td>
+                                <td>
+                                   <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                     <span style={{ fontWeight: '800' }}>{tx.patient_name}</span>
+                                     <span style={{ fontSize: '11px', color: '#64748b' }}>{tx.phone || 'No phone'}</span>
+                                   </div>
+                                </td>
+                                <td><code>{tx.file_no}</code></td>
+                                <td style={{ textAlign: 'center' }}>
+                                   <span className={`leh-status-badge ${tx.days_outstanding > 30 ? 'red' : tx.days_outstanding > 7 ? 'amber' : 'blue'}`}>
+                                     {tx.days_outstanding} Days
+                                   </span>
+                                </td>
+                                <td>₦{tx.total_amount?.toLocaleString()}</td>
+                                <td style={{ color: '#10b981', fontWeight: '800' }}>₦{tx.amount_paid?.toLocaleString()}</td>
+                                <td style={{ color: '#ef4444', fontWeight: '800' }}>₦{tx.balance_due?.toLocaleString()}</td>
+                                <td style={{ textAlign: 'center' }}>
+                                   <button 
+                                     className="btn-print-receipt" 
+                                     style={{ padding: '6px 14px', height: 'auto', borderRadius: '8px', display: 'inline-flex', gap: '6px' }}
+                                     onClick={() => handleOpenReconcile(tx)}
+                                   >
+                                      <CreditCard size={14} /> Reconcile
+                                   </button>
+                                </td>
+                             </tr>
+                           ))
+                         }
+                         {pendingBills.length === 0 && (
+                           <tr>
+                             <td colSpan={8} style={{ textAlign: 'center', padding: '40px 0', color: '#64748b' }}>
+                               No pending bills found.
+                             </td>
+                           </tr>
+                         )}
+                      </tbody>
+                   </table>
+                 </div>
+               )}
+            </div>
+         </div>
+       ) : (
+         <div className="billing-main-grid">
+            <div className="billing-panel" style={{ gridColumn: 'span 2' }}>
+               <h3 className="panel-title" style={{ marginBottom: '24px' }}>Billing History</h3>
               <table className="cart-table">
                  <thead>
                     <tr>

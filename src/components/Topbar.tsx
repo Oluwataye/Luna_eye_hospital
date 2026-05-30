@@ -6,11 +6,12 @@ import { api } from '../api';
 import { NotificationPanel } from './NotificationPanel';
 import { LiveSearch } from './LiveSearch';
 import './Topbar.css';
+import { useAlert } from '../context/AlertContext';
 
 export const Topbar: React.FC = () => {
   const { user, logout } = useAuth();
+  const { alerts: notifications, sseConnected, unreadCount, markRead: handleMarkRead, deleteAlert: handleDelete, clearAllAlerts: handleClearAll } = useAlert();
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
   const [patients, setPatients] = useState<any[]>([]);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
@@ -24,25 +25,14 @@ export const Topbar: React.FC = () => {
     } catch (error) {}
   };
 
-  const fetchNotifications = async () => {
-    if (!user?.role) return;
-    try {
-      const data = await api.getNotifications(user.role);
-      setNotifications(data);
-    } catch (error) {}
-  };
-
   useEffect(() => {
-    fetchNotifications();
     fetchPatients();
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
-  }, [user?.role]);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       // Notification Panel handling
-      const notificationPanel = document.querySelector('.notification-panel-portal');
+      const notificationPanel = document.querySelector('.leh-notification-panel');
       if (notificationRef.current && !notificationRef.current.contains(event.target as Node) &&
           (!notificationPanel || !notificationPanel.contains(event.target as Node))) {
         setShowNotifications(false);
@@ -56,22 +46,13 @@ export const Topbar: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleMarkRead = async (id: number) => {
-    try {
-      await api.markNotificationAsRead(id);
-      setNotifications(notifications.map(n => n.id === id ? { ...n, is_read: 1 } : n));
-    } catch (error) {}
-  };
-
-  const unreadCount = notifications.filter(n => !n.is_read).length;
-
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
   return (
-    <header className="leh-topbar">
+    <header className="leh-topbar no-print">
       <div className="leh-topbar-left">
         {/* Branding removed per user request */}
         
@@ -97,11 +78,28 @@ export const Topbar: React.FC = () => {
       </div>
 
       <div className="leh-topbar-right">
-        <div className="leh-notification-wrapper" ref={notificationRef}>
+        <div className="leh-notification-wrapper" ref={notificationRef} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {!sseConnected && (
+            <span 
+              style={{
+                fontSize: '10px',
+                fontWeight: '900',
+                color: '#f59e0b',
+                background: '#fef3c7',
+                padding: '2px 8px',
+                borderRadius: '99px',
+                letterSpacing: '0.05em',
+                animation: 'pulse 2s infinite'
+              }}
+              title="Connection lost. Trying to reconnect..."
+            >
+              RECONNECTING...
+            </span>
+          )}
           <button 
             className={`leh-notification-trigger ${unreadCount > 0 ? 'pulse-bell' : ''}`}
             onClick={() => setShowNotifications(!showNotifications)}
-            data-tooltip={unreadCount > 0 ? `You have ${unreadCount} new notifications` : "No new notifications"}
+            data-tooltip={!sseConnected ? "Connection lost. Reconnecting..." : (unreadCount > 0 ? `You have ${unreadCount} new notifications` : "No new notifications")}
             data-tooltip-pos="bottom"
           >
             <Bell size={20} strokeWidth={2.5} />
@@ -112,6 +110,8 @@ export const Topbar: React.FC = () => {
             <NotificationPanel 
               notifications={notifications} 
               onMarkRead={handleMarkRead}
+              onDelete={handleDelete}
+              onClearAll={handleClearAll}
               onClose={() => setShowNotifications(false)}
               anchorRef={notificationRef}
             />

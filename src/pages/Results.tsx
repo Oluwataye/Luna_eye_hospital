@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FlaskConical, CheckCircle, FileText, Upload, Printer, Search, RefreshCw, Lock } from 'lucide-react';
+import { FlaskConical, CheckCircle, FileText, Printer, Search, RefreshCw, Lock } from 'lucide-react';
 import { api } from '../api';
 import { PrintInvestigation } from '../components/PrintInvestigation';
 import { useNotification } from '../context/NotificationContext';
@@ -13,6 +13,7 @@ export const Results: React.FC = () => {
   const [investigations, setInvestigations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [templates, setTemplates] = useState<any[]>([]);
 
   // Result entry state
   const [selectedInv, setSelectedInv] = useState<any>(null);
@@ -20,6 +21,12 @@ export const Results: React.FC = () => {
   const [testValue, setTestValue] = useState('');
   const [medicalComments, setMedicalComments] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    api.getInvestigationTemplates()
+      .then(data => setTemplates(data))
+      .catch(err => console.warn('Failed to load investigation templates:', err));
+  }, []);
 
   const loadInvestigations = () => {
     setLoading(true);
@@ -47,6 +54,15 @@ export const Results: React.FC = () => {
     setSelectedInv(null);
   }, [activeTab]);
 
+  const matchedTemplate = selectedInv ? templates.find(t => 
+    t.test_name.toLowerCase() === selectedInv.test_name.toLowerCase() ||
+    selectedInv.test_name.toLowerCase().includes(t.test_name.toLowerCase()) ||
+    t.test_name.toLowerCase().includes(selectedInv.test_name.toLowerCase())
+  ) : null;
+  
+  const displayUnit = selectedInv?.unit || matchedTemplate?.default_unit;
+  const displayRef = selectedInv?.reference_range || matchedTemplate?.default_reference_range;
+
   const handleSubmitResult = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedInv) return;
@@ -57,7 +73,9 @@ export const Results: React.FC = () => {
         results_notes: resultNotes, 
         test_value: testValue,
         medical_comments: medicalComments,
-        status: 'Completed' 
+        status: 'Completed',
+        unit: displayUnit || null,
+        reference_range: displayRef || null
       });
       notify('success', `Investigation results for ${selectedInv.patient_name} submitted`);
       setSelectedInv(null);
@@ -190,9 +208,24 @@ export const Results: React.FC = () => {
                     }}
                     onClick={() => {
                       setSelectedInv(inv);
-                      setResultNotes(inv.results_notes || '');
                       setTestValue(inv.test_value || '');
                       setMedicalComments(inv.medical_comments || '');
+                      
+                      // Look up matching template if results_notes is empty
+                      if (!inv.results_notes) {
+                        const matched = templates.find(t => 
+                          t.test_name.toLowerCase() === inv.test_name.toLowerCase() ||
+                          inv.test_name.toLowerCase().includes(t.test_name.toLowerCase()) ||
+                          t.test_name.toLowerCase().includes(inv.test_name.toLowerCase())
+                        );
+                        if (matched) {
+                          setResultNotes(matched.template_content || '');
+                        } else {
+                          setResultNotes('');
+                        }
+                      } else {
+                        setResultNotes(inv.results_notes);
+                      }
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
@@ -307,8 +340,8 @@ export const Results: React.FC = () => {
                     </div>
                   ) : activeTab === 'pending' ? (
                     <form onSubmit={handleSubmitResult} style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                      {selectedInv.unit && (
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: displayUnit ? '1fr 1fr' : '1fr', gap: '24px' }}>
+                        {displayUnit && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             <label className="leh-label" style={{ fontSize: '11px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px' }}>
                               TEST VALUE / RESULT
@@ -323,28 +356,28 @@ export const Results: React.FC = () => {
                                 placeholder="Numerical value..."
                               />
                               <span style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '12px', fontWeight: '800' }}>
-                                {selectedInv.unit}
+                                {displayUnit}
                               </span>
                             </div>
-                            {selectedInv.reference_range && (
-                              <span style={{ fontSize: '10px', color: '#64748b', marginLeft: '8px' }}>Ref Range: {selectedInv.reference_range}</span>
+                            {displayRef && (
+                              <span style={{ fontSize: '10px', color: '#64748b', marginLeft: '8px' }}>Ref Range: {displayRef}</span>
                             )}
                           </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            <label className="leh-label" style={{ fontSize: '11px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px' }}>
-                              MEDICAL COMMENTS
-                            </label>
-                            <input
-                              type="text"
-                              className="leh-input"
-                              value={medicalComments}
-                              onChange={(e) => setMedicalComments(e.target.value)}
-                              disabled={!(user?.role === 'Admin' || user?.role === 'Optometrist')}
-                              placeholder={user?.role === 'Admin' || user?.role === 'Optometrist' ? "E.g. High, Low, Normal..." : "Restricted to Clinicians (Optometrist / Admin)"}
-                            />
-                          </div>
+                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          <label className="leh-label" style={{ fontSize: '11px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px' }}>
+                            MEDICAL COMMENTS
+                          </label>
+                          <input
+                            type="text"
+                            className="leh-input"
+                            value={medicalComments}
+                            onChange={(e) => setMedicalComments(e.target.value)}
+                            disabled={!(user?.role === 'Admin' || user?.role === 'Optometrist')}
+                            placeholder={user?.role === 'Admin' || user?.role === 'Optometrist' ? "E.g. High, Low, Normal..." : "Restricted to Clinicians (Optometrist / Admin)"}
+                          />
                         </div>
-                      )}
+                      </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         <label className="leh-label" style={{ fontSize: '11px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px' }}>
@@ -360,39 +393,16 @@ export const Results: React.FC = () => {
                         ></textarea>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                         <div style={{ 
-                           padding: '40px', 
-                           border: '2px dashed #e2e8f0', 
-                           borderRadius: '24px', 
-                           background: '#f8fafc',
-                           display: 'flex',
-                           flexDirection: 'column',
-                           alignItems: 'center',
-                           justifyContent: 'center',
-                           textAlign: 'center',
-                           gap: '12px',
-                           cursor: 'pointer'
-                         }}>
-                           <div style={{ width: '48px', height: '48px', background: '#fff', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                             <Upload size={24} />
-                           </div>
-                           <div>
-                             <p className="leh-table-bold" style={{ fontSize: '13px', margin: 0 }}>Attach Scans / Imagery</p>
-                             <p className="leh-label" style={{ fontSize: '10px', margin: '4px 0 0' }}>DICOM, JPEG, PNG SUPPORTED</p>
-                           </div>
-                         </div>
-                         <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-                            <button 
-                              type="submit" 
-                              className="leh-btn-primary" 
-                              style={{ height: '72px', width: '100%', borderRadius: '20px', fontWeight: '800', fontSize: '14px' }} 
-                              disabled={isSubmitting}
-                            >
-                              {isSubmitting ? <RefreshCw className="animate-spin" size={20} style={{ marginRight: '12px' }} /> : <CheckCircle size={20} style={{ marginRight: '12px' }} />}
-                              FINALIZE & RELEASE RESULT
-                            </button>
-                         </div>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
+                             <button 
+                               type="submit" 
+                               className="leh-btn-primary" 
+                               style={{ height: '72px', width: '100%', borderRadius: '20px', fontWeight: '800', fontSize: '14px' }} 
+                               disabled={isSubmitting}
+                             >
+                               {isSubmitting ? <RefreshCw className="animate-spin" size={20} style={{ marginRight: '12px' }} /> : <CheckCircle size={20} style={{ marginRight: '12px' }} />}
+                               FINALIZE & RELEASE RESULT
+                             </button>
                       </div>
                     </form>
                   ) : (
@@ -411,19 +421,19 @@ export const Results: React.FC = () => {
                         </div>
                         <h3 className="leh-label" style={{ color: 'var(--leh-primary)', fontWeight: '800', letterSpacing: '0.2em', marginBottom: '32px' }}>CLINICAL DIAGNOSTIC REPORT</h3>
                         
-                        {selectedInv.unit && (
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '32px', padding: '24px', background: 'rgba(255,255,255,0.05)', borderRadius: '16px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: selectedInv.unit ? '1fr 1fr' : '1fr', gap: '24px', marginBottom: '32px', padding: '24px', background: 'rgba(255,255,255,0.05)', borderRadius: '16px' }}>
+                          {selectedInv.unit && (
                             <div>
                               <p className="leh-label" style={{ fontSize: '10px', color: '#94a3b8' }}>TEST VALUE / RESULT</p>
                               <p style={{ fontSize: '24px', fontWeight: '800', margin: '4px 0' }}>{selectedInv.test_value || 'N/A'} <span style={{ fontSize: '14px', color: 'var(--leh-primary)' }}>{selectedInv.unit}</span></p>
                               {selectedInv.reference_range && <p style={{ fontSize: '11px', color: '#64748b' }}>Ref: {selectedInv.reference_range}</p>}
                             </div>
-                            <div>
-                              <p className="leh-label" style={{ fontSize: '10px', color: '#94a3b8' }}>MEDICAL COMMENTS</p>
-                              <p style={{ fontSize: '16px', margin: '4px 0' }}>{selectedInv.medical_comments || 'None'}</p>
-                            </div>
+                          )}
+                          <div>
+                            <p className="leh-label" style={{ fontSize: '10px', color: '#94a3b8' }}>MEDICAL COMMENTS</p>
+                            <p style={{ fontSize: '16px', margin: '4px 0' }}>{selectedInv.medical_comments || 'None'}</p>
                           </div>
-                        )}
+                        </div>
 
                         <div style={{ fontSize: '16px', lineHeight: '2', opacity: 0.9, whiteSpace: 'pre-wrap', fontFamily: 'serif' }}>
                           {selectedInv.results_notes || 'No clinical notes provided for this investigation.'}

@@ -3,11 +3,11 @@ const path = require('path');
 const dbPath = path.resolve(__dirname, 'luna_eye_hospital.db');
 const db = new sqlite3.Database(dbPath);
 
-db.all('SELECT * FROM audit_logs ORDER BY id DESC LIMIT 10', [], (err, rows) => {
+db.all('SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 30', (err, rows) => {
   if (err) {
     console.error(err);
-    process.exit(1);
+  } else {
+    console.log(JSON.stringify(rows, null, 2));
   }
-  console.log(JSON.stringify(rows, null, 2));
   db.close();
 });

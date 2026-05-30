@@ -9,7 +9,7 @@ export const Breadcrumbs: React.FC = () => {
   if (pathnames.length === 0 || pathnames[0] === 'dashboard') return null;
 
   return (
-    <nav className="breadcrumbs" aria-label="breadcrumb">
+    <nav className="breadcrumbs no-print" aria-label="breadcrumb">
       <Link to="/dashboard" className="breadcrumb-item">
         <Home size={14} />
         <span>Dashboard</span>
