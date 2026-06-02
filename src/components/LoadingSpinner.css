@@ -1,0 +1,126 @@
+/* --- Custom EMR Eye-Branded Loading Spinner Animations (v2.5.0) --- */
+
+.leh-spinner-container {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.leh-spinner-container.button {
+  flex-direction: row;
+  gap: 8px;
+}
+
+.leh-spinner-graphic {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.leh-spinner-svg {
+  width: 100%;
+  height: 100%;
+  animation: leh-spin-clockwise 1.6s linear infinite;
+  filter: drop-shadow(0 0 6px rgba(37, 99, 235, 0.25));
+}
+
+/* Double drop shadow glow for larger widgets */
+.leh-spinner-container.large .leh-spinner-svg {
+  filter: drop-shadow(0 0 10px rgba(37, 99, 235, 0.35));
+}
+
+.leh-spinner-inner {
+  animation: leh-dash-offset 1.6s ease-in-out infinite;
+}
+
+.leh-spinner-core {
+  animation: leh-pulse-core 1.2s ease-in-out infinite alternate;
+  transform-origin: center;
+}
+
+.leh-spinner-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--leh-text-muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin: 0;
+  animation: leh-fade-pulse 1.5s ease-in-out infinite alternate;
+}
+
+.leh-spinner-container.small .leh-spinner-label {
+  font-size: 11px;
+}
+
+/* Fullscreen Glassmorphism Overlay Loading Backdrop */
+.leh-spinner-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(248, 250, 252, 0.75); /* Sleek translucent light background */
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  animation: leh-fade-in 0.3s ease-out;
+}
+
+/* Keyframe Animations */
+@keyframes leh-spin-clockwise {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes leh-dash-offset {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dashoffset: -40;
+  }
+  100% {
+    stroke-dashoffset: -120;
+  }
+}
+
+@keyframes leh-pulse-core {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.1);
+    opacity: 0.95;
+  }
+}
+
+@keyframes leh-fade-pulse {
+  0% {
+    opacity: 0.55;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes leh-fade-in {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(16px);
+  }
+}

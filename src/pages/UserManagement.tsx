@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  UserPlus, ShieldCheck, Key, Edit3, Search, Users, Shield, RefreshCcw, X, Trash2, Eye, EyeOff
+  UserPlus, ShieldCheck, Key, Edit3, Search, Users, Shield, X, Trash2, Eye, EyeOff
 } from 'lucide-react';
 import { api } from '../api';
 import { useNotification } from '../context/NotificationContext';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import { StatCard } from '../components/StatCard';
 
 export const UserManagement: React.FC = () => {
@@ -190,12 +191,7 @@ export const UserManagement: React.FC = () => {
             {loading ? (
               <tr>
                 <td colSpan={6} style={{ textAlign: 'center', padding: '80px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-                    <RefreshCcw size={40} className="animate-spin text-blue-500" />
-                    <p style={{ fontSize: '11px', fontWeight: '800', color: 'var(--leh-text-muted)', textTransform: 'uppercase' }}>
-                      Authenticating Registry...
-                    </p>
-                  </div>
+                  <LoadingSpinner size="large" label="Synchronizing Staff Registry..." />
                 </td>
               </tr>
             ) : filteredUsers.length === 0 ? (

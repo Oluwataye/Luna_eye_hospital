@@ -5,6 +5,7 @@ import { PrintInvestigation } from '../components/PrintInvestigation';
 import { useNotification } from '../context/NotificationContext';
 import { formatDateStandard } from '../utils/date';
 import { useAuth } from '../context/AuthContext';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 
 export const Results: React.FC = () => {
   const { user } = useAuth();
@@ -155,7 +156,7 @@ export const Results: React.FC = () => {
             data-tooltip="Refresh test queue"
             aria-label="Refresh investigations"
           >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            {loading ? <LoadingSpinner size="small" mode="button" /> : <RefreshCw size={14} />}
           </button>
         </div>
       </header>
@@ -179,7 +180,7 @@ export const Results: React.FC = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '600px', overflowY: 'auto', paddingRight: '4px' }}>
               {loading ? (
                 <div style={{ padding: '40px 0', textAlign: 'center' }}>
-                  <div className="leh-loading-spinner" style={{ margin: '0 auto' }}></div>
+                  <LoadingSpinner size="medium" label="Loading tests..." />
                 </div>
               ) : investigations.length === 0 ? (
                 <div style={{ padding: '40px 0', textAlign: 'center' }}>
@@ -400,8 +401,14 @@ export const Results: React.FC = () => {
                                style={{ height: '72px', width: '100%', borderRadius: '20px', fontWeight: '800', fontSize: '14px' }} 
                                disabled={isSubmitting}
                              >
-                               {isSubmitting ? <RefreshCw className="animate-spin" size={20} style={{ marginRight: '12px' }} /> : <CheckCircle size={20} style={{ marginRight: '12px' }} />}
-                               FINALIZE & RELEASE RESULT
+                               {isSubmitting ? (
+                                 <LoadingSpinner size="small" mode="button" label="Releasing findings..." color="white" />
+                               ) : (
+                                 <>
+                                   <CheckCircle size={20} style={{ marginRight: '12px' }} />
+                                   <span>FINALIZE & RELEASE RESULT</span>
+                                 </>
+                               )}
                              </button>
                       </div>
                     </form>

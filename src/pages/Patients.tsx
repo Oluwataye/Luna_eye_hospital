@@ -4,7 +4,6 @@ import {
   Search, 
   Eye, 
   Users,
-  RefreshCcw,
   CheckCircle,
   Phone,
   MapPin,
@@ -24,6 +23,7 @@ import { formatDateStandard } from '../utils/date';
 import { PatientStatus, StatusLabels } from '../constants/workflow';
 import { Modal } from '../components/Modal';
 import { Printer, ClipboardList, Info } from 'lucide-react';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 
 interface PatientsProps {
   view?: 'list' | 'profile' | 'checkin';
@@ -142,7 +142,7 @@ export const Patients: React.FC<PatientsProps> = ({ view: initialView = 'list' }
   if (initialView === 'profile') {
     if (viewLoading) return (
       <div className="leh-page-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '400px' }}>
-        <RefreshCcw size={40} className="animate-spin" style={{ color: 'var(--leh-primary)' }} />
+        <LoadingSpinner size="large" label="Resolving patient record..." />
       </div>
     );
     if (!currentPatient) return null;
@@ -508,7 +508,7 @@ export const Patients: React.FC<PatientsProps> = ({ view: initialView = 'list' }
   if (initialView === 'checkin') {
     if (viewLoading) return (
       <div className="leh-page-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '400px' }}>
-        <RefreshCcw size={40} className="animate-spin" style={{ color: 'var(--leh-primary)' }} />
+        <LoadingSpinner size="large" label="Resolving check-in options..." />
       </div>
     );
     if (!currentPatient) return null;
@@ -609,7 +609,7 @@ export const Patients: React.FC<PatientsProps> = ({ view: initialView = 'list' }
                   }}
                 >
                   <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: checkInLoading ? '#e2e8f0' : action.color, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    {isLoading ? <RefreshCcw size={24} className="animate-spin" /> : <Icon size={24} />}
+                    {isLoading ? <LoadingSpinner size="small" mode="button" color="white" /> : <Icon size={24} />}
                   </div>
                   <div style={{ flex: 1 }}>
                     <p style={{ fontSize: '16px', fontWeight: '900', color: checkInLoading ? 'var(--leh-text-muted)' : action.color, margin: '0 0 4px 0' }}>
@@ -686,10 +686,7 @@ export const Patients: React.FC<PatientsProps> = ({ view: initialView = 'list' }
             {loading ? (
               <tr>
                 <td colSpan={6} style={{ textAlign: 'center', padding: '100px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-                    <RefreshCcw size={40} className="animate-spin" style={{ color: 'var(--leh-primary)' }} />
-                    <p className="leh-label">Loading patient registry...</p>
-                  </div>
+                  <LoadingSpinner size="large" label="Loading clinical patient registry..." />
                 </td>
               </tr>
             ) : filteredPatients.length === 0 ? (

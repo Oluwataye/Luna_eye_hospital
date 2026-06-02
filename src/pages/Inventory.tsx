@@ -10,6 +10,7 @@ import { useNotification } from '../context/NotificationContext';
 import { formatDateStandard } from '../utils/date';
 import { StatCard } from '../components/StatCard';
 import { useAuth } from '../context/AuthContext';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 
 export const Inventory: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -737,7 +738,7 @@ export const Inventory: React.FC = () => {
             data-tooltip="Sync inventory stock levels"
             aria-label="Refresh stock"
           >
-            <RefreshCcw size={18} className={loading ? 'animate-spin' : ''} />
+            {loading ? <LoadingSpinner size="small" mode="button" /> : <RefreshCcw size={18} />}
           </button>
           {isAdmin && (
             <>
@@ -833,12 +834,7 @@ export const Inventory: React.FC = () => {
             {loading ? (
               <tr>
                 <td colSpan={7} style={{ textAlign: 'center', padding: '80px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-                    <RefreshCcw size={40} className="animate-spin text-blue-500" />
-                    <p style={{ fontSize: '11px', fontWeight: '800', color: 'var(--leh-text-muted)', textTransform: 'uppercase' }}>
-                      Synchronizing stock records...
-                    </p>
-                  </div>
+                  <LoadingSpinner size="large" label="Synchronizing stock records..." />
                 </td>
               </tr>
             ) : filteredItems.length === 0 ? (

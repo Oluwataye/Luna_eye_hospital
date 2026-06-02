@@ -24,6 +24,7 @@ import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { PatientStatus } from '../constants/workflow';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import './Triage.css';
 
 const VAInput = ({ placeholder, value, onChange }: any) => (
@@ -166,7 +167,7 @@ export const Triage: React.FC = () => {
             data-tooltip="Refresh patient clinical queue"
             aria-label="Refresh queue"
           >
-            <RefreshCcw size={18} className={loadingQueue ? 'animate-spin' : ''} />
+            {loadingQueue ? <LoadingSpinner size="small" mode="button" /> : <RefreshCcw size={18} />}
           </button>
         </div>
       </header>
@@ -218,7 +219,7 @@ export const Triage: React.FC = () => {
            <div className="custom-scrollbar" style={{ maxHeight: 'calc(100vh - 450px)', overflowY: 'auto' }}>
               {loadingQueue ? (
                 <div style={{ padding: '60px', textAlign: 'center' }}>
-                   <RefreshCcw size={32} className="animate-spin" style={{ color: 'var(--leh-primary)', opacity: 0.5 }} />
+                   <LoadingSpinner size="medium" label="Loading clinical queue..." />
                 </div>
               ) : triageQueue.length === 0 ? (
                 <div style={{ padding: '80px 40px', textAlign: 'center', opacity: 0.3 }}>
@@ -362,15 +363,21 @@ export const Triage: React.FC = () => {
                        </div>
 
                        <div style={{ marginTop: '32px', paddingTop: '24px', borderTop: '1px dashed #cbd5e1' }}>
-                          <button 
-                            className="leh-btn-primary" 
-                            style={{ width: '100%', height: '56px', background: 'var(--leh-green)', fontSize: '14px', fontWeight: '800' }}
-                            onClick={handleSave}
-                            disabled={isSaving}
-                          >
-                            {isSaving ? <RefreshCcw size={22} className="animate-spin" /> : <Save size={22} />}
-                            <span>{isSaving ? 'COMMITTING DATA...' : 'SUBMIT VITALS TO CONSULTANT'}</span>
-                          </button>
+                           <button 
+                             className="leh-btn-primary" 
+                             style={{ width: '100%', height: '56px', background: 'var(--leh-green)', fontSize: '14px', fontWeight: '800' }}
+                             onClick={handleSave}
+                             disabled={isSaving}
+                           >
+                             {isSaving ? (
+                               <LoadingSpinner size="small" mode="button" label="Committing data..." color="white" />
+                             ) : (
+                               <>
+                                 <Save size={22} style={{ marginRight: '12px' }} />
+                                 <span>SUBMIT VITALS TO CONSULTANT</span>
+                               </>
+                             )}
+                           </button>
                           <p style={{ textAlign: 'center', fontSize: '11px', color: 'var(--leh-text-light)', marginTop: '16px', fontWeight: '600' }}>
                              Submitting will move this patient to the Clinical Pool
                           </p>

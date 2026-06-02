@@ -5,6 +5,7 @@ import { api, API_BASE_URL } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { formatDateStandard } from '../utils/date';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 
 const actionTypes = [
   // Auth
@@ -718,7 +719,7 @@ export const Settings: React.FC = () => {
                     data-tooltip="Refresh security audit records"
                     aria-label="Refresh logs"
                   >
-                    <RefreshCw size={14} className={auditLoading ? 'animate-spin' : ''} />
+                    {auditLoading ? <LoadingSpinner size="small" mode="button" /> : <RefreshCw size={14} />}
                   </button>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px' }}>
@@ -800,7 +801,7 @@ export const Settings: React.FC = () => {
                       {auditLoading ? (
                         <tr>
                           <td colSpan={4} style={{ padding: '80px 0', textAlign: 'center' }}>
-                            <div className="leh-loading-spinner" style={{ margin: '0 auto' }}></div>
+                            <LoadingSpinner size="medium" label="Loading security audit trails..." />
                           </td>
                         </tr>
                       ) : auditLogs.length === 0 ? (

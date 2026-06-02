@@ -6,12 +6,12 @@ import {
   CheckCircle2,
   User,
   Shield,
-  Phone,
-  RefreshCcw
+  Phone
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useNotification } from '../context/NotificationContext';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 
 export const PatientRegistration: React.FC = () => {
   const navigate = useNavigate();
@@ -304,8 +304,14 @@ export const PatientRegistration: React.FC = () => {
               </button>
             ) : (
               <button type="submit" disabled={loading} className="leh-btn-primary" style={{ padding: '0 32px' }}>
-                {loading ? <RefreshCcw size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
-                <span>{loading ? 'Registering...' : 'Register Clinical Identity'}</span>
+                {loading ? (
+                  <LoadingSpinner size="small" mode="button" label="Registering..." color="white" />
+                ) : (
+                  <>
+                    <CheckCircle2 size={18} style={{ marginRight: '8px' }} />
+                    <span>Register Clinical Identity</span>
+                  </>
+                )}
               </button>
             )}
           </div>

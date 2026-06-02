@@ -6,13 +6,13 @@ import {
   Lock, 
   User, 
   AlertCircle, 
-  Loader2, 
   ShieldCheck, 
   Activity, 
   Sparkles,
   ArrowRight
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import './Login.css';
 
 export const Login: React.FC = () => {
@@ -183,7 +183,7 @@ export const Login: React.FC = () => {
                 disabled={isLoading}
               >
                 {isLoading ? (
-                   <Loader2 size={24} className="animate-spin" />
+                   <LoadingSpinner size="small" mode="button" label="Authenticating..." color="white" />
                 ) : (
                   <>
                     <span>Sign In to Terminal</span>

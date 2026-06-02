@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { User, Phone, Mail, Calendar, Shield, Save, Key, RefreshCw, BadgeCheck } from 'lucide-react';
+import { User, Phone, Mail, Calendar, Shield, Save, Key, BadgeCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api';
 import { useNotification } from '../context/NotificationContext';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 
 export const Profile: React.FC = () => {
   const { user, updateUserLocally } = useAuth();
@@ -242,8 +243,14 @@ export const Profile: React.FC = () => {
                   style={{ height: '56px', padding: '0 40px', fontWeight: '800' }} 
                   disabled={loading}
                 >
-                  {loading ? <RefreshCw className="animate-spin" size={20} style={{ marginRight: '10px' }} /> : <Save size={20} style={{ marginRight: '10px' }} />}
-                  {loading ? 'COMMITING...' : 'AUTHORIZE UPDATE'}
+                  {loading ? (
+                    <LoadingSpinner size="small" mode="button" label="Committing..." color="white" />
+                  ) : (
+                    <>
+                      <Save size={20} style={{ marginRight: '10px' }} />
+                      <span>AUTHORIZE UPDATE</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -302,8 +309,14 @@ export const Profile: React.FC = () => {
                   style={{ height: '56px', padding: '0 40px', fontWeight: '800', background: '#1e293b' }} 
                   disabled={loading}
                 >
-                  {loading ? <RefreshCw className="animate-spin" size={20} style={{ marginRight: '10px' }} /> : <Key size={20} style={{ marginRight: '10px' }} />}
-                  {loading ? 'RE-ENCRYPTING...' : 'ROTATE CREDENTIALS'}
+                  {loading ? (
+                    <LoadingSpinner size="small" mode="button" label="Re-encrypting..." color="white" />
+                  ) : (
+                    <>
+                      <Key size={20} style={{ marginRight: '10px' }} />
+                      <span>ROTATE CREDENTIALS</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

@@ -8,6 +8,7 @@ import { NairaIcon } from '../components/NairaIcon';
 import { formatDateStandard } from '../utils/date';
 import { api } from '../api';
 import { useNotification } from '../context/NotificationContext';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 
 type ReportTab = 
   | 'inventory' | 'sales' | 'profit_loss' | 'patients' 
@@ -902,8 +903,7 @@ export const Reports: React.FC = () => {
           <div className="leh-table-card">
             {loading ? (
               <div style={{ padding: '100px 0', textAlign: 'center' }}>
-                <div className="leh-loading-spinner" style={{ margin: '0 auto 24px' }}></div>
-                <p className="leh-label" style={{ fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.2em', fontSize: '11px', color: 'var(--leh-primary)' }}>Synchronizing Clinical Telemetry...</p>
+                <LoadingSpinner size="large" label="Synchronizing Clinical Telemetry..." />
               </div>
             ) : (
               <div className="leh-table-container">
