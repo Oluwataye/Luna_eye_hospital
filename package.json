@@ -3,12 +3,16 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "cross-env NODE_OPTIONS=--max-old-space-size=4096 tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "setup:network": "node scripts/network-setup.cjs"
+    "setup:network": "node scripts/network-setup.cjs",
+    "electron:start": "electron .",
+    "electron:build-exe": "npm run build && cd server && npm run build && cd .. && npx pkg -t node18-win-x64 -o packaged-release/VisionCare-EMR.exe server/package.json",
+    "electron:build": "npm run electron:build-exe && electron-builder"
   },
   "dependencies": {
     "lucide-react": "^1.14.0",
@@ -24,6 +28,8 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "cross-env": "^10.1.0",
+    "electron": "^42.3.3",
+    "electron-builder": "^26.8.1",
     "eslint": "^10.2.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",

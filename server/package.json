@@ -1,13 +1,22 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "bin": "dist/index.js",
   "scripts": {
     "start": "node dist/index.js",
     "build": "tsc",
     "dev": "tsx watch index.ts"
   },
   "keywords": [],
+  "pkg": {
+    "assets": [
+      "../dist/**/*"
+    ],
+    "targets": [
+      "node18-win-x64"
+    ]
+  },
   "author": "",
   "license": "ISC",
   "description": "",

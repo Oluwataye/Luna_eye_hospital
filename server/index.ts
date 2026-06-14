@@ -7,6 +7,8 @@ import bcrypt from 'bcryptjs';
 import fs from 'fs';
 import path from 'path';
 const serverRootDir = __dirname.includes('dist') ? path.join(__dirname, '..') : __dirname;
+const isPackaged = typeof (process as any).pkg !== 'undefined';
+const writableRootDir = isPackaged ? path.dirname(process.execPath) : serverRootDir;
 import multer from 'multer';
 import dgram from 'dgram';
 import os from 'os';
@@ -106,7 +108,8 @@ const notify = (user_role: string, message: string, module: string, patient_id: 
 };
 
 // Database file path
-const dbPath = path.resolve(serverRootDir, 'luna_eye_hospital.db');
+const dbPath = path.resolve(writableRootDir, 'luna_eye_hospital.db');
+console.log(`[SERVER] Using database path: ${dbPath}`);
 
 // ── SQLITE_BUSY retry helper ──
 // Wraps db.run with exponential backoff retries on SQLITE_BUSY / SQLITE_LOCKED
@@ -128,6 +131,8 @@ const dbRun = (sql: string, params: any[] = [], retries = 0): Promise<any> => ne
 // ── CORS ──
 const ENV_LAN_IP = process.env.LAN_IP || '';
 const allowedOrigins = [
+  'http://localhost',
+  'http://127.0.0.1',
   'http://localhost:3200',
   'http://127.0.0.1:3200',
   'http://localhost:5173',
@@ -139,8 +144,8 @@ const allowedOrigins = [
 ];
 const corsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    // Allow requests with no origin (same-origin, mobile, curl)
-    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    // Allow requests with no origin (same-origin, mobile, curl) or localhost with any port
+    if (!origin || allowedOrigins.includes(origin) || /^http:\/\/localhost(:\d+)?$/.test(origin) || /^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return callback(null, true);
     console.warn(`[CORS] Rejected origin: ${origin}`);
     callback(null, false);
   },
@@ -312,6 +317,7 @@ const sanitizeInput = (req: Request, res: Response, next: NextFunction) => {
 // ── Apply global middleware ──
 // Secure Helmet CSP configuration permitting local SPA behavior
 app.use(helmet({
+  hsts: false, // Disable HSTS to prevent forcing HTTPS on local/LAN HTTP connections
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
@@ -319,7 +325,8 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:", "https://cdnjs.cloudflare.com"],
-      connectSrc: ["'self'", "ws:", "http://localhost:3200", "http://127.0.0.1:3200"]
+      connectSrc: ["'self'", "ws:", "http://localhost:3200", "http://127.0.0.1:3200"],
+      upgradeInsecureRequests: null // Disable auto-upgrading HTTP requests to HTTPS
     }
   }
 }));
@@ -390,7 +397,12 @@ const authorizeRoles = (allowedRoles: string[]) => {
 app.use('/api', authMiddleware);
 
 // 2. Lock down administrative/financial groups to Admin role only
-app.use('/api/reports', authorizeRoles(['Admin']));
+app.use('/api/reports', (req, res, next) => {
+  if (req.originalUrl.split('?')[0] === '/api/reports/debtors/details') {
+    return authorizeRoles(['Admin', 'Receptionist'])(req, res, next);
+  }
+  return authorizeRoles(['Admin'])(req, res, next);
+});
 app.use('/api/reprints', authorizeRoles(['Admin']));
 app.use('/api/backups', authorizeRoles(['Admin']));
 app.use('/api/restore', authorizeRoles(['Admin']));
@@ -942,6 +954,74 @@ apiRouter.get('/triage-queue', (req, res) => {
   });
 });
 
+// GET triage stats — average wait time, completed triages today, and urgent cases today
+apiRouter.get('/triage-stats', (req, res) => {
+  const queries = {
+    triagedToday: `
+      SELECT COUNT(*) as count 
+      FROM triage 
+      WHERE date(created_at, 'localtime') = date('now', 'localtime')
+    `,
+    urgentCases: `
+      SELECT COUNT(*) as count 
+      FROM triage 
+      WHERE date(created_at, 'localtime') = date('now', 'localtime')
+        AND (
+          (CAST(bp_systolic AS INTEGER) >= 140 AND bp_systolic <> '') OR 
+          (CAST(bp_diastolic AS INTEGER) >= 90 AND bp_diastolic <> '') OR 
+          (CAST(temperature AS REAL) >= 38.0 AND temperature <> '') OR 
+          (CAST(pulse_rate AS INTEGER) >= 100 AND pulse_rate <> '') OR 
+          (CAST(pulse_rate AS INTEGER) <= 50 AND pulse_rate <> '')
+        )
+    `,
+    todayWait: `
+      SELECT COALESCE(AVG(strftime('%s', t.created_at) - strftime('%s', v.visit_date)), 0) as avg_wait
+      FROM triage t
+      JOIN visits v ON t.visit_id = v.id
+      WHERE date(v.visit_date, 'localtime') = date('now', 'localtime')
+        AND (strftime('%s', t.created_at) - strftime('%s', v.visit_date)) < 86400
+        AND (strftime('%s', t.created_at) - strftime('%s', v.visit_date)) >= 0
+    `,
+    allTimeWait: `
+      SELECT COALESCE(AVG(strftime('%s', t.created_at) - strftime('%s', v.visit_date)), 0) as avg_wait
+      FROM triage t
+      JOIN visits v ON t.visit_id = v.id
+      WHERE (strftime('%s', t.created_at) - strftime('%s', v.visit_date)) < 86400
+        AND (strftime('%s', t.created_at) - strftime('%s', v.visit_date)) >= 0
+    `
+  };
+
+  db.get(queries.triagedToday, [], (err1, rToday: any) => {
+    if (err1) return res.status(500).json({ error: err1.message });
+    
+    db.get(queries.urgentCases, [], (err2, rUrgent: any) => {
+      if (err2) return res.status(500).json({ error: err2.message });
+      
+      db.get(queries.todayWait, [], (err3, rTodayWait: any) => {
+        if (err3) return res.status(500).json({ error: err3.message });
+        
+        const sendResponse = (avgWaitSeconds: number) => {
+          const waitMins = Math.round(avgWaitSeconds / 60);
+          res.json({
+            triagedToday: rToday.count,
+            urgentCases: rUrgent.count,
+            avgWaitTime: `${waitMins}m`
+          });
+        };
+
+        if (rTodayWait.avg_wait > 0) {
+          sendResponse(rTodayWait.avg_wait);
+        } else {
+          db.get(queries.allTimeWait, [], (err4, rAllWait: any) => {
+            if (err4) return res.status(500).json({ error: err4.message });
+            sendResponse(rAllWait ? rAllWait.avg_wait : 0);
+          });
+        }
+      });
+    });
+  });
+});
+
 // GET consultation queue — all patients ready for clinician review or currently being seen
 apiRouter.get('/consultation-queue', (req, res) => {
   db.all(`
@@ -1224,7 +1304,14 @@ app.post('/api/transactions', authorizeRoles(['Admin', 'Receptionist']), (req, r
       const transactionId = this.lastID;
       
       const itemStmt = db.prepare('INSERT INTO transaction_items (transaction_id, inventory_id, description, qty, unit_price) VALUES (?, ?, ?, ?, ?)');
-      const invStmt = db.prepare('UPDATE inventory SET stock = stock - ? WHERE id = ? AND stock >= ?');
+      const invStmt = db.prepare(`
+        UPDATE inventory 
+        SET stock = CASE 
+          WHEN category IN ('Test', 'Laboratory', 'lab test', 'diagnostic') THEN stock
+          ELSE stock - ? 
+        END
+        WHERE id = ? AND (stock >= ? OR category IN ('Test', 'Laboratory', 'lab test', 'diagnostic'))
+      `);
       
       let errorOccurred = false;
       let pending = items.length;
@@ -2070,16 +2157,26 @@ app.get('/api/transactions/:id/items', (req, res) => {
 });
 
 app.get('/api/reports/sales', validateRequest({ query: RequiredReportQuerySchema }), (req, res) => {
-  const { start_date, end_date, limit, offset } = req.sanitizedQuery;
+  const { start_date, end_date, limit, offset, cashier } = req.sanitizedQuery;
   
-  db.all(`
+  let sql = `
     SELECT t.*, p.full_name as patient_name, p.id as file_no, t.cashier as cashier_name,
            (SELECT GROUP_CONCAT(description, ', ') FROM transaction_items WHERE transaction_id = t.id) as items_summary
     FROM transactions t
     LEFT JOIN patients p ON t.patient_id = p.id
     WHERE date(t.created_at) BETWEEN ? AND ?
-    ORDER BY t.created_at DESC LIMIT ? OFFSET ?
-  `, [start_date, end_date, limit, offset], (err, rows) => {
+  `;
+  const params: any[] = [start_date, end_date];
+  
+  if (cashier) {
+    sql += ` AND t.cashier = ?`;
+    params.push(cashier);
+  }
+  
+  sql += ` ORDER BY t.created_at DESC LIMIT ? OFFSET ?`;
+  params.push(limit, offset);
+  
+  db.all(sql, params, (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
   });
@@ -2088,12 +2185,15 @@ app.get('/api/reports/sales', validateRequest({ query: RequiredReportQuerySchema
 // Patient Debtors Report (Detailed)
 app.get('/api/reports/debtors/details', (req, res) => {
   const sql = `
-    SELECT t.id as transaction_id, t.receipt_no, p.id as file_no, p.full_name as patient_name, p.phone, 
+    SELECT t.id as transaction_id, t.receipt_no, 
+           COALESCE(p.id, t.patient_id) as file_no, 
+           COALESCE(p.full_name, 'Unregistered / Walk-in Patient') as patient_name, 
+           COALESCE(p.phone, 'N/A') as phone, 
            date(t.created_at) as visit_date, t.total_amount, t.amount_paid, t.discount,
            (t.total_amount - t.amount_paid - t.discount) as balance_due,
            CAST((julianday('now') - julianday(t.created_at)) AS INTEGER) as days_outstanding
     FROM transactions t
-    JOIN patients p ON t.patient_id = p.id
+    LEFT JOIN patients p ON t.patient_id = p.id
     WHERE (t.total_amount - t.amount_paid - t.discount) > 0
     ORDER BY days_outstanding DESC
   `;
@@ -2449,7 +2549,7 @@ app.get('/api/backups', (req, res) => {
 app.post('/api/backups', (req, res) => {
   const { performed_by } = req.sanitizedBody;
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const backupDir = path.join(serverRootDir, 'backups_history');
+  const backupDir = path.join(writableRootDir, 'backups_history');
   if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir);
   
   const filename = `backup_${timestamp}.sqlite`;
@@ -2471,7 +2571,7 @@ app.post('/api/backups', (req, res) => {
 
 // Restore Logic
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, serverRootDir),
+  destination: (req, file, cb) => cb(null, writableRootDir),
   filename: (req, file, cb) => cb(null, 'database_restore.sqlite')
 });
 const upload = multer({ storage });
@@ -2479,7 +2579,7 @@ const upload = multer({ storage });
 app.post('/api/restore', upload.single('backup'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   
-  const restorePath = path.join(serverRootDir, 'database_restore.sqlite');
+  const restorePath = path.join(writableRootDir, 'database_restore.sqlite');
   
   // Close DB connection, replace file, and restart
   db.close((err) => {
@@ -2499,7 +2599,7 @@ app.post('/api/restore', upload.single('backup'), (req, res) => {
 // CRON: Automatic backup daily at midnight
 cron.schedule('0 0 * * *', () => {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const backupDir = path.join(serverRootDir, 'backups_history');
+  const backupDir = path.join(writableRootDir, 'backups_history');
   if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir);
   const filename = `auto_backup_${timestamp}.sqlite`;
   fs.copyFileSync(dbPath, path.join(backupDir, filename));

@@ -56,3 +56,11 @@ server/read_*.cjs
 server/search_*.cjs
 server/test_*.cjs
 server/test_verify.js
+
+# Desktop & Electron build/log artifacts
+packaged-release/
+electron-dist/
+emr_run_log.txt
+test_env_out.txt
+test-launch.bat
+*.backup

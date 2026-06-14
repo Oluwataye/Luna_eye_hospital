@@ -104,14 +104,41 @@ export const Billing: React.FC = () => {
   const fetchCatalog = async () => {
     try {
       const [services, inventory] = await Promise.all([api.getServices(), api.getInventory()]);
-      setCatalog([
+      const fullCatalog = [
         ...services.map((s: any) => ({ ...s, type: 'service', identifier: s.id })),
         ...inventory.map((i: any) => ({ ...i, type: 'product', identifier: i.id }))
-      ]);
+      ];
+      setCatalog(fullCatalog);
+
+      // Auto-select item from URL query parameter (e.g. auto_select=Registration)
+      const autoSelect = searchParams.get('auto_select') || searchParams.get('autoSelect');
+      if (autoSelect) {
+        const itemToSelect = fullCatalog.find(
+          (item: any) => item.name.toLowerCase() === autoSelect.toLowerCase()
+        );
+        if (itemToSelect) {
+          setCart(prevCart => {
+            const existingIdx = prevCart.findIndex(c => c.identifier === itemToSelect.identifier && c.type === itemToSelect.type);
+            if (existingIdx >= 0) {
+              const newCart = [...prevCart];
+              newCart[existingIdx].qty += 1;
+              return newCart;
+            } else {
+              return [...prevCart, { 
+                ...itemToSelect, 
+                qty: 1, 
+                unit_price: itemToSelect.price,
+                description: itemToSelect.name
+              }];
+            }
+          });
+        }
+      }
     } catch (err) {
       notify('error', 'Catalog Synchronization Failure');
     }
   };
+
 
 
   // Live Patient Search

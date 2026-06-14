@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Truck, ShoppingBag, Plus, FileText, 
   Users, Loader2, Printer, Search, RefreshCw, ChevronRight, Package, ShieldCheck, X, Filter, ChevronLeft, CreditCard, Box, MessageSquare, Briefcase, Save
 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { NairaIcon } from '../components/NairaIcon';
 import { api } from '../api';
 import { useNotification } from '../context/NotificationContext';
@@ -15,11 +16,37 @@ export const Procurement: React.FC = () => {
   const [procurements, setProcurements] = useState<any[]>([]);
   const [stats, setStats] = useState<any>({ total_procured: 0, total_payables: 0, total_suppliers: 0, po_this_month: 0 });
   
-  // Search & Filter State
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  // Navigation & Pagination States
+  const [activeTab, setActiveTab] = useState<'procurements' | 'suppliers'>(
+    (searchParams.get('tab') as 'procurements' | 'suppliers') || 'procurements'
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
+  const [supplierCurrentPage, setSupplierCurrentPage] = useState(1);
   const rowsPerPage = 20;
+
+  // Sync activeTab state with searchParams
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'suppliers' || tab === 'procurements') {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (tab: 'procurements' | 'suppliers') => {
+    setSearchParams({ tab });
+  };
+
+  // Reset pagination/search when switching tabs
+  useEffect(() => {
+    setSearchQuery('');
+    setCurrentPage(1);
+    setSupplierCurrentPage(1);
+  }, [activeTab]);
 
   // Modals
   const [showSupplierModal, setShowSupplierModal] = useState(false);
@@ -129,9 +156,24 @@ export const Procurement: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
+  // Supplier Filtering Logic
+  const filteredSuppliers = suppliers.filter(s => {
+    return (
+      s.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.contact_person?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.phone?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.address?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  });
+
   // Pagination Logic
   const totalPages = Math.ceil(filteredData.length / rowsPerPage);
   const paginatedData = filteredData.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+
+  // Supplier Pagination Logic
+  const supplierTotalPages = Math.ceil(filteredSuppliers.length / rowsPerPage);
+  const paginatedSuppliers = filteredSuppliers.slice((supplierCurrentPage - 1) * rowsPerPage, supplierCurrentPage * rowsPerPage);
 
   const currentTotal = procForm.quantity_received * procForm.unit_cost;
   const currentBalance = currentTotal - procForm.amount_paid;
@@ -204,13 +246,26 @@ export const Procurement: React.FC = () => {
           <span className="leh-stat-value">₦{stats.total_payables?.toLocaleString()}</span>
           <div className="leh-stat-bottom">Outstanding balances to suppliers</div>
         </div>
-        <div className="leh-stat-card green">
+        <div 
+          className="leh-stat-card green" 
+          onClick={() => {
+            handleTabChange('suppliers');
+            setTimeout(() => {
+              tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+          }} 
+          style={{ cursor: 'pointer', transition: 'transform 0.2s', userSelect: 'none' }}
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-4px)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+        >
           <div className="leh-stat-card-top">
             <span className="leh-stat-title">Active Suppliers</span>
             <div className="leh-stat-icon-box"><Users /></div>
           </div>
           <span className="leh-stat-value">{stats.total_suppliers}</span>
-          <div className="leh-stat-bottom">Registered supply chain partners</div>
+          <div className="leh-stat-bottom" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            Registered supply chain partners <ChevronRight size={12} />
+          </div>
         </div>
         <div className="leh-stat-card amber">
           <div className="leh-stat-card-top">
@@ -222,6 +277,46 @@ export const Procurement: React.FC = () => {
         </div>
       </div>
 
+      {/* Tabs Switcher */}
+      <div ref={tableRef} className="leh-table-card" style={{ padding: '8px', marginBottom: '24px', maxWidth: '420px' }}>
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <button 
+            type="button"
+            onClick={() => handleTabChange('procurements')}
+            style={{ 
+              flex: 1, 
+              padding: '12px', 
+              borderRadius: '10px', 
+              border: 'none', 
+              background: activeTab === 'procurements' ? 'var(--leh-primary-light)' : 'transparent', 
+              color: activeTab === 'procurements' ? 'var(--leh-primary)' : 'var(--leh-text-grey)', 
+              fontWeight: '800', 
+              fontSize: '13px', 
+              cursor: 'pointer' 
+            }}
+          >
+            PROCUREMENT REGISTRY
+          </button>
+          <button 
+            type="button"
+            onClick={() => handleTabChange('suppliers')}
+            style={{ 
+              flex: 1, 
+              padding: '12px', 
+              borderRadius: '10px', 
+              border: 'none', 
+              background: activeTab === 'suppliers' ? 'var(--leh-primary-light)' : 'transparent', 
+              color: activeTab === 'suppliers' ? 'var(--leh-primary)' : 'var(--leh-text-grey)', 
+              fontWeight: '800', 
+              fontSize: '13px', 
+              cursor: 'pointer' 
+            }}
+          >
+            SUPPLIER REGISTRY
+          </button>
+        </div>
+      </div>
+
       {/* Filter & Search Bar */}
       <div className="leh-table-card" style={{ padding: '20px', marginBottom: '24px' }}>
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
@@ -229,7 +324,7 @@ export const Procurement: React.FC = () => {
             <Search className="leh-search-icon" size={18} />
             <input 
               type="text" 
-              placeholder="Search by Item, Supplier, or Invoice #..." 
+              placeholder={activeTab === 'procurements' ? "Search by Item, Supplier, or Invoice #..." : "Search by Company Name, Contact, or Email..."} 
               className="leh-search-input"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -240,144 +335,269 @@ export const Procurement: React.FC = () => {
               </button>
             )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '200px' }}>
-            <Filter size={16} style={{ color: 'var(--leh-text-grey)' }} />
-            <select 
-              className="leh-search-input" 
-              style={{ padding: '8px 12px' }}
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="All">All Statuses</option>
-              <option value="Paid">Paid</option>
-              <option value="Partial">Partial</option>
-              <option value="Unpaid">Unpaid</option>
-            </select>
-          </div>
+          {activeTab === 'procurements' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '200px' }}>
+              <Filter size={16} style={{ color: 'var(--leh-text-grey)' }} />
+              <select 
+                className="leh-search-input" 
+                style={{ padding: '8px 12px' }}
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="All">All Statuses</option>
+                <option value="Paid">Paid</option>
+                <option value="Partial">Partial</option>
+                <option value="Unpaid">Unpaid</option>
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Main Data Table */}
-      <div className="leh-table-card">
-        <div className="leh-table-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 className="leh-table-title">Procurement Registry</h3>
-          <div style={{ display: 'flex', gap: '8px' }}>
-             <button 
-               className="leh-refresh-btn" 
-               onClick={() => window.print()} 
-               data-tooltip="Print Procurement Registry"
-               aria-label="Print registry"
-             >
-               <Printer size={14} />
-             </button>
-             <button 
-               className="leh-refresh-btn" 
-               onClick={fetchData} 
-               data-tooltip="Refresh procurement records"
-               aria-label="Refresh records"
-             >
-               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-             </button>
-          </div>
-        </div>
-        <div className="leh-table-wrapper">
-          <table className="leh-table">
-            <thead>
-              <tr>
-                <th style={{ paddingLeft: '32px' }}>Date</th>
-                <th>Supplier</th>
-                <th>Item Description</th>
-                <th>Qty</th>
-                <th>Unit Cost</th>
-                <th>Total</th>
-                <th>Paid</th>
-                <th>Balance</th>
-                <th>Status</th>
-                <th style={{ paddingRight: '32px', textAlign: 'right' }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedData.length === 0 ? (
-                <tr>
-                  <td colSpan={10} style={{ textAlign: 'center', padding: '48px', color: 'var(--leh-text-grey)' }}>
-                    No procurement records found matching your criteria.
-                  </td>
-                </tr>
-              ) : (
-                paginatedData.map(p => (
-                  <tr key={p.id}>
-                    <td style={{ paddingLeft: '32px' }} className="leh-label">
-                      {formatDateStandard(p.purchase_date)}
-                    </td>
-                    <td className="leh-table-bold">{p.supplier_name}</td>
-                    <td className="leh-table-bold" style={{ color: 'var(--leh-primary)' }}>{p.item_name}</td>
-                    <td>{p.quantity_received}</td>
-                    <td>₦{p.unit_cost?.toLocaleString()}</td>
-                    <td className="font-bold">₦{p.total_cost?.toLocaleString()}</td>
-                    <td style={{ color: 'var(--leh-success)' }}>₦{p.amount_paid?.toLocaleString()}</td>
-                    <td style={{ color: 'var(--leh-red)', fontWeight: 700 }}>₦{p.balance?.toLocaleString()}</td>
-                    <td>
-                      <span className={`leh-badge ${p.status === 'Paid' ? 'leh-badge-green' : p.status === 'Partial' ? 'leh-badge-amber' : 'leh-badge-red'}`}>
-                        {p.status?.toUpperCase()}
-                      </span>
-                    </td>
-                    <td style={{ paddingRight: '32px', textAlign: 'right' }}>
-                      <button className="leh-refresh-btn" style={{ marginLeft: 'auto' }}>
-                        <ChevronRight size={14} />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination Footer */}
-        {totalPages > 1 && (
-          <div style={{ padding: '16px 32px', borderTop: '1px solid var(--leh-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '13px', color: 'var(--leh-text-grey)' }}>
-              Showing {((currentPage - 1) * rowsPerPage) + 1} to {Math.min(currentPage * rowsPerPage, filteredData.length)} of {filteredData.length} records
-            </span>
+      {activeTab === 'procurements' ? (
+        <div className="leh-table-card">
+          <div className="leh-table-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 className="leh-table-title">Procurement Registry</h3>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button 
-                className="leh-refresh-btn" 
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(p => p - 1)}
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(num => (
-                  <button 
-                    key={num}
-                    onClick={() => setCurrentPage(num)}
-                    style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      background: currentPage === num ? 'var(--leh-primary)' : 'transparent',
-                      color: currentPage === num ? 'white' : 'var(--leh-text-grey)',
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {num}
-                  </button>
-                ))}
-              </div>
-              <button 
-                className="leh-refresh-btn" 
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage(p => p + 1)}
-              >
-                <ChevronRight size={16} />
-              </button>
+               <button 
+                 className="leh-refresh-btn" 
+                 onClick={() => window.print()} 
+                 data-tooltip="Print Procurement Registry"
+                 aria-label="Print registry"
+               >
+                 <Printer size={14} />
+               </button>
+               <button 
+                 className="leh-refresh-btn" 
+                 onClick={fetchData} 
+                 data-tooltip="Refresh procurement records"
+                 aria-label="Refresh records"
+               >
+                 <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+               </button>
             </div>
           </div>
-        )}
-      </div>
+          <div className="leh-table-wrapper">
+            <table className="leh-table">
+              <thead>
+                <tr>
+                  <th style={{ paddingLeft: '32px' }}>Date</th>
+                  <th>Supplier</th>
+                  <th>Item Description</th>
+                  <th>Qty</th>
+                  <th>Unit Cost</th>
+                  <th>Total</th>
+                  <th>Paid</th>
+                  <th>Balance</th>
+                  <th>Status</th>
+                  <th style={{ paddingRight: '32px', textAlign: 'right' }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedData.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} style={{ textAlign: 'center', padding: '48px', color: 'var(--leh-text-grey)' }}>
+                      No procurement records found matching your criteria.
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedData.map(p => (
+                    <tr key={p.id}>
+                      <td style={{ paddingLeft: '32px' }} className="leh-label">
+                        {formatDateStandard(p.purchase_date)}
+                      </td>
+                      <td className="leh-table-bold">{p.supplier_name}</td>
+                      <td className="leh-table-bold" style={{ color: 'var(--leh-primary)' }}>{p.item_name}</td>
+                      <td>{p.quantity_received}</td>
+                      <td>₦{p.unit_cost?.toLocaleString()}</td>
+                      <td className="font-bold">₦{p.total_cost?.toLocaleString()}</td>
+                      <td style={{ color: 'var(--leh-success)' }}>₦{p.amount_paid?.toLocaleString()}</td>
+                      <td style={{ color: 'var(--leh-red)', fontWeight: 700 }}>₦{p.balance?.toLocaleString()}</td>
+                      <td>
+                        <span className={`leh-badge ${p.status === 'Paid' ? 'leh-badge-green' : p.status === 'Partial' ? 'leh-badge-amber' : 'leh-badge-red'}`}>
+                          {p.status?.toUpperCase()}
+                        </span>
+                      </td>
+                      <td style={{ paddingRight: '32px', textAlign: 'right' }}>
+                        <button className="leh-refresh-btn" style={{ marginLeft: 'auto' }}>
+                          <ChevronRight size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination Footer */}
+          {totalPages > 1 && (
+            <div style={{ padding: '16px 32px', borderTop: '1px solid var(--leh-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', color: 'var(--leh-text-grey)' }}>
+                Showing {((currentPage - 1) * rowsPerPage) + 1} to {Math.min(currentPage * rowsPerPage, filteredData.length)} of {filteredData.length} records
+              </span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button 
+                  className="leh-refresh-btn" 
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(p => p - 1)}
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(num => (
+                    <button 
+                      key={num}
+                      onClick={() => setCurrentPage(num)}
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: currentPage === num ? 'var(--leh-primary)' : 'transparent',
+                        color: currentPage === num ? 'white' : 'var(--leh-text-grey)',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+                <button 
+                  className="leh-refresh-btn" 
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(p => p + 1)}
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="leh-table-card">
+          <div className="leh-table-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 className="leh-table-title">Supplier Registry</h3>
+            <div style={{ display: 'flex', gap: '8px' }}>
+               <button 
+                 className="leh-refresh-btn" 
+                 onClick={() => window.print()} 
+                 data-tooltip="Print Supplier Registry"
+                 aria-label="Print registry"
+               >
+                 <Printer size={14} />
+               </button>
+               <button 
+                 className="leh-refresh-btn" 
+                 onClick={fetchData} 
+                 data-tooltip="Refresh supplier records"
+                 aria-label="Refresh records"
+               >
+                 <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+               </button>
+            </div>
+          </div>
+          <div className="leh-table-wrapper">
+            <table className="leh-table">
+              <thead>
+                <tr>
+                  <th style={{ paddingLeft: '32px' }}>Company Name</th>
+                  <th>Contact Person</th>
+                  <th>Phone Number</th>
+                  <th>Email Address</th>
+                  <th>Address</th>
+                  <th>Outstanding Balance</th>
+                  <th style={{ paddingRight: '32px', textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedSuppliers.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '48px', color: 'var(--leh-text-grey)' }}>
+                      No suppliers found matching your criteria.
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedSuppliers.map(s => (
+                    <tr key={s.id}>
+                      <td style={{ paddingLeft: '32px' }} className="leh-table-bold">{s.name}</td>
+                      <td>{s.contact_person || 'N/A'}</td>
+                      <td>{s.phone || 'N/A'}</td>
+                      <td>{s.email || 'N/A'}</td>
+                      <td style={{ maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.address}>
+                        {s.address || 'N/A'}
+                      </td>
+                      <td style={{ color: s.balance > 0 ? 'var(--leh-red)' : 'var(--leh-success)', fontWeight: 700 }}>
+                        ₦{s.balance?.toLocaleString()}
+                      </td>
+                      <td style={{ paddingRight: '32px', textAlign: 'right' }}>
+                        <button 
+                          onClick={() => {
+                            setProcForm(prev => ({ ...prev, supplier_id: s.id.toString() }));
+                            setShowProcurementModal(true);
+                          }} 
+                          className="leh-btn-outline" 
+                          style={{ height: '32px', fontSize: '11px', padding: '0 12px' }}
+                          data-tooltip="Acquire from this supplier"
+                        >
+                          <Plus size={10} style={{ marginRight: '4px' }} /> ACQUIRE
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Supplier Pagination Footer */}
+          {supplierTotalPages > 1 && (
+            <div style={{ padding: '16px 32px', borderTop: '1px solid var(--leh-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', color: 'var(--leh-text-grey)' }}>
+                Showing {((supplierCurrentPage - 1) * rowsPerPage) + 1} to {Math.min(supplierCurrentPage * rowsPerPage, filteredSuppliers.length)} of {filteredSuppliers.length} suppliers
+              </span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button 
+                  className="leh-refresh-btn" 
+                  disabled={supplierCurrentPage === 1}
+                  onClick={() => setSupplierCurrentPage(p => p - 1)}
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  {Array.from({ length: supplierTotalPages }, (_, i) => i + 1).map(num => (
+                    <button 
+                      key={num}
+                      onClick={() => setSupplierCurrentPage(num)}
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: supplierCurrentPage === num ? 'var(--leh-primary)' : 'transparent',
+                        color: supplierCurrentPage === num ? 'white' : 'var(--leh-text-grey)',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+                <button 
+                  className="leh-refresh-btn" 
+                  disabled={supplierCurrentPage === supplierTotalPages}
+                  onClick={() => setSupplierCurrentPage(p => p + 1)}
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Supplier Modal */}
       {showSupplierModal && (

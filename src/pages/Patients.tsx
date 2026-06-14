@@ -123,7 +123,7 @@ export const Patients: React.FC<PatientsProps> = ({ view: initialView = 'list' }
       
       if (target === 'billing') {
         notify('success', `${currentPatient.full_name} routed to billing`);
-        navigate(`/billing?patient_id=${encodeURIComponent(currentPatient.id)}&visit_id=${result.visit_id || ''}&patient_name=${encodeURIComponent(currentPatient.full_name)}`);
+        navigate(`/billing?patient_id=${encodeURIComponent(currentPatient.id)}&visit_id=${result.visit_id || ''}&patient_name=${encodeURIComponent(currentPatient.full_name)}&auto_select=Registration`);
       } else {
         const destMsg = target === 'triage' 
           ? `${currentPatient.full_name} has been sent to the triage queue.` 

@@ -315,6 +315,8 @@ export const Reports: React.FC = () => {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPlCategory, setSelectedPlCategory] = useState('ALL');
+  const [cashierFilter, setCashierFilter] = useState('');
+  const [cashiersList, setCashiersList] = useState<any[]>([]);
 
   const [dateRange, setDateRange] = useState({
     start: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
@@ -338,7 +340,7 @@ export const Reports: React.FC = () => {
       let result: any = [];
       switch (activeTab) {
         case 'inventory': result = await api.getInventory(); break;
-        case 'sales': result = await api.getSalesReport(dateRange.start, dateRange.end); break;
+        case 'sales': result = await api.getSalesReport(dateRange.start, dateRange.end, cashierFilter); break;
         case 'profit_loss': 
           const pl = await api.getProfitLoss(dateRange.start, dateRange.end);
           result = pl.details || [];
@@ -359,11 +361,25 @@ export const Reports: React.FC = () => {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchReportData(); }, [activeTab, dateRange]);
+  const fetchCashiers = async () => {
+    try {
+      const usersList = await api.getUsers();
+      setCashiersList(usersList || []);
+    } catch (e) {
+      console.error('Failed to load cashiers list:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchCashiers();
+  }, []);
+
+  useEffect(() => { fetchReportData(); }, [activeTab, dateRange, cashierFilter]);
 
   useEffect(() => {
     setSelectedPlCategory('ALL');
     setSearchQuery('');
+    setCashierFilter('');
   }, [activeTab]);
 
   const profitCategories = useMemo(() => {
@@ -630,6 +646,36 @@ export const Reports: React.FC = () => {
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          {activeTab === 'sales' && (
+            <select
+              className="leh-select no-print"
+              style={{
+                width: '180px',
+                height: '50px',
+                padding: '0 16px',
+                fontSize: '12px',
+                fontWeight: '800',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+                background: '#fff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '14px',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                color: '#1e293b'
+              }}
+              value={cashierFilter}
+              onChange={e => setCashierFilter(e.target.value)}
+            >
+              <option value="">ALL CASHIERS</option>
+              {cashiersList
+                .filter(u => u.status?.toLowerCase() !== 'inactive')
+                .map(u => (
+                  <option key={u.id} value={u.full_name}>
+                    {u.full_name.toUpperCase()}
+                  </option>
+                ))}
+            </select>
+          )}
           <div style={{ 
             display: 'flex', 
             alignItems: 'center', 

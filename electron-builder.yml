@@ -1,0 +1,26 @@
+appId: com.lunaeye.visioncare-emr
+productName: VisionCare EMR
+directories:
+  output: electron-dist
+files:
+  - electron/**/*
+  - package.json
+extraResources:
+  - from: packaged-release
+    to: packaged-release
+    filter:
+      - "**/*"
+win:
+  icon: electron/assets/icon.png
+  forceCodeSigning: false
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: VisionCare EMR
+  artifactName: "${productName} Setup.${ext}"

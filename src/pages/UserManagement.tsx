@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  UserPlus, ShieldCheck, Key, Edit3, Search, Users, Shield, X, Trash2, Eye, EyeOff
+  UserPlus, ShieldCheck, Key, Edit3, Search, Users, Shield, X, Eye, EyeOff, UserCheck, UserX
 } from 'lucide-react';
 import { api } from '../api';
 import { useNotification } from '../context/NotificationContext';
@@ -21,7 +21,8 @@ export const UserManagement: React.FC = () => {
     password: '',
     full_name: '',
     role: 'Receptionist',
-    department: ''
+    department: '',
+    status: 'Active'
   });
 
   const fetchUsers = async () => {
@@ -47,6 +48,17 @@ export const UserManagement: React.FC = () => {
     }
   };
 
+  const handleReactivate = (userId: number, name: string) => {
+    if (window.confirm(`Are you sure you want to reactivate account: ${name}?`)) {
+      api.updateUser(userId, { status: 'Active' })
+        .then(() => {
+          notify('success', `Account ${name} has been reactivated.`);
+          fetchUsers();
+        })
+        .catch((err: any) => notify('error', 'Reactivation failed: ' + err.message));
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -67,7 +79,8 @@ export const UserManagement: React.FC = () => {
         password: '', // Don't show password
         full_name: user.full_name,
         role: user.role,
-        department: user.department || ''
+        department: user.department || '',
+        status: user.status || 'Active'
       });
     } else {
       setEditingUser(null);
@@ -76,7 +89,8 @@ export const UserManagement: React.FC = () => {
         password: '',
         full_name: '',
         role: 'Receptionist',
-        department: ''
+        department: '',
+        status: 'Active'
       });
     }
     setIsModalOpen(true);
@@ -245,13 +259,24 @@ export const UserManagement: React.FC = () => {
                       >
                         <Key size={16} />
                       </button>
-                      <button 
-                        className="leh-icon-btn red" 
-                        title="Deactivate Account"
-                        onClick={() => handleDeactivate(userAccount.id, userAccount.full_name)}
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {userAccount.status?.toLowerCase() === 'inactive' ? (
+                        <button 
+                          className="leh-icon-btn" 
+                          title="Reactivate Account"
+                          style={{ color: 'var(--leh-green)' }}
+                          onClick={() => handleReactivate(userAccount.id, userAccount.full_name)}
+                        >
+                          <UserCheck size={16} />
+                        </button>
+                      ) : (
+                        <button 
+                          className="leh-icon-btn red" 
+                          title="Deactivate Account"
+                          onClick={() => handleDeactivate(userAccount.id, userAccount.full_name)}
+                        >
+                          <UserX size={16} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -339,6 +364,19 @@ export const UserManagement: React.FC = () => {
                           onChange={e => setFormData({...formData, department: e.target.value})}
                         />
                       </div>
+                      {editingUser && (
+                        <div className="leh-form-group">
+                          <label className="leh-label">ACCOUNT STATUS</label>
+                          <select
+                            className="leh-select"
+                            value={formData.status}
+                            onChange={e => setFormData({...formData, status: e.target.value})}
+                          >
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                          </select>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

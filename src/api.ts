@@ -12,11 +12,6 @@ const request = async (
   options: RequestInit & { signal?: AbortSignal } = {},
   _retry = 0
 ): Promise<any> => {
-  // Offline guard — fail fast without a network round-trip
-  if (!navigator.onLine) {
-    throw new Error('No internet connection. Please check your network and try again.');
-  }
-
   const method = (options.method || 'GET').toUpperCase();
   const isGet = method === 'GET';
   const dedupeKey = `${method}:${endpoint}`;
@@ -176,6 +171,10 @@ export const api = {
   async getTriageHistory(patientId: string) {
     const data = await request(`/triage/history/${encodeURIComponent(patientId)}`);
     return Array.isArray(data) ? data : [];
+  },
+
+  async getTriageStats() {
+    return request('/triage-stats');
   },
 
   async saveTriage(data: any) {
@@ -379,9 +378,12 @@ export const api = {
     return request('/procurement/stats');
   },
 
-  // Reports API
-  async getSalesReport(startDate: string, endDate: string) {
-    const data = await request(`/reports/sales?start_date=${startDate}&end_date=${endDate}`);
+  async getSalesReport(startDate: string, endDate: string, cashier?: string) {
+    let url = `/reports/sales?start_date=${startDate}&end_date=${endDate}`;
+    if (cashier) {
+      url += `&cashier=${encodeURIComponent(cashier)}`;
+    }
+    const data = await request(url);
     return Array.isArray(data) ? data : [];
   },
   async getSalesSummary() {

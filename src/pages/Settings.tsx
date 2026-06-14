@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Database, HardDriveDownload, Users, Building2, Save, History, Upload, Download, Trash2, Edit3, Plus, Tags, Folders, RefreshCw, Shield, FileText, Printer, FileSpreadsheet, Filter, Calendar, User } from 'lucide-react';
+import { Database, HardDriveDownload, Users, Building2, Save, History, Upload, Download, Trash2, Edit3, Plus, Tags, Folders, RefreshCw, Shield, FileText, Printer, FileSpreadsheet, Filter, Calendar, User, ClipboardList } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { api, API_BASE_URL } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -57,9 +57,10 @@ export const Settings: React.FC = () => {
   const [discounts, setDiscounts] = useState<any[]>([]);
   const [inventoryCats, setInventoryCats] = useState<any[]>([]);
   const [investigationTemplates, setInvestigationTemplates] = useState<any[]>([]);
+  const [investigations, setInvestigations] = useState<any[]>([]);
   const [showMgmtModal, setShowMgmtModal] = useState(false);
   const [mgmtForm, setMgmtForm] = useState<any>({});
-  const [mgmtTarget, setMgmtTarget] = useState<'ward' | 'discount' | 'category' | 'template' | null>(null);
+  const [mgmtTarget, setMgmtTarget] = useState<'ward' | 'discount' | 'category' | 'template' | 'investigation' | null>(null);
   const [isEdit, setIsEdit] = useState(false);
 
   // Audit Logs States
@@ -79,14 +80,15 @@ export const Settings: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      const [stats, sets, baks, wrds, dscs, cats, tpls] = await Promise.all([
+      const [stats, sets, baks, wrds, dscs, cats, tpls, invItems] = await Promise.all([
         api.getDbStats(),
         api.getSettings(),
         api.getBackups(),
         api.getWards(),
         api.getDiscounts(),
         api.getInventoryCategories(),
-        api.getInvestigationTemplates()
+        api.getInvestigationTemplates(),
+        api.getInventory()
       ]);
       setDbStats(stats);
       setSettings(sets);
@@ -95,6 +97,10 @@ export const Settings: React.FC = () => {
       setDiscounts(dscs);
       setInventoryCats(cats);
       setInvestigationTemplates(tpls);
+      const tests = invItems.filter((i: any) =>
+        ['laboratory', 'test', 'lab test', 'diagnostic'].includes((i.category || '').toLowerCase())
+      );
+      setInvestigations(tests);
     } catch (error: any) {
       notify('error', 'Failed to fetch settings: ' + (error.message || 'Check connection'));
     }
@@ -154,13 +160,22 @@ export const Settings: React.FC = () => {
     });
   };
 
-  const handleOpenMgmt = (target: 'ward' | 'discount' | 'category' | 'template', item?: any) => {
+  const handleOpenMgmt = (target: 'ward' | 'discount' | 'category' | 'template' | 'investigation', item?: any) => {
     setMgmtTarget(target);
     if (item) {
       setMgmtForm(item);
       setIsEdit(true);
     } else {
-      setMgmtForm({});
+      setMgmtForm(target === 'investigation' ? {
+        category: 'Laboratory',
+        stock: 0,
+        price: 0,
+        cost_price: 0,
+        reorder_level: 0,
+        expiry_date: '',
+        supplier: '',
+        batch_number: ''
+      } : {});
       setIsEdit(false);
     }
     setShowMgmtModal(true);
@@ -176,6 +191,7 @@ export const Settings: React.FC = () => {
     const prevDiscounts = [...discounts];
     const prevCategories = [...inventoryCats];
     const prevTemplates = [...investigationTemplates];
+    const prevInvestigations = [...investigations];
 
     // 2. Determine state setters
     let setList: React.Dispatch<React.SetStateAction<any[]>> = () => {};
@@ -188,6 +204,8 @@ export const Settings: React.FC = () => {
       setList = setInventoryCats;
     } else if (target === 'template') {
       setList = setInvestigationTemplates;
+    } else if (target === 'investigation') {
+      setList = setInvestigations;
     }
 
     // 3. Apply optimistic update to local state
@@ -214,9 +232,23 @@ export const Settings: React.FC = () => {
         res = isEdit ? await api.updateInventoryCategory(mgmtForm.id, mgmtForm) : await api.createInventoryCategory(mgmtForm);
       } else if (target === 'template') {
         res = isEdit ? await api.updateInvestigationTemplate(mgmtForm.id, mgmtForm) : await api.createInvestigationTemplate(mgmtForm);
+      } else if (target === 'investigation') {
+        const payload = {
+          name: mgmtForm.name,
+          category: mgmtForm.category || 'Laboratory',
+          price: parseFloat(mgmtForm.price) || 0,
+          stock: 0,
+          cost_price: 0,
+          reorder_level: 0,
+          expiry_date: '',
+          supplier: '',
+          batch_number: '',
+          attributes: mgmtForm.attributes || {}
+        };
+        res = isEdit ? await api.updateInventoryItem(mgmtForm.id, payload) : await api.createInventoryItem(payload);
       }
 
-      notify('success', `${target} protocol ${isEdit ? 'updated' : 'initialized'} successfully`);
+      notify('success', `${target === 'investigation' ? 'Investigation' : target} protocol ${isEdit ? 'updated' : 'initialized'} successfully`);
       
       // If we created a new item, update its ID from the response
       if (!isEdit && res && res.id) {
@@ -231,11 +263,12 @@ export const Settings: React.FC = () => {
       setDiscounts(prevDiscounts);
       setInventoryCats(prevCategories);
       setInvestigationTemplates(prevTemplates);
+      setInvestigations(prevInvestigations);
       notify('error', error.message || 'Failed to save protocol');
     }
   };
 
-  const handleDeleteMgmt = (target: 'ward' | 'discount' | 'category' | 'template', id: number) => {
+  const handleDeleteMgmt = (target: 'ward' | 'discount' | 'category' | 'template' | 'investigation', id: number | string) => {
     confirm({
       title: 'Decommission Protocol',
       message: `Are you sure you want to decommission this ${target}? This may affect historical clinical records.`,
@@ -245,6 +278,7 @@ export const Settings: React.FC = () => {
         const prevDiscounts = [...discounts];
         const prevCategories = [...inventoryCats];
         const prevTemplates = [...investigationTemplates];
+        const prevInvestigations = [...investigations];
 
         // 2. Perform optimistic UI deletion
         if (target === 'ward') {
@@ -255,13 +289,16 @@ export const Settings: React.FC = () => {
           setInventoryCats(prev => prev.filter(item => item.id !== id));
         } else if (target === 'template') {
           setInvestigationTemplates(prev => prev.filter(item => item.id !== id));
+        } else if (target === 'investigation') {
+          setInvestigations(prev => prev.filter(item => item.id !== id));
         }
 
         try {
-          if (target === 'ward') await api.deleteWard(id);
-          else if (target === 'discount') await api.deleteDiscount(id);
-          else if (target === 'category') await api.deleteInventoryCategory(id);
-          else if (target === 'template') await api.deleteInvestigationTemplate(id);
+          if (target === 'ward') await api.deleteWard(id as number);
+          else if (target === 'discount') await api.deleteDiscount(id as number);
+          else if (target === 'category') await api.deleteInventoryCategory(id as number);
+          else if (target === 'template') await api.deleteInvestigationTemplate(id as number);
+          else if (target === 'investigation') await api.deleteInventoryItem(id as string);
           
           notify('success', 'Protocol decommissioned successfully');
           fetchData();
@@ -271,6 +308,7 @@ export const Settings: React.FC = () => {
           setDiscounts(prevDiscounts);
           setInventoryCats(prevCategories);
           setInvestigationTemplates(prevTemplates);
+          setInvestigations(prevInvestigations);
           notify('error', error.message || 'Failed to decommission');
         }
       }
@@ -363,6 +401,7 @@ export const Settings: React.FC = () => {
             {[
               { id: 'clinic', label: 'Clinical Metadata', icon: Building2 },
               { id: 'management', label: 'Resource Management', icon: Users },
+              { id: 'investigations', label: 'Manage Investigations', icon: ClipboardList },
               { id: 'templates', label: 'Result Templates', icon: FileText },
               { id: 'database', label: 'Database & Security', icon: Database },
               { id: 'logs', label: 'System Audit Logs', icon: History }
@@ -644,6 +683,65 @@ export const Settings: React.FC = () => {
             </div>
           )}
 
+          {activeTab === 'investigations' && (
+            <div className="leh-table-card">
+              <div className="leh-table-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 className="leh-table-title">Clinical Investigations & Fees</h3>
+                <button type="button" onClick={() => handleOpenMgmt('investigation')} className="leh-btn-primary" style={{ height: '38px', padding: '0 16px', fontSize: '12px' }}>
+                  <Plus size={14} /> NEW INVESTIGATION
+                </button>
+              </div>
+              <div className="leh-table-wrapper">
+                <table className="leh-table">
+                  <thead>
+                    <tr>
+                      <th style={{ paddingLeft: '32px' }}>Investigation Name</th>
+                      <th>Category</th>
+                      <th>Billing Fee</th>
+                      <th style={{ width: '120px', paddingRight: '32px' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {investigations.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} style={{ padding: '40px 0', textAlign: 'center', color: 'var(--leh-text-muted)', fontStyle: 'italic' }}>
+                          No clinical investigations registered.
+                        </td>
+                      </tr>
+                    ) : (
+                      investigations.map(inv => (
+                        <tr key={inv.id}>
+                          <td style={{ paddingLeft: '32px' }} className="leh-table-bold">{inv.name}</td>
+                          <td>
+                            <span style={{
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: '800',
+                              background: inv.category?.toLowerCase() === 'test' ? 'rgba(37, 99, 235, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                              color: inv.category?.toLowerCase() === 'test' ? 'var(--leh-primary)' : 'var(--leh-green)'
+                            }}>
+                              {inv.category}
+                            </span>
+                          </td>
+                          <td>
+                            <span style={{ fontWeight: '800' }}>₦{(inv.price || 0).toLocaleString()}</span>
+                          </td>
+                          <td style={{ paddingRight: '32px' }}>
+                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                              <button type="button" onClick={() => handleOpenMgmt('investigation', inv)} className="leh-refresh-btn"><Edit3 size={14} /></button>
+                              <button type="button" onClick={() => handleDeleteMgmt('investigation', inv.id)} className="leh-refresh-btn" style={{ color: 'var(--leh-red)' }}><Trash2 size={14} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'templates' && (
             <div className="leh-table-card">
               <div className="leh-table-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -869,8 +967,9 @@ export const Settings: React.FC = () => {
                 {mgmtTarget === 'ward' ? <Building2 style={{ color: 'var(--leh-primary)' }} /> : 
                  mgmtTarget === 'discount' ? <Tags style={{ color: 'var(--leh-amber)' }} /> : 
                  mgmtTarget === 'template' ? <FileText style={{ color: 'var(--leh-primary)' }} /> :
+                 mgmtTarget === 'investigation' ? <ClipboardList style={{ color: 'var(--leh-primary)' }} /> :
                  <Folders style={{ color: 'var(--leh-green)' }} />}
-                <span>{isEdit ? `Edit ${mgmtTarget?.toUpperCase()} Protocol` : `Register New ${mgmtTarget?.toUpperCase()}`}</span>
+                <span>{isEdit ? `Edit ${(mgmtTarget === 'investigation' ? 'Investigation' : mgmtTarget)?.toUpperCase()}` : `Register New ${(mgmtTarget === 'investigation' ? 'Investigation' : mgmtTarget)?.toUpperCase()}`}</span>
               </div>
               <button type="button" className="leh-modal-close" onClick={() => setShowMgmtModal(false)}>
                 <RefreshCw size={20} className={isSaving ? "animate-spin" : ""} />
@@ -885,18 +984,46 @@ export const Settings: React.FC = () => {
                   </h4>
                   <div className="leh-form-grid">
                     <div className="leh-form-group full-width">
-                      <label className="leh-label">{mgmtTarget === 'template' ? 'INVESTIGATION / TEST NAME' : 'PROTOCOL DESIGNATION'}</label>
+                      <label className="leh-label">
+                        {mgmtTarget === 'template' || mgmtTarget === 'investigation' ? 'INVESTIGATION / TEST NAME' : 'PROTOCOL DESIGNATION'}
+                      </label>
                       <input 
                         className="leh-input"
                         required 
                         autoFocus
                         value={mgmtForm.name || mgmtForm.test_name || ''} 
                         onChange={e => setMgmtForm({...mgmtForm, name: e.target.value, test_name: e.target.value})}
-                        placeholder={mgmtTarget === 'template' ? "e.g. Random Blood Sugar, RBS..." : `Enter unique ${mgmtTarget} name...`}
+                        placeholder={mgmtTarget === 'template' || mgmtTarget === 'investigation' ? "e.g. Random Blood Sugar, RBS..." : `Enter unique ${mgmtTarget} name...`}
                       />
                     </div>
 
-                    {mgmtTarget === 'discount' ? (
+                    {mgmtTarget === 'investigation' ? (
+                      <>
+                        <div className="leh-form-group">
+                          <label className="leh-label">BILLING PRICE (₦)</label>
+                          <input 
+                            className="leh-input"
+                            type="number" 
+                            step="0.01"
+                            required 
+                            value={mgmtForm.price || ''} 
+                            onChange={e => setMgmtForm({...mgmtForm, price: parseFloat(e.target.value) || 0})}
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div className="leh-form-group">
+                          <label className="leh-label">CLINICAL CATEGORY</label>
+                          <select 
+                            className="leh-select"
+                            value={mgmtForm.category || 'Laboratory'} 
+                            onChange={e => setMgmtForm({...mgmtForm, category: e.target.value})}
+                          >
+                            <option value="Laboratory">Laboratory</option>
+                            <option value="Test">Test (Diagnostic)</option>
+                          </select>
+                        </div>
+                      </>
+                    ) : mgmtTarget === 'discount' ? (
                       <>
                         <div className="leh-form-group">
                           <label className="leh-label">YIELD VALUE</label>

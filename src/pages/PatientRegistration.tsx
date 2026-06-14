@@ -11,11 +11,13 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useNotification } from '../context/NotificationContext';
+import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 
 export const PatientRegistration: React.FC = () => {
   const navigate = useNavigate();
   const { notify } = useNotification();
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
@@ -57,7 +59,17 @@ export const PatientRegistration: React.FC = () => {
     try {
       const result = await api.createPatient(formData);
       notify('success', `Patient ${formData.full_name} registered. File No: ${result.id}`);
-      navigate('/patients');
+      
+      // Automatically check in the registered patient to billing queue
+      try {
+        const checkinResult = await api.checkInPatient(String(result.id), 'billing', user?.full_name || 'System');
+        notify('success', `${formData.full_name} checked in and routed to billing`);
+        navigate(`/billing?patient_id=${encodeURIComponent(result.id)}&visit_id=${checkinResult.visit_id || ''}&patient_name=${encodeURIComponent(formData.full_name)}&auto_select=Registration`);
+      } catch (checkinErr) {
+        console.error('Failed to auto-checkin patient to billing:', checkinErr);
+        // Fallback: if check-in fails, still navigate to billing with auto-select
+        navigate(`/billing?patient_id=${encodeURIComponent(result.id)}&auto_select=Registration`);
+      }
     } catch (err: any) {
       notify('error', err.message || 'Registration failed. Please check all required fields.');
     } finally {

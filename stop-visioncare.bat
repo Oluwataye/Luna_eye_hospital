@@ -1,18 +1,12 @@
 @echo off
-set PORT=3200
 echo.
-echo Stopping VisionCare EMR on port %PORT%...
+echo Stopping VisionCare EMR...
 
-set FOUND=0
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":%PORT% " ^| findstr "LISTENING"') do (
-    echo [!] Found process %%a listening on port %PORT%
-    taskkill /PID %%a /F >nul 2>&1
-    echo [✓] VisionCare EMR stopped successfully.
-    set FOUND=1
-)
-
-if %FOUND% equ 0 (
-    echo [!] WARNING: VisionCare EMR was not found running on port %PORT%.
+taskkill /F /IM VisionCare-EMR.exe >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [OK] VisionCare EMR stopped successfully.
+) else (
+    echo [!] WARNING: VisionCare EMR was not running.
 )
 
 timeout /t 2 >nul

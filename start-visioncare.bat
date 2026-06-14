@@ -1,36 +1,36 @@
 @echo off
-set PORT=3200
 echo.
 echo ========================================================
-echo   Starting VisionCare EMR - Luna Eye Hospital on port %PORT%...
+echo   Starting VisionCare EMR - Standalone Package...
 echo ========================================================
 echo.
 
-:: Check if port is in use
-netstat -ano | findstr ":%PORT% " | findstr "LISTENING" >nul 2>&1
+:: Check if port 80 is in use
+netstat -ano | findstr ":80 " | findstr "LISTENING" >nul 2>&1
 if %errorlevel% equ 0 (
-    echo [!] WARNING: Port %PORT% is already in use!
-    echo     Please ensure no other instance is running.
+    echo [!] WARNING: Port 80 is already in use by another service!
+    echo     Please stop any other web server.
     echo.
-    set /p choice="Do you want to continue anyway? (Y/N): "
-    if /i "!choice!" neq "Y" exit /b 1
+    pause
+    exit /b 1
 )
 
-:: Start backend server
-echo [1/2] Launching backend server...
-cd /d "%~dp0server"
-start /b "" node index.js
+:: Start standalone executable
+echo Launching VisionCare-EMR.exe...
+cd /d "%~dp0packaged-release"
+start /b "" VisionCare-EMR.exe
 
 :: Wait for initialization
-echo [2/2] Initializing environment...
+echo Initializing environment...
 timeout /t 3 /nobreak >nul
 
 echo.
-echo VisionCare EMR is running at: http://localhost:%PORT%
+echo VisionCare EMR is running at: http://lunaeyehospital/
 echo.
 
 :: Open browser
-start http://localhost:%PORT%/login
+start http://lunaeyehospital/
 
+echo.
 echo Keep this window open while using the app.
 pause >nul

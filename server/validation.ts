@@ -164,7 +164,8 @@ export const RequiredReportQuerySchema = z.object({
     return isNaN(parsed) ? 0 : Math.max(parsed, 0);
   }, z.number().int().default(0)),
   start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'start_date must be in YYYY-MM-DD format'),
-  end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'end_date must be in YYYY-MM-DD format')
+  end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'end_date must be in YYYY-MM-DD format'),
+  cashier: sanitizedString().optional()
 });
 
 // ── Generic Schema Validation Middleware ──

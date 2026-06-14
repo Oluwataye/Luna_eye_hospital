@@ -83,15 +83,29 @@ export const Triage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [loadingQueue, setLoadingQueue] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [stats, setStats] = useState({
+    avgWaitTime: '0m',
+    triagedToday: 0,
+    urgentCases: 0
+  });
 
   const loadQueue = useCallback(() => {
     setLoadingQueue(true);
-    api.getTriageQueue()
-      .then(data => {
-        const queue = Array.isArray(data) ? data.filter((p: any) => p.status === PatientStatus.WAITING_FOR_TRIAGE || p.status === 'Paid - Waiting for Triage' || p.status === 'Registered/Waiting') : [];
+    Promise.all([
+      api.getTriageQueue(),
+      api.getTriageStats()
+    ])
+      .then(([queueData, statsData]) => {
+        const queue = Array.isArray(queueData) ? queueData.filter((p: any) => p.status === PatientStatus.WAITING_FOR_TRIAGE || p.status === 'Paid - Waiting for Triage' || p.status === 'Registered/Waiting') : [];
         setTriageQueue(queue);
+        if (statsData) {
+          setStats(statsData);
+        }
       })
-      .catch(() => notify('error', 'Failed to update clinical queue'))
+      .catch((err) => {
+        console.error('Failed to load queue or stats:', err);
+        notify('error', 'Failed to update clinical queue');
+      })
       .finally(() => setLoadingQueue(false));
   }, [notify]);
 
@@ -186,21 +200,21 @@ export const Triage: React.FC = () => {
              <span className="leh-stat-title">Avg. Wait Time</span>
              <div className="leh-stat-icon-box"><Clock size={16} /></div>
           </div>
-          <h3 className="leh-stat-value" style={{ fontSize: '24px', marginBottom: 0 }}>12m</h3>
+          <h3 className="leh-stat-value" style={{ fontSize: '24px', marginBottom: 0 }}>{stats.avgWaitTime}</h3>
         </div>
         <div className="leh-stat-card green" style={{ minHeight: 'auto', padding: '20px' }}>
           <div className="leh-stat-card-top" style={{ marginBottom: '8px' }}>
              <span className="leh-stat-title">Triaged Today</span>
              <div className="leh-stat-icon-box"><CheckCircle2 size={16} /></div>
           </div>
-          <h3 className="leh-stat-value" style={{ fontSize: '24px', marginBottom: 0 }}>24</h3>
+          <h3 className="leh-stat-value" style={{ fontSize: '24px', marginBottom: 0 }}>{stats.triagedToday}</h3>
         </div>
         <div className="leh-stat-card red" style={{ minHeight: 'auto', padding: '20px' }}>
           <div className="leh-stat-card-top" style={{ marginBottom: '8px' }}>
              <span className="leh-stat-title">Urgent Cases</span>
              <div className="leh-stat-icon-box"><Zap size={16} /></div>
           </div>
-          <h3 className="leh-stat-value" style={{ fontSize: '24px', marginBottom: 0 }}>2</h3>
+          <h3 className="leh-stat-value" style={{ fontSize: '24px', marginBottom: 0 }}>{stats.urgentCases}</h3>
         </div>
       </div>
 

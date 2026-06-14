@@ -14,7 +14,11 @@ const findRootDir = () => {
 };
 
 const serverRootDir = findRootDir();
-const dbPath = path.resolve(serverRootDir, 'luna_eye_hospital.db');
+const isPackaged = typeof (process as any).pkg !== 'undefined';
+const dbDir = isPackaged ? path.dirname(process.execPath) : serverRootDir;
+const dbPath = path.resolve(dbDir, 'luna_eye_hospital.db');
+console.log(`[DB] Database path: ${dbPath} (Packaged: ${isPackaged})`);
+
 
 const db = new sqlite.Database(dbPath, (err: Error | null) => {
   if (err) {
