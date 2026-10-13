@@ -4,13 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'src/**'
-      - 'server/**'
-      - 'scripts/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'vite.config.ts'
     tags:
       - 'v*'
   workflow_dispatch:
@@ -68,13 +61,14 @@ jobs:
           New-Item -ItemType Directory -Path $sqliteDest -Force | Out-Null
           Copy-Item -Path "packaged-release\node_modules\sqlite3\build\Release\node_sqlite3.node" -Destination $sqliteDest -Force
           
-          # Copy launcher scripts
+          # Copy launcher scripts and desktop icons
           Copy-Item -Path "start-visioncare-silent.vbs" -Destination $distDir -Force -ErrorAction SilentlyContinue
           Copy-Item -Path "StartVisionCareEMR.vbs" -Destination $distDir -Force -ErrorAction SilentlyContinue
           Copy-Item -Path "StopVisionCareEMR.vbs" -Destination $distDir -Force -ErrorAction SilentlyContinue
           Copy-Item -Path "VisionCare-EMR.ico" -Destination $distDir -Force -ErrorAction SilentlyContinue
+          Copy-Item -Path "visioncare-emr-desktop-256.png" -Destination $distDir -Force -ErrorAction SilentlyContinue
           
-          # Archive into zip
+          # Archive into zip distribution
           Compress-Archive -Path "$distDir\*" -DestinationPath "VisionCare-EMR-Standalone-Windows-x64.zip" -Force
           
           Write-Host "Archive created: VisionCare-EMR-Standalone-Windows-x64.zip"
@@ -89,6 +83,38 @@ jobs:
             packaged-release/VisionCare-EMR.exe
           retention-days: 14
 
+      - name: Prepare Release Notes
+        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.create_github_release == 'true'
+        shell: pwsh
+        run: |
+          $ver = "${{ github.ref_name }}"
+          $releaseNotes = @"
+          ## 🏥 VisionCare EMR — Luna Eye Hospital
+          ### Release: $ver
+
+          ---
+
+          ### 📦 Downloadable Station Packages
+          - **`VisionCare-EMR-Standalone-Windows-x64.zip`**: Complete offline standalone package. Contains pre-compiled executable, bundled web frontend, SQLite runtime, and silent background launchers.
+          - **`VisionCare-EMR.exe`**: Standalone single-file binary executable.
+
+          ---
+
+          ### 🚀 Included Features & Fixes
+          - **AI Voice & Dictation Suite**: Local Faster-Whisper microservice, real-time WebSocket audio streaming, GPU CUDA / CPU int8 acceleration.
+          - **Global Push-to-Talk Hotkey**: Configurable shortcut (<kbd>Ctrl</kbd>+<kbd>Space</kbd> / <kbd>F8</kbd>) for clinical note dictation.
+          - **Clinical Modules**: Consultation notes, refraction records, diagnosis management, and billing operations.
+          - **Security & Concurrency**: Role-based access control, input sanitization, dynamic secrets, and automated audit logging.
+
+          ---
+
+          ### 🛠 Station Installation & Upgrade Guide
+          1. Download and extract **\`VisionCare-EMR-Standalone-Windows-x64.zip\`** to \`C:\Users\HP\Documents\Luna Eyes Hospital\` (or station drive).
+          2. Double-click **\`start-visioncare-silent.vbs\`** (or run as Administrator to bind to port 80).
+          3. Open **\`http://lunaeyehospital/\`** or **\`http://localhost:3200/\`** in the workstation browser.
+          "@
+          Set-Content -Path "RELEASE_NOTES.md" -Value $releaseNotes -Encoding UTF8
+
       - name: Create or Update GitHub Release
         if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.create_github_release == 'true'
         uses: softprops/action-gh-release@v2
@@ -96,7 +122,8 @@ jobs:
           files: |
             VisionCare-EMR-Standalone-Windows-x64.zip
             packaged-release/VisionCare-EMR.exe
-          name: Release ${{ github.ref_name }}
+          name: VisionCare EMR ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
           draft: false
           prerelease: false
           generate_release_notes: true
