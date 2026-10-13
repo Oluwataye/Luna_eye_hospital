@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "setup:network": "node scripts/network-setup.cjs",
     "release:standalone": "node scripts/release-standalone.cjs",
+    "prepare": "git config core.hooksPath .githooks",
     "electron:start": "electron .",
     "electron:build-exe": "npm run release:standalone",
     "electron:build": "npm run release:standalone && electron-builder"
