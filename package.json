@@ -10,9 +10,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "setup:network": "node scripts/network-setup.cjs",
+    "release:standalone": "node scripts/release-standalone.cjs",
     "electron:start": "electron .",
-    "electron:build-exe": "npm run build && cd server && npm run build && cd .. && npx pkg -t node18-win-x64 -o packaged-release/VisionCare-EMR.exe server/package.json",
-    "electron:build": "npm run electron:build-exe && electron-builder"
+    "electron:build-exe": "npm run release:standalone",
+    "electron:build": "npm run release:standalone && electron-builder"
   },
   "dependencies": {
     "lucide-react": "^1.14.0",
