@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Outlet, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { SidebarProvider, useSidebar } from './context/SidebarContext';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { Dashboard } from './pages/Dashboard';
@@ -48,9 +49,10 @@ import { FloatingActionButton } from './components/FloatingActionButton';
 
 const Layout = () => {
   const location = useLocation();
+  const { collapsed } = useSidebar();
 
   return (
-    <div className="app-layout">
+    <div className={`app-layout${collapsed ? ' layout--sidebar-collapsed' : ''}`}>
       <Sidebar />
       <div className="content-wrapper">
         <Topbar />
@@ -69,14 +71,25 @@ const Layout = () => {
 
 import { NotificationProvider } from './context/NotificationContext';
 import { AlertProvider } from './context/AlertContext';
+import { VoiceSessionProvider } from './components/voice';
+import { useGlobalDictationHotkey } from './hooks/useGlobalDictationHotkey';
+
+/** Mounts the global dictation hotkey listener inside the app tree */
+const HotkeyActivator: React.FC = () => {
+  useGlobalDictationHotkey();
+  return null;
+};
 
 function App() {
   return (
     <NotificationProvider>
       <AuthProvider>
-        <AlertProvider>
-          <BrowserRouter>
-            <Routes>
+        <SidebarProvider>
+          <AlertProvider>
+            <VoiceSessionProvider>
+              <BrowserRouter>
+              <HotkeyActivator />
+              <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/auth/login" element={<Login />} />
               
@@ -104,9 +117,11 @@ function App() {
                 <Route path="profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Route>
-            </Routes>
-          </BrowserRouter>
-        </AlertProvider>
+              </Routes>
+            </BrowserRouter>
+            </VoiceSessionProvider>
+          </AlertProvider>
+        </SidebarProvider>
       </AuthProvider>
     </NotificationProvider>
   );

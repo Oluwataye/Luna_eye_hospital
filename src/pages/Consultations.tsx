@@ -6,6 +6,7 @@ import {
   History as HistoryIcon, Droplets, Target, 
   ClipboardList, AlertTriangle, Download, Info, AlertCircle
 } from 'lucide-react';
+import { VoiceInputWrapper, VoiceRecordingBadge } from '../components/voice';
 
 const SNELLEN_OPTIONS = ['6/6', '6/9', '6/12', '6/18', '6/24', '6/36', '6/60', '3/60', '1/60', 'CF', 'HM', 'PL', 'NPL'];
 
@@ -726,25 +727,81 @@ export const Consultations: React.FC = () => {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: '32px' }}>
                 <ClinicalField label="Chief Complaint" fullWidth>
-                  <textarea className="clinical-textarea" name="complaint" value={formData.complaint} onChange={handleInputChange} placeholder="Reason for visit..." style={{ height: '120px' }} required disabled={isLocked} />
+                  <VoiceInputWrapper
+                    fieldName="complaint"
+                    value={formData.complaint}
+                    onChange={(val) => { setFormData((prev: any) => ({ ...prev, complaint: val })); setIsDirty(true); }}
+                    disabled={isLocked}
+                    visitId={selectedPatient?.visit_id || selectedPatient?.id}
+                  >
+                    <textarea className="clinical-textarea" name="complaint" value={formData.complaint} onChange={handleInputChange} placeholder="Reason for visit..." style={{ height: '120px' }} required disabled={isLocked} />
+                  </VoiceInputWrapper>
                 </ClinicalField>
                 <ClinicalField label="History of Present Illness (HPI)" fullWidth>
-                  <textarea className="clinical-textarea" name="hpi" value={formData.hpi} onChange={handleInputChange} placeholder="Details of current symptoms..." style={{ height: '120px' }} disabled={isLocked} />
+                  <VoiceInputWrapper
+                    fieldName="hpi"
+                    value={formData.hpi}
+                    onChange={(val) => { setFormData((prev: any) => ({ ...prev, hpi: val })); setIsDirty(true); }}
+                    disabled={isLocked}
+                    visitId={selectedPatient?.visit_id || selectedPatient?.id}
+                  >
+                    <textarea className="clinical-textarea" name="hpi" value={formData.hpi} onChange={handleInputChange} placeholder="Details of current symptoms..." style={{ height: '120px' }} disabled={isLocked} />
+                  </VoiceInputWrapper>
                 </ClinicalField>
                 <ClinicalField label="Ocular History">
-                  <textarea className="clinical-textarea" name="ocular_history" value={formData.ocular_history} onChange={handleInputChange} placeholder="Previous conditions, surgeries..." style={{ height: '100px' }} disabled={isLocked} />
+                  <VoiceInputWrapper
+                    fieldName="ocular_history"
+                    value={formData.ocular_history}
+                    onChange={(val) => { setFormData((prev: any) => ({ ...prev, ocular_history: val })); setIsDirty(true); }}
+                    disabled={isLocked}
+                    visitId={selectedPatient?.visit_id || selectedPatient?.id}
+                  >
+                    <textarea className="clinical-textarea" name="ocular_history" value={formData.ocular_history} onChange={handleInputChange} placeholder="Previous conditions, surgeries..." style={{ height: '100px' }} disabled={isLocked} />
+                  </VoiceInputWrapper>
                 </ClinicalField>
                 <ClinicalField label="Medical/Systemic History">
-                  <textarea className="clinical-textarea" name="medical_history" value={formData.medical_history} onChange={handleInputChange} placeholder="DM, Hypertension, etc..." style={{ height: '100px' }} disabled={isLocked} />
+                  <VoiceInputWrapper
+                    fieldName="medical_history"
+                    value={formData.medical_history}
+                    onChange={(val) => { setFormData((prev: any) => ({ ...prev, medical_history: val })); setIsDirty(true); }}
+                    disabled={isLocked}
+                    visitId={selectedPatient?.visit_id || selectedPatient?.id}
+                  >
+                    <textarea className="clinical-textarea" name="medical_history" value={formData.medical_history} onChange={handleInputChange} placeholder="DM, Hypertension, etc..." style={{ height: '100px' }} disabled={isLocked} />
+                  </VoiceInputWrapper>
                 </ClinicalField>
                 <ClinicalField label="Drug History">
-                  <textarea className="clinical-textarea" name="drug_history" value={formData.drug_history} onChange={handleInputChange} placeholder="Current medications..." style={{ height: '100px' }} disabled={isLocked} />
+                  <VoiceInputWrapper
+                    fieldName="drug_history"
+                    value={formData.drug_history}
+                    onChange={(val) => { setFormData((prev: any) => ({ ...prev, drug_history: val })); setIsDirty(true); }}
+                    disabled={isLocked}
+                    visitId={selectedPatient?.visit_id || selectedPatient?.id}
+                  >
+                    <textarea className="clinical-textarea" name="drug_history" value={formData.drug_history} onChange={handleInputChange} placeholder="Current medications..." style={{ height: '100px' }} disabled={isLocked} />
+                  </VoiceInputWrapper>
                 </ClinicalField>
                 <ClinicalField label="Allergies">
-                  <textarea className="clinical-textarea" name="allergies" value={formData.allergies} onChange={handleInputChange} placeholder="Allergic reactions..." style={{ height: '100px', border: formData.allergies ? '2px solid #ef4444' : '' }} disabled={isLocked} />
+                  <VoiceInputWrapper
+                    fieldName="allergies"
+                    value={formData.allergies}
+                    onChange={(val) => { setFormData((prev: any) => ({ ...prev, allergies: val })); setIsDirty(true); }}
+                    disabled={isLocked}
+                    visitId={selectedPatient?.visit_id || selectedPatient?.id}
+                  >
+                    <textarea className="clinical-textarea" name="allergies" value={formData.allergies} onChange={handleInputChange} placeholder="Allergic reactions..." style={{ height: '100px', border: formData.allergies ? '2px solid #ef4444' : '' }} disabled={isLocked} />
+                  </VoiceInputWrapper>
                 </ClinicalField>
                 <ClinicalField label="Family History" fullWidth>
-                  <textarea className="clinical-textarea" name="family_history" value={formData.family_history} onChange={handleInputChange} placeholder="Hereditary conditions..." style={{ height: '80px' }} disabled={isLocked} />
+                  <VoiceInputWrapper
+                    fieldName="family_history"
+                    value={formData.family_history}
+                    onChange={(val) => { setFormData((prev: any) => ({ ...prev, family_history: val })); setIsDirty(true); }}
+                    disabled={isLocked}
+                    visitId={selectedPatient?.visit_id || selectedPatient?.id}
+                  >
+                    <textarea className="clinical-textarea" name="family_history" value={formData.family_history} onChange={handleInputChange} placeholder="Hereditary conditions..." style={{ height: '80px' }} disabled={isLocked} />
+                  </VoiceInputWrapper>
                 </ClinicalField>
               </div>
             </div>
@@ -780,13 +837,21 @@ export const Consultations: React.FC = () => {
 
               <div className="leh-form-group">
                 <label className="clinical-label-premium">Consultant's Observation Notes</label>
-                <textarea 
-                  className="clinical-textarea" 
-                  name="vitals_notes" 
-                  value={formData.vitals_notes} 
-                  onChange={handleInputChange} 
-                  placeholder="Enter any specific observations regarding patient vitals..."
-                />
+                <VoiceInputWrapper
+                  fieldName="vitals_notes"
+                  value={formData.vitals_notes}
+                  onChange={(val) => { setFormData((prev: any) => ({ ...prev, vitals_notes: val })); setIsDirty(true); }}
+                  disabled={isLocked}
+                  visitId={selectedPatient?.visit_id || selectedPatient?.id}
+                >
+                  <textarea 
+                    className="clinical-textarea" 
+                    name="vitals_notes" 
+                    value={formData.vitals_notes} 
+                    onChange={handleInputChange} 
+                    placeholder="Enter any specific observations regarding patient vitals..."
+                  />
+                </VoiceInputWrapper>
               </div>
             </div>
           </div>
@@ -966,15 +1031,23 @@ export const Consultations: React.FC = () => {
 
               <div className="leh-form-group" style={{ marginTop: '32px' }}>
                 <label className="clinical-label-premium">Visual Acuity Clinical Notes</label>
-                <textarea 
-                  className="clinical-textarea" 
-                  name="va_notes" 
-                  value={formData.va_notes} 
-                  onChange={handleInputChange} 
-                  placeholder="Enter any notes on visual acuity, test behaviors, anomalies..."
+                <VoiceInputWrapper
+                  fieldName="va_notes"
+                  value={formData.va_notes}
+                  onChange={(val) => { setFormData((prev: any) => ({ ...prev, va_notes: val })); setIsDirty(true); }}
                   disabled={isLocked}
-                  style={{ height: '80px' }}
-                />
+                  visitId={selectedPatient?.visit_id || selectedPatient?.id}
+                >
+                  <textarea 
+                    className="clinical-textarea" 
+                    name="va_notes" 
+                    value={formData.va_notes} 
+                    onChange={handleInputChange} 
+                    placeholder="Enter any notes on visual acuity, test behaviors, anomalies..."
+                    disabled={isLocked}
+                    style={{ height: '80px' }}
+                  />
+                </VoiceInputWrapper>
               </div>
 
             </div>
@@ -1301,7 +1374,15 @@ export const Consultations: React.FC = () => {
                 />
                 <div className="leh-form-group">
                    <label className="clinical-label-premium">Posterior Segment Summary</label>
-                   <textarea className="clinical-textarea" name="fs_summary" value={formData.fs_summary} onChange={handleInputChange} placeholder="Overall posterior pole assessment..." style={{ height: '80px' }} disabled={isLocked} />
+                   <VoiceInputWrapper
+                     fieldName="fs_summary"
+                     value={formData.fs_summary}
+                     onChange={(val) => { setFormData((prev: any) => ({ ...prev, fs_summary: val })); setIsDirty(true); }}
+                     disabled={isLocked}
+                     visitId={selectedPatient?.visit_id || selectedPatient?.id}
+                   >
+                     <textarea className="clinical-textarea" name="fs_summary" value={formData.fs_summary} onChange={handleInputChange} placeholder="Overall posterior pole assessment..." style={{ height: '80px' }} disabled={isLocked} />
+                   </VoiceInputWrapper>
                 </div>
               </div>
             </div>
@@ -1341,7 +1422,15 @@ export const Consultations: React.FC = () => {
               />
               <div className="leh-form-group" style={{ marginTop: '24px' }}>
                  <label className="clinical-label-premium">CVF Clinical Notes</label>
-                 <textarea className="clinical-textarea" name="cvf_notes" value={formData.cvf_notes} onChange={handleInputChange} placeholder="Describe any field defects or visual field details..." style={{ height: '80px' }} disabled={isLocked} />
+                 <VoiceInputWrapper
+                   fieldName="cvf_notes"
+                   value={formData.cvf_notes}
+                   onChange={(val) => { setFormData((prev: any) => ({ ...prev, cvf_notes: val })); setIsDirty(true); }}
+                   disabled={isLocked}
+                   visitId={selectedPatient?.visit_id || selectedPatient?.id}
+                 >
+                   <textarea className="clinical-textarea" name="cvf_notes" value={formData.cvf_notes} onChange={handleInputChange} placeholder="Describe any field defects or visual field details..." style={{ height: '80px' }} disabled={isLocked} />
+                 </VoiceInputWrapper>
               </div>
             </div>
           </div>
@@ -1370,7 +1459,15 @@ export const Consultations: React.FC = () => {
               />
               <div className="leh-form-group" style={{ marginTop: '24px' }}>
                  <label className="clinical-label-premium">Pachymetry Clinical Notes</label>
-                 <textarea className="clinical-textarea" name="pachymetry_notes" value={formData.pachymetry_notes} onChange={handleInputChange} placeholder="Enter any notes on corneal thickness or glaucoma corrections..." style={{ height: '80px' }} disabled={isLocked} />
+                 <VoiceInputWrapper
+                   fieldName="pachymetry_notes"
+                   value={formData.pachymetry_notes}
+                   onChange={(val) => { setFormData((prev: any) => ({ ...prev, pachymetry_notes: val })); setIsDirty(true); }}
+                   disabled={isLocked}
+                   visitId={selectedPatient?.visit_id || selectedPatient?.id}
+                 >
+                   <textarea className="clinical-textarea" name="pachymetry_notes" value={formData.pachymetry_notes} onChange={handleInputChange} placeholder="Enter any notes on corneal thickness or glaucoma corrections..." style={{ height: '80px' }} disabled={isLocked} />
+                 </VoiceInputWrapper>
               </div>
             </div>
           </div>
@@ -1579,15 +1676,23 @@ export const Consultations: React.FC = () => {
               {/* General Notes */}
               <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid var(--leh-border-light)' }}>
                 <ClinicalField label="General Investigation Notes" fullWidth>
-                  <textarea
-                    className="clinical-textarea"
-                    name="investigations_notes"
+                  <VoiceInputWrapper
+                    fieldName="investigations_notes"
                     value={formData.investigations_notes}
-                    onChange={handleInputChange}
-                    placeholder="Additional notes on investigations ordered..."
-                    style={{ height: '80px' }}
+                    onChange={(val) => { setFormData((prev: any) => ({ ...prev, investigations_notes: val })); setIsDirty(true); }}
                     disabled={isLocked}
-                  />
+                    visitId={selectedPatient?.visit_id || selectedPatient?.id}
+                  >
+                    <textarea
+                      className="clinical-textarea"
+                      name="investigations_notes"
+                      value={formData.investigations_notes}
+                      onChange={handleInputChange}
+                      placeholder="Additional notes on investigations ordered..."
+                      style={{ height: '80px' }}
+                      disabled={isLocked}
+                    />
+                  </VoiceInputWrapper>
                 </ClinicalField>
               </div>
             </div>
@@ -1622,7 +1727,15 @@ export const Consultations: React.FC = () => {
 
                 <div className="leh-form-group">
                    <label className="clinical-label-premium">Other/Specific Findings (ICD-10 Notes)</label>
-                   <textarea className="clinical-textarea" name="diagnosis_notes" value={formData.diagnosis_notes} onChange={handleInputChange} placeholder="Additional diagnostic details, staging, or specific ICD codes..." style={{ height: '120px' }} disabled={isLocked} />
+                   <VoiceInputWrapper
+                     fieldName="diagnosis_notes"
+                     value={formData.diagnosis_notes}
+                     onChange={(val) => { setFormData((prev: any) => ({ ...prev, diagnosis_notes: val })); setIsDirty(true); }}
+                     disabled={isLocked}
+                     visitId={selectedPatient?.visit_id || selectedPatient?.id}
+                   >
+                     <textarea className="clinical-textarea" name="diagnosis_notes" value={formData.diagnosis_notes} onChange={handleInputChange} placeholder="Additional diagnostic details, staging, or specific ICD codes..." style={{ height: '120px' }} disabled={isLocked} />
+                   </VoiceInputWrapper>
                 </div>
               </div>
             </div>
@@ -1767,6 +1880,97 @@ export const Consultations: React.FC = () => {
                    <ClinicalField label="Lens Type"><input className="clinical-input" value={formData.plan_lens_type} onChange={(e) => setFormData((prev: any) => ({ ...prev, plan_lens_type: e.target.value }))} placeholder="e.g. Bifocal, Photochromic" /></ClinicalField>
                 </div>
               </div>
+
+              {/* Clinical Notes & Departmental Instructions */}
+              <div className="clinical-section-card">
+                <div className="clinical-group-header">
+                   <div className="clinical-group-title">Clinical Notes & Departmental Instructions</div>
+                </div>
+
+                <div style={{ display: 'grid', gap: '24px' }}>
+                  <ClinicalField label="Special Clinical Instructions & Follow-up Plan" fullWidth>
+                    <VoiceInputWrapper
+                      fieldName="plan_special_instructions"
+                      value={formData.plan_special_instructions || ''}
+                      onChange={(val) => { setFormData((prev: any) => ({ ...prev, plan_special_instructions: val })); setIsDirty(true); }}
+                      disabled={isLocked}
+                      visitId={selectedPatient?.visit_id || selectedPatient?.id}
+                    >
+                      <textarea
+                        className="clinical-textarea"
+                        name="plan_special_instructions"
+                        value={formData.plan_special_instructions || ''}
+                        onChange={handleInputChange}
+                        placeholder="Detailed management plan, patient counseling, follow-up timeline..."
+                        style={{ height: '90px' }}
+                        disabled={isLocked}
+                      />
+                    </VoiceInputWrapper>
+                  </ClinicalField>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+                    <ClinicalField label="Private Internal Clinical Notes">
+                      <VoiceInputWrapper
+                        fieldName="notes_internal"
+                        value={formData.notes_internal || ''}
+                        onChange={(val) => { setFormData((prev: any) => ({ ...prev, notes_internal: val })); setIsDirty(true); }}
+                        disabled={isLocked}
+                        visitId={selectedPatient?.visit_id || selectedPatient?.id}
+                      >
+                        <textarea
+                          className="clinical-textarea"
+                          name="notes_internal"
+                          value={formData.notes_internal || ''}
+                          onChange={handleInputChange}
+                          placeholder="Confidential clinician notes..."
+                          style={{ height: '80px' }}
+                          disabled={isLocked}
+                        />
+                      </VoiceInputWrapper>
+                    </ClinicalField>
+
+                    <ClinicalField label="Notes for Reception / Cashier">
+                      <VoiceInputWrapper
+                        fieldName="notes_reception"
+                        value={formData.notes_reception || ''}
+                        onChange={(val) => { setFormData((prev: any) => ({ ...prev, notes_reception: val })); setIsDirty(true); }}
+                        disabled={isLocked}
+                        visitId={selectedPatient?.visit_id || selectedPatient?.id}
+                      >
+                        <textarea
+                          className="clinical-textarea"
+                          name="notes_reception"
+                          value={formData.notes_reception || ''}
+                          onChange={handleInputChange}
+                          placeholder="Handover instructions for reception/billing..."
+                          style={{ height: '80px' }}
+                          disabled={isLocked}
+                        />
+                      </VoiceInputWrapper>
+                    </ClinicalField>
+
+                    <ClinicalField label="Instructions for Nurse / Clinic">
+                      <VoiceInputWrapper
+                        fieldName="notes_nurse"
+                        value={formData.notes_nurse || ''}
+                        onChange={(val) => { setFormData((prev: any) => ({ ...prev, notes_nurse: val })); setIsDirty(true); }}
+                        disabled={isLocked}
+                        visitId={selectedPatient?.visit_id || selectedPatient?.id}
+                      >
+                        <textarea
+                          className="clinical-textarea"
+                          name="notes_nurse"
+                          value={formData.notes_nurse || ''}
+                          onChange={handleInputChange}
+                          placeholder="Nursing procedures, drops administration..."
+                          style={{ height: '80px' }}
+                          disabled={isLocked}
+                        />
+                      </VoiceInputWrapper>
+                    </ClinicalField>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         );
@@ -1823,7 +2027,15 @@ export const Consultations: React.FC = () => {
                    <div className="animate-slide-up" style={{ marginTop: '24px' }}>
                      <div className="leh-form-group">
                        <label className="clinical-label-premium">Reason for Admission</label>
-                       <textarea className="clinical-textarea" name="admission_reason" value={formData.admission_reason} onChange={handleInputChange} placeholder="e.g. Post-op monitoring, intensive topical therapy..." />
+                       <VoiceInputWrapper
+                         fieldName="admission_reason"
+                         value={formData.admission_reason || ''}
+                         onChange={(val) => { setFormData((prev: any) => ({ ...prev, admission_reason: val })); setIsDirty(true); }}
+                         disabled={isLocked}
+                         visitId={selectedPatient?.visit_id || selectedPatient?.id}
+                       >
+                         <textarea className="clinical-textarea" name="admission_reason" value={formData.admission_reason} onChange={handleInputChange} placeholder="e.g. Post-op monitoring, intensive topical therapy..." />
+                       </VoiceInputWrapper>
                      </div>
                    </div>
                  )}
@@ -1880,6 +2092,7 @@ export const Consultations: React.FC = () => {
       {selectedPatient && (
         <div style={{ padding: '14px 32px', background: '#f8fafc', borderBottom: '1px solid var(--leh-border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 50 }} className="no-print">
            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <VoiceRecordingBadge />
               <button className="leh-btn-outline" onClick={() => setShowTriageModal(true)} style={{ background: 'white' }}>
                  <HistoryIcon size={16} />
                  <span style={{ fontSize: '11px' }}>VIEW TRIAGE</span>

@@ -721,4 +721,22 @@ export const api = {
   async deleteInvestigationTemplate(id: number) {
     return request(`/settings/investigations/templates/${id}`, { method: 'DELETE' });
   },
+
+  // Voice AI & Dictation Settings
+  async getVoiceSettings() {
+    return request('/voice/settings');
+  },
+  async updateVoiceSettings(data: any) {
+    return request('/voice/settings', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+  async testVoiceLLM(data: { ollama_base_url?: string; ollama_model?: string }) {
+    return request('/voice/test-llm', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
 };
+

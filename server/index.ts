@@ -31,6 +31,10 @@ import { createAuthMiddleware } from './src/infrastructure/web/middlewares/auth.
 import { PatientRepositorySqlite } from './src/adapters/repositories/patient.repository.sqlite';
 import { PatientUseCase } from './src/usecases/patient/patient.usecase';
 import { PatientController } from './src/adapters/controllers/patient.controller';
+import voiceRoutes from './routes/voice';
+import { startAudioCleanupJob } from './jobs/audioCleanup';
+import { setupVoiceWebSocket } from './websocket';
+import { spawn } from 'child_process';
 
 // Extend Express Request namespace for authenticateToken compatibility
 declare global {
@@ -412,6 +416,9 @@ app.use('/api/users', authorizeRoles(['Admin']));
 // Mount apiRouter for legacy endpoints
 const apiRouter = express.Router();
 app.use('/api', apiRouter);
+
+// Voice Dictation & Live Transcription Routes
+app.use('/api/voice', voiceRoutes);
 
 // --- LAN DOMAIN RESOLVER (NBNS/DNS) ---
 // This allows other computers on the LAN to find this server by typing 'lunaeyehospital'
@@ -3325,6 +3332,41 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   ALL_IPS.forEach(ip => console.log(`  - ${ip.name}: http://${ip.address}/`));
   console.log(`Domain: http://${DOMAIN_NAME}/`);
   console.log(`--------------------------------------------------`);
+
+  // Start nightly voice audio cleanup cron
+  try {
+    startAudioCleanupJob();
+  } catch (cronErr) {
+    console.error('[CRON] Failed to start audio cleanup job:', cronErr);
+  }
+
+  // Attach real-time Voice Dictation WebSocket server
+  try {
+    setupVoiceWebSocket(server);
+  } catch (wsErr) {
+    console.error('[VOICE WS] Failed to initialize WebSocket server:', wsErr);
+  }
+
+  // Ensure local faster-whisper microservice is running
+  const startWhisperService = () => {
+    const venvPython = path.join(writableRootDir, 'whisper_service', '.venv', 'Scripts', 'python.exe');
+    const whisperScript = path.join(writableRootDir, 'whisper_service', 'whisper_service.py');
+    if (fs.existsSync(venvPython) && fs.existsSync(whisperScript)) {
+      fetch('http://127.0.0.1:8765/health')
+        .then(() => console.log('[WHISPER] Local faster-whisper service is online at http://127.0.0.1:8765'))
+        .catch(() => {
+          console.log('[WHISPER] Spawning local faster-whisper background microservice...');
+          const pyProc = spawn(venvPython, [whisperScript], {
+            detached: true,
+            stdio: 'ignore',
+            windowsHide: true
+          });
+          pyProc.unref();
+          console.log('[WHISPER] faster-whisper service process started.');
+        });
+    }
+  };
+  startWhisperService();
 });
 
 // ── 404 catch-all (must be after all routes) ──

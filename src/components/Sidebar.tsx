@@ -16,13 +16,17 @@ import {
   Printer,
   Eye,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  PanelLeftClose,
+  PanelLeftOpen
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useSidebar } from '../context/SidebarContext';
 import './Sidebar.css';
 
 export const Sidebar: React.FC = () => {
   const { user, logout } = useAuth();
+  const { collapsed, toggle } = useSidebar();
   const navigate = useNavigate();
   
   const navGroups = React.useMemo(() => [
@@ -71,19 +75,31 @@ export const Sidebar: React.FC = () => {
   };
 
   return (
-    <aside className="sidebar no-print">
+    <aside className={`sidebar no-print${collapsed ? ' sidebar--collapsed' : ''}`}>
+      {/* Brand */}
       <div className="sidebar-brand">
         <div className="sidebar-brand-container">
           <div className="sidebar-logo">
             <Eye size={24} strokeWidth={2.5} />
           </div>
-          <div className="sidebar-brand-text">
+          <div className={`sidebar-brand-text${collapsed ? ' sidebar-brand-text--hidden' : ''}`}>
             <h1 className="brand-name">Luna Eye</h1>
             <p className="brand-sub">Enterprise EMR</p>
           </div>
         </div>
+
+        {/* Toggle button */}
+        <button
+          className="sidebar-toggle-btn"
+          onClick={toggle}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+        </button>
       </div>
 
+      {/* Nav */}
       <div className="sidebar-scrollable">
         <nav className="sidebar-nav">
           {navGroups.map((group) => {
@@ -95,16 +111,23 @@ export const Sidebar: React.FC = () => {
 
             return (
               <div key={group.label} className="nav-group">
-                <div className="nav-group-label">{group.label}</div>
+                {!collapsed && (
+                  <div className="nav-group-label">{group.label}</div>
+                )}
                 {filteredItems.map((item) => (
                   <NavLink
                     key={item.path}
                     to={item.path}
                     className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+                    title={collapsed ? item.label : undefined}
                   >
                     <item.icon className="sidebar-icon" size={20} />
-                    <span className="sidebar-text">{item.label}</span>
-                    <ChevronRight className="sidebar-chevron" size={14} />
+                    {!collapsed && (
+                      <>
+                        <span className="sidebar-text">{item.label}</span>
+                        <ChevronRight className="sidebar-chevron" size={14} />
+                      </>
+                    )}
                   </NavLink>
                 ))}
               </div>
@@ -113,19 +136,22 @@ export const Sidebar: React.FC = () => {
         </nav>
       </div>
 
+      {/* Footer */}
       <div className="sidebar-footer">
         <div className="sidebar-profile">
           <div className="profile-avatar">
             {user.full_name?.charAt(0) || user.username?.charAt(0)}
           </div>
-          <div className="profile-info">
-            <span className="profile-name">{user.full_name || user.username}</span>
-            <span className="profile-role">{user.role}</span>
-          </div>
+          {!collapsed && (
+            <div className="profile-info">
+              <span className="profile-name">{user.full_name || user.username}</span>
+              <span className="profile-role">{user.role}</span>
+            </div>
+          )}
         </div>
         <button className="logout-btn" onClick={handleLogout} title="Sign Out">
           <LogOut size={18} />
-          <span>Sign Out</span>
+          {!collapsed && <span>Sign Out</span>}
         </button>
       </div>
     </aside>

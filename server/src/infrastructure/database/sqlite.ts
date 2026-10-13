@@ -390,6 +390,22 @@ const db = new sqlite.Database(dbPath, (err: Error | null) => {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )`);
 
+      // Voice Sessions table
+      db.run(`CREATE TABLE IF NOT EXISTS voice_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        visit_id INTEGER,
+        field_name TEXT NOT NULL,
+        voice_mode TEXT,
+        audio_file_path TEXT,
+        raw_transcript TEXT,
+        ai_filter_applied INTEGER DEFAULT 0,
+        ai_processing_ms INTEGER,
+        recording_duration_sec INTEGER,
+        recording_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        audio_deleted_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`);
+
       // Procurement table
       db.run(`CREATE TABLE IF NOT EXISTS procurement (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

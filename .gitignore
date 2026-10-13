@@ -64,3 +64,8 @@ emr_run_log.txt
 test_env_out.txt
 test-launch.bat
 *.backup
+
+# Voice audio files and local whisper venv
+server/audio/
+server/whisper_service/.venv/
+server/whisper_service/models/
