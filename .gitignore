@@ -69,3 +69,4 @@ test-launch.bat
 server/audio/
 server/whisper_service/.venv/
 server/whisper_service/models/
+*.lnk

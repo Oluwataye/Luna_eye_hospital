@@ -1,10 +1,13 @@
 const db = require('../server/db');
-db.run("UPDATE users SET password = 'password' WHERE username = 'admin'", function(err) {
+const bcrypt = require('bcryptjs');
+const newPassword = 'admin123';
+const hash = bcrypt.hashSync(newPassword, 10);
+
+db.run("UPDATE users SET password = ? WHERE username = 'admin'", [hash], function(err) {
   if (err) {
-    console.error(err);
-    process.exit(1);
+    console.error('Error:', err);
   } else {
-    console.log('Password reset successfully to "password".');
-    process.exit(0);
+    console.log(`✅ Admin password successfully reset to: "${newPassword}"`);
+    console.log(`   Rows updated: ${this.changes}`);
   }
 });
