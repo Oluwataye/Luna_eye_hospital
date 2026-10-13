@@ -6,15 +6,17 @@ import db from '../db';
 
 const router = express.Router();
 
-// Audio storage directory
+// Audio storage & configuration directory (pkg-safe)
+const isPackaged = typeof (process as any).pkg !== 'undefined';
 const serverRootDir = __dirname.includes('dist') ? path.join(__dirname, '..') : path.resolve(__dirname, '..');
-const AUDIO_DIR = path.resolve(serverRootDir, 'audio');
+const writableRootDir = isPackaged ? path.dirname(process.execPath) : serverRootDir;
+const AUDIO_DIR = path.resolve(writableRootDir, 'audio');
 if (!fs.existsSync(AUDIO_DIR)) {
   fs.mkdirSync(AUDIO_DIR, { recursive: true });
 }
 
 // Configuration file path
-const CONFIG_FILE = path.resolve(serverRootDir, 'voice_config.json');
+const CONFIG_FILE = path.resolve(writableRootDir, 'voice_config.json');
 
 export interface VoiceConfig {
   active_whisper_model: string;

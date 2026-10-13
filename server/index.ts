@@ -3162,7 +3162,13 @@ app.get('/api/billing/receipts/:receipt_number', (req, res) => {
 
 
 // --- SERVE FRONTEND ---
-const DIST_PATH = path.join(serverRootDir, '..', 'dist');
+let DIST_PATH = path.join(serverRootDir, '..', 'dist');
+if (!fs.existsSync(DIST_PATH) && isPackaged) {
+  const diskDist = path.join(writableRootDir, '..', 'dist');
+  if (fs.existsSync(diskDist)) {
+    DIST_PATH = diskDist;
+  }
+}
 if (fs.existsSync(DIST_PATH)) {
   app.use(express.static(DIST_PATH));
   app.get(/^(?!\/api).+/, (req, res, next) => {
@@ -3349,14 +3355,23 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 
   // Ensure local faster-whisper microservice is running
   const startWhisperService = () => {
-    const venvPython = path.join(writableRootDir, 'whisper_service', '.venv', 'Scripts', 'python.exe');
-    const whisperScript = path.join(writableRootDir, 'whisper_service', 'whisper_service.py');
+    let venvPython = path.join(writableRootDir, 'whisper_service', '.venv', 'Scripts', 'python.exe');
+    let whisperScript = path.join(writableRootDir, 'whisper_service', 'whisper_service.py');
+    if (!fs.existsSync(venvPython)) {
+      const altVenv = path.join(writableRootDir, '..', 'server', 'whisper_service', '.venv', 'Scripts', 'python.exe');
+      const altScript = path.join(writableRootDir, '..', 'server', 'whisper_service', 'whisper_service.py');
+      if (fs.existsSync(altVenv)) {
+        venvPython = altVenv;
+        whisperScript = altScript;
+      }
+    }
     if (fs.existsSync(venvPython) && fs.existsSync(whisperScript)) {
       fetch('http://127.0.0.1:8765/health')
         .then(() => console.log('[WHISPER] Local faster-whisper service is online at http://127.0.0.1:8765'))
         .catch(() => {
           console.log('[WHISPER] Spawning local faster-whisper background microservice...');
           const pyProc = spawn(venvPython, [whisperScript], {
+            cwd: path.dirname(whisperScript),
             detached: true,
             stdio: 'ignore',
             windowsHide: true
