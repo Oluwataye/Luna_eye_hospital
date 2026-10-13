@@ -27,11 +27,15 @@ const isDryRun = args.includes('--dry-run');
 const isForce = args.includes('--force');
 
 function checkEnvironmentBypass() {
-  const bypassVars = ['SKIP_EMR_PACKAGE', 'SKIP_PACKAGING', 'SKIP_PACKAGE', 'NO_VERIFY'];
+  const bypassVars = ['SKIP_EMR_PACKAGE', 'SKIP_PACKAGING', 'SKIP_PACKAGE', 'NO_VERIFY', 'EMR_CI_OFFLOAD'];
   for (const v of bypassVars) {
     if (process.env[v] === '1' || process.env[v] === 'true') {
-      console.log(`\n\x1b[33m⚡ [Git Pre-Push Hook] Environment flag ${v}=1 detected.\x1b[0m`);
-      console.log('   Bypassing offline standalone executable packaging pipeline.\n');
+      console.log(`\n\x1b[33m⚡ [Git Pre-Push Hook] Flag ${v}=1 detected.\x1b[0m`);
+      if (v === 'EMR_CI_OFFLOAD') {
+        console.log('   Offloading release packaging to GitHub Actions CI runner in the cloud.\n');
+      } else {
+        console.log('   Bypassing offline standalone executable packaging pipeline.\n');
+      }
       return true;
     }
   }
@@ -238,7 +242,7 @@ Manual Bypasses:
   }
 
   console.log('\n\x1b[33m⚡ Automatically compiling and packaging standalone release before push...\x1b[0m');
-  console.log('\x1b[90m   💡 Tip: Use "SKIP_EMR_PACKAGE=1 git push" or "git push --no-verify" to bypass.\x1b[0m\n');
+  console.log('\x1b[90m   💡 Tip: Use "EMR_CI_OFFLOAD=1 git push" to offload to GitHub Actions, or "git push --no-verify" to skip.\x1b[0m\n');
 
   try {
     execSync('npm run release:standalone', {

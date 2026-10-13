@@ -1,0 +1,104 @@
+name: Release Standalone EMR Package
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'server/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      create_github_release:
+        description: 'Publish as GitHub Release'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-standalone-windows:
+    name: Build & Package Windows Standalone (.exe)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install Frontend Dependencies
+        run: npm ci
+
+      - name: Install Server Dependencies
+        working-directory: ./server
+        run: npm install
+
+      - name: Compile and Package Standalone Executable
+        run: npm run release:standalone
+
+      - name: Prepare Standalone Distribution Bundle
+        shell: pwsh
+        run: |
+          $distDir = "release-distribution"
+          New-Item -ItemType Directory -Path $distDir -Force | Out-Null
+          
+          # Copy executable and runtime dependencies
+          Copy-Item -Path "packaged-release\VisionCare-EMR.exe" -Destination $distDir -Force
+          Copy-Item -Path "packaged-release\dist" -Destination $distDir -Recurse -Force
+          Copy-Item -Path "packaged-release\voice_config.json" -Destination $distDir -Force -ErrorAction SilentlyContinue
+          Copy-Item -Path "packaged-release\README.txt" -Destination $distDir -Force -ErrorAction SilentlyContinue
+          
+          # Copy native SQLite module structure
+          $sqliteDest = "$distDir\node_modules\sqlite3\build\Release"
+          New-Item -ItemType Directory -Path $sqliteDest -Force | Out-Null
+          Copy-Item -Path "packaged-release\node_modules\sqlite3\build\Release\node_sqlite3.node" -Destination $sqliteDest -Force
+          
+          # Copy launcher scripts
+          Copy-Item -Path "start-visioncare-silent.vbs" -Destination $distDir -Force -ErrorAction SilentlyContinue
+          Copy-Item -Path "StartVisionCareEMR.vbs" -Destination $distDir -Force -ErrorAction SilentlyContinue
+          Copy-Item -Path "StopVisionCareEMR.vbs" -Destination $distDir -Force -ErrorAction SilentlyContinue
+          Copy-Item -Path "VisionCare-EMR.ico" -Destination $distDir -Force -ErrorAction SilentlyContinue
+          
+          # Archive into zip
+          Compress-Archive -Path "$distDir\*" -DestinationPath "VisionCare-EMR-Standalone-Windows-x64.zip" -Force
+          
+          Write-Host "Archive created: VisionCare-EMR-Standalone-Windows-x64.zip"
+          Get-Item "VisionCare-EMR-Standalone-Windows-x64.zip" | Select-Object Name, Length, LastWriteTime
+
+      - name: Upload Run Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: VisionCare-EMR-Windows-x64
+          path: |
+            VisionCare-EMR-Standalone-Windows-x64.zip
+            packaged-release/VisionCare-EMR.exe
+          retention-days: 14
+
+      - name: Create or Update GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.create_github_release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            VisionCare-EMR-Standalone-Windows-x64.zip
+            packaged-release/VisionCare-EMR.exe
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

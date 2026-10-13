@@ -65,9 +65,14 @@ function syncReleaseAssets() {
     console.log('   ✓ Synced voice_config.json into packaged-release/');
   }
 
-  // 3. Verify SQLite native addon
+  // 3. Verify and copy SQLite native addon
   const nativeBinding = path.resolve(RELEASE_DIR, 'node_modules', 'sqlite3', 'build', 'Release', 'node_sqlite3.node');
-  if (fs.existsSync(nativeBinding)) {
+  const serverBinding = path.resolve(SERVER_DIR, 'node_modules', 'sqlite3', 'build', 'Release', 'node_sqlite3.node');
+  if (!fs.existsSync(nativeBinding) && fs.existsSync(serverBinding)) {
+    fs.mkdirSync(path.dirname(nativeBinding), { recursive: true });
+    fs.copyFileSync(serverBinding, nativeBinding);
+    console.log('   ✓ Copied native SQLite3 binding from server/node_modules into packaged-release/');
+  } else if (fs.existsSync(nativeBinding)) {
     console.log('   ✓ Verified native SQLite3 binding (node_sqlite3.node) is present.');
   } else {
     console.warn('   ⚠ Warning: Native SQLite binding not found at: ' + nativeBinding);
