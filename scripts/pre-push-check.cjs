@@ -7,13 +7,17 @@
  * to guarantee that the offline packaged executable (VisionCare-EMR.exe)
  * is fully up to date and compiles cleanly before allowing the push.
  *
- * Bypass Options:
- *   - Environment variable: SKIP_EMR_PACKAGE=1 git push
- *   - Git native bypass:    git push --no-verify
- *   - CLI Dry Run mode:     node scripts/pre-push-check.cjs --dry-run
+ * Branch Targeting & Bypass:
+ *   - Only runs on release branches by default: main, master, release*
+ *   - Automatically bypasses for feature/experimental branches (feature/*, fix/*, etc.)
+ *   - Configurable via: EMR_PACKAGE_BRANCHES="main,release*"
+ *   - Manual env bypass: SKIP_EMR_PACKAGE=1 git push
+ *   - Git native bypass: git push --no-verify
+ *   - CLI Dry Run mode:  node scripts/pre-push-check.cjs --dry-run
  */
 
 const { execSync } = require('child_process');
+const fs = require('fs');
 const path = require('path');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
@@ -32,6 +36,88 @@ function checkEnvironmentBypass() {
     }
   }
   return false;
+}
+
+function getTargetPushInfo() {
+  const targets = [];
+  let isBranchDeletion = false;
+
+  // 1. Check CLI override: --branch <name>
+  const branchArgIndex = args.indexOf('--branch');
+  if (branchArgIndex !== -1 && args[branchArgIndex + 1]) {
+    return { branches: [args[branchArgIndex + 1]], isBranchDeletion: false };
+  }
+
+  // 2. Read piped stdin from Git if available
+  if (!process.stdin.isTTY) {
+    try {
+      const input = fs.readFileSync(0, 'utf-8');
+      if (input && input.trim()) {
+        const lines = input.trim().split(/\r?\n/);
+        for (const line of lines) {
+          const parts = line.trim().split(/\s+/);
+          // format: <local ref> <local sha1> <remote ref> <remote sha1>
+          if (parts.length >= 3) {
+            const localSha = parts[1];
+            const remoteRef = parts[2];
+            // Check if deleting branch (all 0s or (delete))
+            if (localSha === '0000000000000000000000000000000000000000' || parts[0] === '(delete)') {
+              isBranchDeletion = true;
+            }
+            const branchName = remoteRef.replace(/^refs\/heads\//, '');
+            targets.push(branchName);
+          }
+        }
+      }
+    } catch {
+      // stdin not readable or empty, fall through
+    }
+  }
+
+  // 3. Fallback: retrieve active local branch
+  if (targets.length === 0) {
+    try {
+      const current = execSync('git rev-parse --abbrev-ref HEAD', {
+        cwd: ROOT_DIR,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'ignore']
+      }).trim();
+      if (current && current !== 'HEAD') {
+        targets.push(current);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return {
+    branches: targets.length > 0 ? targets : ['main'],
+    isBranchDeletion
+  };
+}
+
+function checkBranchEligibility(targetBranches) {
+  // Configurable via EMR_PACKAGE_BRANCHES (comma separated patterns)
+  // Default: main, master, release*
+  const patternConfig = process.env.EMR_PACKAGE_BRANCHES || 'main,master,release*';
+  const patterns = patternConfig.split(',').map((p) => p.trim().toLowerCase()).filter(Boolean);
+
+  for (const branch of targetBranches) {
+    const bLower = branch.toLowerCase();
+    const matches = patterns.some((pattern) => {
+      if (pattern === '*') return true;
+      if (pattern.endsWith('*')) {
+        return bLower.startsWith(pattern.slice(0, -1));
+      }
+      return bLower === pattern;
+    });
+
+    if (matches) {
+      return { eligible: true, branch, patterns };
+    }
+  }
+
+  return { eligible: false, branch: targetBranches.join(', '), patterns };
 }
 
 function getChangedFiles() {
@@ -77,11 +163,17 @@ Usage:
   node scripts/pre-push-check.cjs [options]
 
 Options:
-  --dry-run   Simulate pre-push inspection without running the build
-  --force     Force execution of release:standalone even if no code changed
-  --help, -h  Show this help screen
+  --dry-run         Simulate pre-push inspection without running the build
+  --force           Force execution of release:standalone regardless of branch or diff
+  --branch <name>   Test eligibility for a specific target branch
+  --help, -h        Show this help screen
 
-Bypass during git push:
+Branch Target Policy:
+  Automated packaging is restricted to release branches (main, master, release*).
+  Pushes to feature/*, fix/*, chore/*, etc. are automatically bypassed.
+  Configure via: EMR_PACKAGE_BRANCHES="main,release*"
+
+Manual Bypasses:
   SKIP_EMR_PACKAGE=1 git push
   git push --no-verify
 `);
@@ -90,11 +182,31 @@ Bypass during git push:
 
   console.log('\x1b[36m⚡ [Git Pre-Push Hook] Inspecting push payload...\x1b[0m');
 
-  // Check 1: Environment variable bypass
+  // Check 1: Manual environment bypass
   if (checkEnvironmentBypass()) {
     process.exit(0);
   }
 
+  // Check 2: Branch target evaluation & remote deletion
+  const { branches, isBranchDeletion } = getTargetPushInfo();
+
+  if (isBranchDeletion) {
+    console.log('\x1b[32m✔ [Git Pre-Push Hook] Remote branch deletion detected. Skipping standalone repackaging.\x1b[0m\n');
+    process.exit(0);
+  }
+
+  const branchCheck = checkBranchEligibility(branches);
+
+  if (!branchCheck.eligible && !isForce) {
+    console.log(`\x1b[36mℹ [Git Pre-Push Hook] Target branch "${branchCheck.branch}" is a feature/non-release branch.\x1b[0m`);
+    console.log(`   Configured release branches: ${branchCheck.patterns.join(', ')}`);
+    console.log('   ✔ Automatically bypassing standalone repackaging for this push.\n');
+    process.exit(0);
+  }
+
+  console.log(`\x1b[32m✔ [Git Pre-Push Hook] Target branch "${branchCheck.branch}" is an active release branch.\x1b[0m`);
+
+  // Check 3: Modified files
   const files = getChangedFiles();
   const relevantFiles = files.filter(
     (file) =>
@@ -117,7 +229,7 @@ Bypass during git push:
     console.log(`   ...and ${relevantFiles.length - 5} more`);
   }
 
-  // Check 2: Dry Run Flag
+  // Check 4: Dry Run Flag
   if (isDryRun) {
     console.log('\n\x1b[36mℹ [Git Pre-Push Hook] --dry-run mode active:\x1b[0m');
     console.log('   Build trigger confirmed, but release packaging skipped due to --dry-run flag.');
