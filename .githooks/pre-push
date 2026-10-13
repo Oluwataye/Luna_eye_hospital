@@ -1,4 +1,5 @@
 #!/bin/sh
 # VisionCare EMR - Git Pre-Push Hook
 # Automatically repackages VisionCare-EMR.exe if src/ or server/ files changed.
-node scripts/pre-push-check.cjs
+# Bypass: SKIP_EMR_PACKAGE=1 git push   OR   git push --no-verify
+node scripts/pre-push-check.cjs "$@"

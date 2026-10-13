@@ -6,6 +6,11 @@
  * If changes are detected, automatically runs `npm run release:standalone`
  * to guarantee that the offline packaged executable (VisionCare-EMR.exe)
  * is fully up to date and compiles cleanly before allowing the push.
+ *
+ * Bypass Options:
+ *   - Environment variable: SKIP_EMR_PACKAGE=1 git push
+ *   - Git native bypass:    git push --no-verify
+ *   - CLI Dry Run mode:     node scripts/pre-push-check.cjs --dry-run
  */
 
 const { execSync } = require('child_process');
@@ -13,9 +18,25 @@ const path = require('path');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 
+const args = process.argv.slice(2);
+const isDryRun = args.includes('--dry-run');
+const isForce = args.includes('--force');
+
+function checkEnvironmentBypass() {
+  const bypassVars = ['SKIP_EMR_PACKAGE', 'SKIP_PACKAGING', 'SKIP_PACKAGE', 'NO_VERIFY'];
+  for (const v of bypassVars) {
+    if (process.env[v] === '1' || process.env[v] === 'true') {
+      console.log(`\n\x1b[33m⚡ [Git Pre-Push Hook] Environment flag ${v}=1 detected.\x1b[0m`);
+      console.log('   Bypassing offline standalone executable packaging pipeline.\n');
+      return true;
+    }
+  }
+  return false;
+}
+
 function getChangedFiles() {
   try {
-    // Try diffing against upstream tracking branch
+    // Diff against upstream tracking branch
     const output = execSync('git diff --name-only @{u} HEAD', {
       cwd: ROOT_DIR,
       encoding: 'utf-8',
@@ -48,7 +69,31 @@ function getChangedFiles() {
 }
 
 function main() {
+  if (args.includes('--help') || args.includes('-h')) {
+    console.log(`
+VisionCare EMR — Pre-Push Hook Inspector
+
+Usage:
+  node scripts/pre-push-check.cjs [options]
+
+Options:
+  --dry-run   Simulate pre-push inspection without running the build
+  --force     Force execution of release:standalone even if no code changed
+  --help, -h  Show this help screen
+
+Bypass during git push:
+  SKIP_EMR_PACKAGE=1 git push
+  git push --no-verify
+`);
+    process.exit(0);
+  }
+
   console.log('\x1b[36m⚡ [Git Pre-Push Hook] Inspecting push payload...\x1b[0m');
+
+  // Check 1: Environment variable bypass
+  if (checkEnvironmentBypass()) {
+    process.exit(0);
+  }
 
   const files = getChangedFiles();
   const relevantFiles = files.filter(
@@ -61,7 +106,7 @@ function main() {
       file === 'vite.config.ts'
   );
 
-  if (relevantFiles.length === 0) {
+  if (relevantFiles.length === 0 && !isForce) {
     console.log('\x1b[32m✔ [Git Pre-Push Hook] No changes in src/ or server/. Skipping standalone repackaging.\x1b[0m\n');
     process.exit(0);
   }
@@ -72,7 +117,16 @@ function main() {
     console.log(`   ...and ${relevantFiles.length - 5} more`);
   }
 
-  console.log('\n\x1b[33m⚡ Automatically compiling and packaging standalone release before push...\x1b[0m\n');
+  // Check 2: Dry Run Flag
+  if (isDryRun) {
+    console.log('\n\x1b[36mℹ [Git Pre-Push Hook] --dry-run mode active:\x1b[0m');
+    console.log('   Build trigger confirmed, but release packaging skipped due to --dry-run flag.');
+    console.log('   Push would proceed cleanly.\n');
+    process.exit(0);
+  }
+
+  console.log('\n\x1b[33m⚡ Automatically compiling and packaging standalone release before push...\x1b[0m');
+  console.log('\x1b[90m   💡 Tip: Use "SKIP_EMR_PACKAGE=1 git push" or "git push --no-verify" to bypass.\x1b[0m\n');
 
   try {
     execSync('npm run release:standalone', {
@@ -82,7 +136,8 @@ function main() {
     console.log('\n\x1b[32m✔ [Git Pre-Push Hook] Standalone packaging completed successfully. Proceeding with push!\x1b[0m\n');
     process.exit(0);
   } catch (err) {
-    console.error('\n\x1b[31m✖ [Git Pre-Push Hook ERROR] Standalone packaging failed! Aborting git push.\x1b[0m\n');
+    console.error('\n\x1b[31m✖ [Git Pre-Push Hook ERROR] Standalone packaging failed! Aborting git push.\x1b[0m');
+    console.error('\x1b[90m   To push anyway without packaging, run: SKIP_EMR_PACKAGE=1 git push\x1b[0m\n');
     process.exit(1);
   }
 }
