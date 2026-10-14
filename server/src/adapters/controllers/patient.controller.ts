@@ -6,9 +6,19 @@ export class PatientController {
 
   async getPatients(req: Request, res: Response): Promise<void> {
     try {
-      const search = req.query.search as string | undefined;
-      const limit = parseInt(req.query.limit as string) || 20;
-      const offset = parseInt(req.query.offset as string) || 0;
+      const q: any = (req as any).sanitizedQuery || req.query || {};
+      const id = q.id as string | undefined;
+
+      if (id) {
+        const decodedId = decodeURIComponent(id).trim();
+        const patient = await this.patientUseCase.getPatientById(decodedId);
+        res.status(200).json(patient ? [patient] : []);
+        return;
+      }
+
+      const search = q.search as string | undefined;
+      const limit = typeof q.limit === 'number' ? q.limit : (parseInt(q.limit as string) || 200);
+      const offset = typeof q.offset === 'number' ? q.offset : (parseInt(q.offset as string) || 0);
 
       const patients = await this.patientUseCase.getPatients({ search, limit, offset });
       res.status(200).json(patients);
@@ -20,8 +30,13 @@ export class PatientController {
 
   async getPatientById(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
-      const patient = await this.patientUseCase.getPatientById(id as string);
+      const rawId = (req.params as any).id || (req.params as any)[0] || req.query.id;
+      if (!rawId) {
+        res.status(400).json({ error: 'Patient ID is required' });
+        return;
+      }
+      const id = decodeURIComponent(String(rawId)).trim();
+      const patient = await this.patientUseCase.getPatientById(id);
       if (!patient) {
         res.status(404).json({ error: 'Patient not found' });
         return;

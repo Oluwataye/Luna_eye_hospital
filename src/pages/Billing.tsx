@@ -86,16 +86,8 @@ export const Billing: React.FC = () => {
 
   const fetchPatients = async () => {
     try {
-      const data = await api.getPatients();
+      const data = await api.getPatients({ limit: 200 });
       setPatients(Array.isArray(data) ? data : []);
-      
-      const urlPatientId = searchParams.get('patient_id') || searchParams.get('patientId');
-      const urlVisitId = searchParams.get('visit_id') || searchParams.get('visitId');
-      
-      if (urlPatientId) {
-        const found = data.find((p: any) => String(p.id) === String(urlPatientId));
-        if (found) handlePatientSelect(found, urlVisitId);
-      }
     } catch (err) {
       notify('error', 'Registry Link Failure');
     }
@@ -109,35 +101,93 @@ export const Billing: React.FC = () => {
         ...inventory.map((i: any) => ({ ...i, type: 'product', identifier: i.id }))
       ];
       setCatalog(fullCatalog);
-
-      // Auto-select item from URL query parameter (e.g. auto_select=Registration)
-      const autoSelect = searchParams.get('auto_select') || searchParams.get('autoSelect');
-      if (autoSelect) {
-        const itemToSelect = fullCatalog.find(
-          (item: any) => item.name.toLowerCase() === autoSelect.toLowerCase()
-        );
-        if (itemToSelect) {
-          setCart(prevCart => {
-            const existingIdx = prevCart.findIndex(c => c.identifier === itemToSelect.identifier && c.type === itemToSelect.type);
-            if (existingIdx >= 0) {
-              const newCart = [...prevCart];
-              newCart[existingIdx].qty += 1;
-              return newCart;
-            } else {
-              return [...prevCart, { 
-                ...itemToSelect, 
-                qty: 1, 
-                unit_price: itemToSelect.price,
-                description: itemToSelect.name
-              }];
-            }
-          });
-        }
-      }
     } catch (err) {
       notify('error', 'Catalog Synchronization Failure');
     }
   };
+
+  // Synchronize patient context from URL parameters dynamically
+  useEffect(() => {
+    const urlPatientId = searchParams.get('patient_id') || searchParams.get('patientId');
+    const urlVisitId = searchParams.get('visit_id') || searchParams.get('visitId');
+    const urlPatientName = searchParams.get('patient_name') || searchParams.get('patientName');
+
+    if (!urlPatientId) return;
+
+    // Skip if this patient is already selected with current visit
+    if (selectedPatient && String(selectedPatient.id).trim().toLowerCase() === String(urlPatientId).trim().toLowerCase()) {
+      if (urlVisitId && selectedVisitId !== urlVisitId) {
+        setSelectedVisitId(urlVisitId);
+      }
+      return;
+    }
+
+    let isMounted = true;
+
+    const resolvePatient = async () => {
+      // 1. Check local patients state if loaded
+      const found = patients.find((p: any) => 
+        String(p.id).trim().toLowerCase() === String(urlPatientId).trim().toLowerCase()
+      );
+      if (found) {
+        if (isMounted) handlePatientSelect(found, urlVisitId);
+        return;
+      }
+
+      // 2. Fetch directly from server by ID
+      try {
+        const remote = await api.getPatient(urlPatientId);
+        if (remote && isMounted) {
+          handlePatientSelect(remote, urlVisitId);
+          return;
+        }
+      } catch (err) {
+        console.warn('[Billing] Direct patient fetch failed, using fallback URL context:', err);
+      }
+
+      // 3. Fallback to URL metadata so billing context is never lost
+      if (isMounted) {
+        const fallback = {
+          id: urlPatientId,
+          full_name: urlPatientName ? decodeURIComponent(urlPatientName) : `Patient #${urlPatientId}`,
+          current_visit_id: urlVisitId || null,
+          payment_category: 'Standard'
+        };
+        handlePatientSelect(fallback, urlVisitId);
+      }
+    };
+
+    resolvePatient();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [searchParams, patients]);
+
+  // Auto-select catalog item from URL query parameter (e.g. auto_select=Registration)
+  useEffect(() => {
+    const autoSelect = searchParams.get('auto_select') || searchParams.get('autoSelect');
+    if (!autoSelect || catalog.length === 0) return;
+
+    const itemToSelect = catalog.find(
+      (item: any) => item.name?.toLowerCase() === autoSelect.toLowerCase()
+    );
+    if (itemToSelect) {
+      setCart(prevCart => {
+        const alreadyInCart = prevCart.some(
+          c => (c.identifier === itemToSelect.identifier && c.type === itemToSelect.type) ||
+               c.name?.toLowerCase() === itemToSelect.name?.toLowerCase()
+        );
+        if (alreadyInCart) return prevCart;
+        return [...prevCart, { 
+          ...itemToSelect, 
+          qty: 1, 
+          unit_price: itemToSelect.price,
+          description: itemToSelect.name
+        }];
+      });
+    }
+  }, [searchParams, catalog]);
 
 
 
@@ -743,10 +793,46 @@ export const Billing: React.FC = () => {
                  </div>
                  
                  <div style={{ padding: '0 16px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                       <span style={{ fontSize: '10px', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>FILE NUMBER</span>
-                       <span style={{ fontSize: '14px', fontWeight: '800', color: '#64748b' }}>{selectedPatient ? selectedPatient.id : '—'}</span>
-                    </div>
+                    {selectedPatient ? (
+                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                          <div>
+                            <span style={{ fontSize: '10px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>SELECTED PATIENT</span>
+                            <div style={{ fontSize: '14px', fontWeight: '900', color: '#0f172a', marginTop: '2px' }}>{selectedPatient.full_name}</div>
+                          </div>
+                          <button
+                            type="button"
+                            className="leh-icon-btn red"
+                            style={{ padding: '4px' }}
+                            title="Unlink patient from billing"
+                            onClick={() => {
+                              setSelectedPatient(null);
+                              setSelectedVisitId(null);
+                              notify('info', 'Patient unlinked from billing session');
+                            }}
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                        <div style={{ display: 'flex', gap: '16px', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #f1f5f9', fontSize: '11px' }}>
+                          <div>
+                            <span style={{ color: '#94a3b8', fontWeight: '700' }}>FILE NO: </span>
+                            <strong style={{ color: 'var(--leh-primary)' }}>{selectedPatient.id}</strong>
+                          </div>
+                          {selectedVisitId && (
+                            <div>
+                              <span style={{ color: '#94a3b8', fontWeight: '700' }}>VISIT: </span>
+                              <strong style={{ color: '#64748b' }}>#{selectedVisitId}</strong>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                         <span style={{ fontSize: '10px', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>FILE NUMBER</span>
+                         <span style={{ fontSize: '14px', fontWeight: '800', color: '#94a3b8' }}>No patient attached (search above)</span>
+                      </div>
+                    )}
                  </div>
               </div>
 
@@ -793,13 +879,18 @@ export const Billing: React.FC = () => {
            <div className="billing-right-panel">
               <div className="billing-panel" style={{ padding: '0' }}>
                  <div className="panel-header" style={{ padding: '24px 24px 0 24px', marginBottom: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                       <h3 className="panel-title" style={{ background: '#e2e8f0', padding: '4px 8px', borderRadius: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                       <h3 className="panel-title" style={{ background: '#e2e8f0', padding: '4px 8px', borderRadius: '4px', margin: 0 }}>
                           <ShoppingCart size={16} /> Current Billing
                        </h3>
-                        {selectedPatient && (
-                           <span className="patient-pill">{(selectedPatient.full_name || '').toUpperCase()}</span>
-                        )}
+                       {selectedPatient ? (
+                          <span className="patient-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ opacity: 0.75, fontWeight: 700 }}>#{selectedPatient.id}</span>
+                            <span>{(selectedPatient.full_name || '').toUpperCase()}</span>
+                          </span>
+                       ) : (
+                          <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600 }}>No patient attached</span>
+                       )}
                     </div>
                  </div>
                  

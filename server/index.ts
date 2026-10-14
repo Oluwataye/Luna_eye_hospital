@@ -759,6 +759,11 @@ app.get('/api/patients', validateRequest({ query: PatientListQuerySchema }), (re
   patientController.getPatients(req, res);
 });
 
+// GET patient by ID (supports file numbers with slashes like 0001/26/LETH or 0024/26/LEH)
+app.get('/api/patients/:id(*)', (req, res) => {
+  patientController.getPatientById(req, res);
+});
+
 // POST new patient
 app.post('/api/patients', authorizeRoles(['Admin', 'Receptionist']), validateRequest({ body: CreatePatientSchema }), (req, res) => {
   patientController.registerPatient(req, res);

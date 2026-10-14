@@ -123,7 +123,8 @@ export const AuditLogQuerySchema = PaginationQuerySchema.extend({
 });
 
 export const PatientListQuerySchema = PaginationQuerySchema.extend({
-  search: sanitizedString().optional()
+  search: sanitizedString().optional(),
+  id: sanitizedString().optional()
 });
 
 export const CategoryQuerySchema = PaginationQuerySchema.extend({

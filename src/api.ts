@@ -127,9 +127,27 @@ export const api = {
     return request('/logout', { method: 'POST' });
   },
 
-  async getPatients() {
-    const data = await request('/patients');
+  async getPatients(params?: { search?: string; limit?: number; offset?: number; id?: string }) {
+    const query = new URLSearchParams();
+    if (params?.search) query.set('search', params.search);
+    if (params?.id) query.set('id', params.id);
+    if (params?.limit !== undefined) query.set('limit', String(params.limit));
+    if (params?.offset !== undefined) query.set('offset', String(params.offset));
+    const qs = query.toString();
+    const data = await request(qs ? `/patients?${qs}` : '/patients');
     return Array.isArray(data) ? data : [];
+  },
+
+  async getPatient(id: string | number) {
+    const rawId = String(id).trim();
+    try {
+      return await request(`/patients/${encodeURIComponent(rawId)}`);
+    } catch {
+      // Fallback query parameter lookup
+      const res = await request(`/patients?id=${encodeURIComponent(rawId)}`);
+      if (Array.isArray(res) && res.length > 0) return res[0];
+      throw new Error(`Patient ${id} not found`);
+    }
   },
 
   async getQueue() {
