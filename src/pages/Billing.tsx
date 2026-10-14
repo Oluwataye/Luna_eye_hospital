@@ -43,6 +43,7 @@ export const Billing: React.FC = () => {
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
   const [patientSearchQuery, setPatientSearchQuery] = useState('');
   const [patientResults, setPatientResults] = useState<any[]>([]);
+  const [isSearchingPatients, setIsSearchingPatients] = useState(false);
   
   // Catalog State
   const [catalog, setCatalog] = useState<any[]>([]);
@@ -59,6 +60,11 @@ export const Billing: React.FC = () => {
   const [mixedBreakdown, setMixedBreakdown] = useState({ cash: 0, bank: 0 });
   const [isProcessing, setIsProcessing] = useState(false);
   const [pendingInvestigations, setPendingInvestigations] = useState<any[]>([]);
+
+  // Draft & Persistence State
+  const BILLING_DRAFT_KEY = 'luna_billing_active_draft_v1';
+  const [isRestoredFromDraft, setIsRestoredFromDraft] = useState(false);
+  const isDraftHydratedRef = useRef(false);
   
   // History State
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -105,6 +111,68 @@ export const Billing: React.FC = () => {
       notify('error', 'Catalog Synchronization Failure');
     }
   };
+
+  // Hydrate draft from localStorage on initial mount if not overriding via URL
+  useEffect(() => {
+    const urlPatientId = searchParams.get('patient_id') || searchParams.get('patientId');
+    const autoSelect = searchParams.get('auto_select') || searchParams.get('autoSelect');
+
+    // Only restore draft if URL has no explicit new patient assignment
+    if (!urlPatientId && !autoSelect) {
+      try {
+        const raw = localStorage.getItem(BILLING_DRAFT_KEY);
+        if (raw) {
+          const draft = JSON.parse(raw);
+          if (draft && (draft.selectedPatient || (Array.isArray(draft.cart) && draft.cart.length > 0))) {
+            if (draft.selectedPatient) setSelectedPatient(draft.selectedPatient);
+            if (draft.selectedVisitId) setSelectedVisitId(draft.selectedVisitId);
+            if (Array.isArray(draft.cart)) setCart(draft.cart);
+            if (draft.discountPercent !== undefined) setDiscountPercent(draft.discountPercent);
+            if (draft.manualDiscount !== undefined) setManualDiscount(draft.manualDiscount);
+            if (draft.isManualDiscountUnlocked !== undefined) setIsManualDiscountUnlocked(draft.isManualDiscountUnlocked);
+            if (draft.amountTendred !== undefined) setAmountTendred(draft.amountTendred);
+            if (draft.paymentMethod) setPaymentMethod(draft.paymentMethod);
+            if (draft.mixedBreakdown) setMixedBreakdown(draft.mixedBreakdown);
+            setIsRestoredFromDraft(true);
+            notify('info', 'Active billing session restored from draft');
+          }
+        }
+      } catch (err) {
+        console.warn('[Billing] Error reading draft from localStorage:', err);
+      }
+    }
+    isDraftHydratedRef.current = true;
+  }, []);
+
+  // Autosave active session draft to localStorage
+  useEffect(() => {
+    if (!isDraftHydratedRef.current) return;
+
+    const hasContent = (cart && cart.length > 0) || selectedPatient !== null || discountPercent > 0 || manualDiscount > 0;
+    if (hasContent) {
+      const draft = {
+        selectedPatient,
+        selectedVisitId,
+        cart,
+        discountPercent,
+        manualDiscount,
+        isManualDiscountUnlocked,
+        amountTendred,
+        paymentMethod,
+        mixedBreakdown,
+        savedAt: new Date().toISOString()
+      };
+      try {
+        localStorage.setItem(BILLING_DRAFT_KEY, JSON.stringify(draft));
+      } catch (e) {
+        console.warn('[Billing] Unable to persist draft:', e);
+      }
+    } else {
+      try {
+        localStorage.removeItem(BILLING_DRAFT_KEY);
+      } catch {}
+    }
+  }, [cart, selectedPatient, selectedVisitId, discountPercent, manualDiscount, isManualDiscountUnlocked, amountTendred, paymentMethod, mixedBreakdown]);
 
   // Synchronize patient context from URL parameters dynamically
   useEffect(() => {
@@ -191,18 +259,34 @@ export const Billing: React.FC = () => {
 
 
 
-  // Live Patient Search
+  // Debounced Server-Side Patient Autocomplete Search
   useEffect(() => {
-    if (patientSearchQuery.length >= 2) {
-      const q = patientSearchQuery.toLowerCase();
-      setPatientResults(patients.filter(p => 
-        p.full_name?.toLowerCase().includes(q) || 
-        p.id?.toString().toLowerCase().includes(q) ||
-        (p.phone && p.phone.toString().includes(q))
-      ));
-    } else {
+    const trimmed = patientSearchQuery.trim();
+    if (trimmed.length < 2) {
       setPatientResults([]);
+      setIsSearchingPatients(false);
+      return;
     }
+
+    setIsSearchingPatients(true);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await api.getPatients({ search: trimmed, limit: 12 });
+        setPatientResults(Array.isArray(results) ? results : []);
+      } catch (err) {
+        console.warn('[Billing] Server-side patient search failed, using local fallback:', err);
+        const q = trimmed.toLowerCase();
+        setPatientResults(patients.filter(p => 
+          p.full_name?.toLowerCase().includes(q) || 
+          p.id?.toString().toLowerCase().includes(q) ||
+          (p.phone && p.phone.toString().includes(q))
+        ).slice(0, 12));
+      } finally {
+        setIsSearchingPatients(false);
+      }
+    }, 280);
+
+    return () => clearTimeout(timer);
   }, [patientSearchQuery, patients]);
 
   // Fetch pending investigations when patient is selected
@@ -431,13 +515,16 @@ export const Billing: React.FC = () => {
         printReceiptContent(receiptHtml);
       }
 
-      // Reset
+      // Reset & Clear Draft
+      localStorage.removeItem(BILLING_DRAFT_KEY);
+      setIsRestoredFromDraft(false);
       setCart([]);
       setDiscountPercent(0);
       setManualDiscount(0);
       setIsManualDiscountUnlocked(false);
       setAmountTendred(0);
       setSelectedPatient(null);
+      setSelectedVisitId(null);
       setActiveTab('history');
     } catch (err: any) {
       notify('error', err.message);
@@ -499,8 +586,17 @@ export const Billing: React.FC = () => {
                 className="leh-btn-primary"
                 style={{ flex: 1, height: '48px', background: 'var(--leh-red)' }}
                 onClick={() => {
-                  setCart([]); setDiscountPercent(0); setManualDiscount(0); setIsManualDiscountUnlocked(false); setAmountTendred(0); setSelectedPatient(null);
+                  localStorage.removeItem(BILLING_DRAFT_KEY);
+                  setIsRestoredFromDraft(false);
+                  setCart([]);
+                  setDiscountPercent(0);
+                  setManualDiscount(0);
+                  setIsManualDiscountUnlocked(false);
+                  setAmountTendred(0);
+                  setSelectedPatient(null);
+                  setSelectedVisitId(null);
                   setShowCancelModal(false);
+                  notify('info', 'Billing session terminated and draft discarded');
                 }}
               >
                 CONFIRM TERMINATION
@@ -769,14 +865,19 @@ export const Billing: React.FC = () => {
                        Patient Details
                     </h3>
                  </div>
-                 <div className="search-input-wrapper" style={{ marginBottom: '16px' }}>
+                 <div className="search-input-wrapper" style={{ marginBottom: '16px', position: 'relative' }}>
                     <input 
                       className="billing-search-input" 
-                      style={{ paddingLeft: '16px' }}
-                      placeholder="Search patient name or ID..." 
+                      style={{ paddingLeft: '16px', paddingRight: isSearchingPatients ? '36px' : '16px' }}
+                      placeholder="Search patient name, file #, or phone..." 
                       value={patientSearchQuery} 
                       onChange={(e) => setPatientSearchQuery(e.target.value)} 
                     />
+                    {isSearchingPatients && (
+                      <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+                        <RefreshCcw size={14} className="animate-spin" color="var(--leh-primary)" />
+                      </div>
+                    )}
                     {patientResults.length > 0 && (
                       <div className="search-results-popover">
                          {patientResults.map(p => (
@@ -890,6 +991,20 @@ export const Billing: React.FC = () => {
                           </span>
                        ) : (
                           <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600 }}>No patient attached</span>
+                       )}
+                       {isRestoredFromDraft && (
+                          <span style={{ 
+                            fontSize: '10px', 
+                            fontWeight: 800, 
+                            background: '#fef3c7', 
+                            color: '#92400e', 
+                            border: '1px solid #fde68a', 
+                            padding: '3px 8px', 
+                            borderRadius: '6px',
+                            letterSpacing: '0.04em'
+                          }}>
+                            DRAFT RESTORED
+                          </span>
                        )}
                     </div>
                  </div>
