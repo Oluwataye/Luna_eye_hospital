@@ -124,7 +124,8 @@ export const AuditLogQuerySchema = PaginationQuerySchema.extend({
 
 export const PatientListQuerySchema = PaginationQuerySchema.extend({
   search: sanitizedString().optional(),
-  id: sanitizedString().optional()
+  id: sanitizedString().optional(),
+  file_no: sanitizedString().optional()
 });
 
 export const CategoryQuerySchema = PaginationQuerySchema.extend({

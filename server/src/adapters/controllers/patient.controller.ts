@@ -7,7 +7,7 @@ export class PatientController {
   async getPatients(req: Request, res: Response): Promise<void> {
     try {
       const q: any = (req as any).sanitizedQuery || req.query || {};
-      const id = q.id as string | undefined;
+      const id = (q.id as string | undefined) || (q.file_no as string | undefined);
 
       if (id) {
         const decodedId = decodeURIComponent(id).trim();
@@ -30,12 +30,13 @@ export class PatientController {
 
   async getPatientById(req: Request, res: Response): Promise<void> {
     try {
-      let rawId = (req.params as any).id ?? (req.params as any)[0] ?? req.query.id;
+      const q: any = (req as any).sanitizedQuery || req.query || {};
+      let rawId = q.file_no ?? q.id ?? (req.params as any).id ?? (req.params as any)[0];
       if (Array.isArray(rawId)) {
         rawId = rawId.join('/');
       }
       if (!rawId) {
-        res.status(400).json({ error: 'Patient ID is required' });
+        res.status(400).json({ error: 'Patient ID or file_no is required' });
         return;
       }
       const id = decodeURIComponent(String(rawId)).trim();
@@ -68,8 +69,17 @@ export class PatientController {
 
   async updatePatient(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
-      await this.patientUseCase.updatePatient(id as string, req.body);
+      const q: any = (req as any).sanitizedQuery || req.query || {};
+      let rawId = q.file_no ?? q.id ?? (req.params as any).id ?? (req.params as any)[0];
+      if (Array.isArray(rawId)) {
+        rawId = rawId.join('/');
+      }
+      if (!rawId) {
+        res.status(400).json({ error: 'Patient ID or file_no is required' });
+        return;
+      }
+      const id = decodeURIComponent(String(rawId)).trim();
+      await this.patientUseCase.updatePatient(id, req.body);
       res.status(200).json({ message: 'Patient details updated successfully' });
     } catch (err: any) {
       console.error('[PATIENTS] Update failure:', err.message);

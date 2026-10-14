@@ -763,6 +763,11 @@ app.get('/api/patients', validateRequest({ query: PatientListQuerySchema }), (re
   patientController.getPatients(req, res);
 });
 
+// GET patient by number / query parameter (URL-safe, reverse-proxy friendly)
+app.get('/api/patients/by-number', (req, res) => {
+  patientController.getPatientById(req, res);
+});
+
 // GET patient by ID (supports file numbers with slashes like 0001/26/LETH or 0024/26/LEH)
 app.get('/api/patients/{*id}', (req, res) => {
   patientController.getPatientById(req, res);
@@ -773,8 +778,13 @@ app.post('/api/patients', authorizeRoles(['Admin', 'Receptionist']), validateReq
   patientController.registerPatient(req, res);
 });
 
-// PUT update patient
-app.put('/api/patients/:id', authorizeRoles(['Admin', 'Receptionist']), (req, res) => {
+// PUT update patient by query parameter (URL-safe)
+app.put('/api/patients/by-number', authorizeRoles(['Admin', 'Receptionist']), (req, res) => {
+  patientController.updatePatient(req, res);
+});
+
+// PUT update patient (supports wildcard slash paths)
+app.put('/api/patients/{*id}', authorizeRoles(['Admin', 'Receptionist']), (req, res) => {
   patientController.updatePatient(req, res);
 });
 

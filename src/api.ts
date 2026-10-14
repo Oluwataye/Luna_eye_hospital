@@ -127,10 +127,11 @@ export const api = {
     return request('/logout', { method: 'POST' });
   },
 
-  async getPatients(params?: { search?: string; limit?: number; offset?: number; id?: string }) {
+  async getPatients(params?: { search?: string; limit?: number; offset?: number; id?: string; file_no?: string }) {
     const query = new URLSearchParams();
     if (params?.search) query.set('search', params.search);
     if (params?.id) query.set('id', params.id);
+    if (params?.file_no) query.set('file_no', params.file_no);
     if (params?.limit !== undefined) query.set('limit', String(params.limit));
     if (params?.offset !== undefined) query.set('offset', String(params.offset));
     const qs = query.toString();
@@ -141,12 +142,18 @@ export const api = {
   async getPatient(id: string | number) {
     const rawId = String(id).trim();
     try {
-      return await request(`/patients/${encodeURIComponent(rawId)}`);
+      // Primary: URL-safe query parameter lookup (avoids slash route normalization bugs on IIS/Nginx reverse proxies)
+      return await request(`/patients/by-number?file_no=${encodeURIComponent(rawId)}`);
     } catch {
-      // Fallback query parameter lookup
-      const res = await request(`/patients?id=${encodeURIComponent(rawId)}`);
-      if (Array.isArray(res) && res.length > 0) return res[0];
-      throw new Error(`Patient ${id} not found`);
+      try {
+        // Fallback 1: Legacy path parameter route
+        return await request(`/patients/${encodeURIComponent(rawId)}`);
+      } catch {
+        // Fallback 2: General patients query
+        const res = await request(`/patients?id=${encodeURIComponent(rawId)}`);
+        if (Array.isArray(res) && res.length > 0) return res[0];
+        throw new Error(`Patient ${id} not found`);
+      }
     }
   },
 
@@ -254,10 +261,20 @@ export const api = {
   },
 
   async updatePatient(id: string, patientData: any) {
-    return request(`/patients/${encodeURIComponent(id)}`, {
-      method: 'PUT',
-      body: JSON.stringify(patientData)
-    });
+    const rawId = String(id).trim();
+    try {
+      // Primary: URL-safe query parameter lookup
+      return await request(`/patients/by-number?file_no=${encodeURIComponent(rawId)}`, {
+        method: 'PUT',
+        body: JSON.stringify(patientData)
+      });
+    } catch {
+      // Fallback: Path parameter route
+      return await request(`/patients/${encodeURIComponent(rawId)}`, {
+        method: 'PUT',
+        body: JSON.stringify(patientData)
+      });
+    }
   },
 
   async dischargePatient(id: string | number, summary: string) {
