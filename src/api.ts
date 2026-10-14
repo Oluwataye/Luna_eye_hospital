@@ -756,5 +756,19 @@ export const api = {
       body: JSON.stringify(data)
     });
   },
+
+  // Thermal Receipt Direct Raw Printing
+  async printNetworkRaw(data: { ip: string; port?: number; dataBase64?: string; rawBytes?: number[] }) {
+    return request('/print/network', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+  async testNetworkPrinter(data: { ip: string; port?: number }) {
+    return request('/print/test', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
 };
 

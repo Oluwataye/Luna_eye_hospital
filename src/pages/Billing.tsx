@@ -10,13 +10,16 @@ import {
   Printer,
   ShieldCheck,
   AlertTriangle,
-  Layers
+  Layers,
+  Sliders
 } from 'lucide-react';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
-import { buildReceiptHtml, printReceiptContent } from '../utils/printHelpers';
 import { formatDateStandard } from '../utils/date';
+import { dispatchReceiptPrint } from '../utils/thermalPrinter';
+import { getPrinterSettings } from '../utils/printerConfig';
+import ThermalPrinterModal from '../components/ThermalPrinterModal';
 import './Billing.css';
 
 export interface BillingSession {
@@ -104,6 +107,7 @@ export const Billing: React.FC = () => {
   
   // Modal State
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showPrinterConfig, setShowPrinterConfig] = useState(false);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -508,22 +512,26 @@ export const Billing: React.FC = () => {
       // Fetch transaction details and items to print updated receipt
       try {
         const items = await api.getTransactionItems(reconcileTx.transaction_id);
-        if (window.confirm('Payment recorded successfully. Print updated receipt?')) {
-          const receiptHtml = buildReceiptHtml({
-            receipt_no: reconcileTx.receipt_no,
-            created_at: new Date(reconcileTx.visit_date),
-            patient_id: reconcileTx.file_no,
-            patient_name: reconcileTx.patient_name,
-            total_amount: reconcileTx.total_amount,
-            discount: reconcileTx.discount,
-            amount_paid: reconcileTx.amount_paid + reconcileAmount,
-            balance: reconcileTx.balance_due - reconcileAmount,
-            payment_method: reconcilePaymentMethod,
-            payment_details: reconcilePaymentMethod === 'Mixed' ? reconcileMixedBreakdown : {},
-            cashier: user?.full_name || 'System',
-            items: items
-          }, user);
-          printReceiptContent(receiptHtml);
+        const printerConfig = getPrinterSettings();
+        const receiptPayload = {
+          receipt_no: reconcileTx.receipt_no,
+          created_at: new Date(reconcileTx.visit_date),
+          patient_id: reconcileTx.file_no,
+          patient_name: reconcileTx.patient_name,
+          total_amount: reconcileTx.total_amount,
+          discount: reconcileTx.discount,
+          amount_paid: reconcileTx.amount_paid + reconcileAmount,
+          balance: reconcileTx.balance_due - reconcileAmount,
+          payment_method: reconcilePaymentMethod,
+          payment_details: reconcilePaymentMethod === 'Mixed' ? reconcileMixedBreakdown : {},
+          cashier: user?.full_name || 'System',
+          items: items
+        };
+
+        if (printerConfig.autoPrintOnPayment || window.confirm('Payment recorded successfully. Print updated receipt?')) {
+          dispatchReceiptPrint(receiptPayload, user).then(printRes => {
+            if (printRes.fallbackUsed) notify('info', printRes.message);
+          });
         }
       } catch (errPrint) {
         console.error('Failed to auto-print receipt:', errPrint);
@@ -620,15 +628,28 @@ export const Billing: React.FC = () => {
       notify('success', balance === 0 ? 'Payment Settled' : 'Partial Payment Recorded');
       
       // Print Receipt
-      if (window.confirm('Transaction successful. Print official receipt?')) {
-        const receiptHtml = buildReceiptHtml({ 
-          ...transactionData, 
-          receipt_no: res.receipt_no, 
-          created_at: new Date(),
-          patient_name: selectedPatient.full_name,
-          balance: balance
-        }, user);
-        printReceiptContent(receiptHtml);
+      const printerConfig = getPrinterSettings();
+      const receiptPayload = { 
+        ...transactionData, 
+        receipt_no: res.receipt_no, 
+        created_at: new Date(),
+        patient_name: selectedPatient.full_name,
+        balance: balance
+      };
+
+      if (printerConfig.autoPrintOnPayment) {
+        // Silent instant print in under 1 second
+        dispatchReceiptPrint(receiptPayload, user).then(printRes => {
+          if (printRes.fallbackUsed) {
+            notify('info', printRes.message);
+          } else if (printRes.mode === 'network') {
+            notify('success', `Receipt printed silently to ${printerConfig.networkIp}`);
+          }
+        }).catch(err => console.error('Silent print failed:', err));
+      } else if (window.confirm('Transaction successful. Print official receipt?')) {
+        dispatchReceiptPrint(receiptPayload, user).then(printRes => {
+          if (printRes.fallbackUsed) notify('info', printRes.message);
+        });
       }
 
       // Close completed session or reset
@@ -902,11 +923,21 @@ export const Billing: React.FC = () => {
                  notify('info', `Printing most recent system receipt: ${targetTx.receipt_no}`);
                }
 
-               const html = buildReceiptHtml(targetTx, user, true);
-               printReceiptContent(html);
+               dispatchReceiptPrint(targetTx, user, { isReprint: true }).then(printRes => {
+                 if (printRes.fallbackUsed) notify('info', printRes.message);
+               });
             }).catch(() => notify('error', 'Failed to fetch receipts.'));
           }}>
             <Printer size={16} /> Print Last Receipt
+          </button>
+          <button 
+            type="button"
+            className="billing-btn-secondary" 
+            onClick={() => setShowPrinterConfig(true)}
+            title="Configure Direct ESC/POS Thermal Receipt Printer"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#1e293b', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}
+          >
+            <Sliders size={16} color="#2563eb" /> Thermal Setup
           </button>
         </div>
       </header>
@@ -1547,8 +1578,9 @@ export const Billing: React.FC = () => {
                               className="leh-btn-icon" 
                               style={{ padding: '4px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px' }}
                               onClick={() => {
-                                const html = buildReceiptHtml(tx, user, true);
-                                printReceiptContent(html);
+                                dispatchReceiptPrint(tx, user, { isReprint: true }).then(printRes => {
+                                  if (printRes.fallbackUsed) notify('info', printRes.message);
+                                });
                               }}
                               title="Reprint Receipt"
                             >
@@ -1561,6 +1593,14 @@ export const Billing: React.FC = () => {
               </table>
            </div>
         </div>
+      )}
+
+      {/* Thermal Printer Settings Modal */}
+      {showPrinterConfig && (
+        <ThermalPrinterModal 
+          onClose={() => setShowPrinterConfig(false)} 
+          onSaved={() => notify('success', 'Thermal printer configuration saved.')}
+        />
       )}
 
       {/* POS Footer */}

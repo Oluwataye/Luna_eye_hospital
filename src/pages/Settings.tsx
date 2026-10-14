@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { formatDateStandard } from '../utils/date';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { ThermalPrinterModal } from '../components/ThermalPrinterModal';
 
 const actionTypes = [
   // Auth
@@ -491,6 +492,7 @@ export const Settings: React.FC = () => {
               { id: 'investigations', label: 'Manage Investigations', icon: ClipboardList },
               { id: 'templates', label: 'Result Templates', icon: FileText },
               { id: 'voice_ai', label: 'AI Voice & Dictation', icon: Mic },
+              { id: 'printer', label: 'Thermal Receipt Printer', icon: Printer },
               { id: 'database', label: 'Database & Security', icon: Database },
               { id: 'logs', label: 'System Audit Logs', icon: History }
             ].map(tab => (
@@ -1354,6 +1356,15 @@ export const Settings: React.FC = () => {
                   </button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'printer' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <ThermalPrinterModal
+                embedded={true}
+                onSaved={() => notify('success', 'Thermal printer configuration saved successfully!')}
+              />
             </div>
           )}
 

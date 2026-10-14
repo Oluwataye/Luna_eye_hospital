@@ -32,6 +32,7 @@ import { PatientRepositorySqlite } from './src/adapters/repositories/patient.rep
 import { PatientUseCase } from './src/usecases/patient/patient.usecase';
 import { PatientController } from './src/adapters/controllers/patient.controller';
 import voiceRoutes from './routes/voice';
+import printRoutes from './routes/print';
 import { startAudioCleanupJob } from './jobs/audioCleanup';
 import { setupVoiceWebSocket } from './websocket';
 import { spawn } from 'child_process';
@@ -419,6 +420,9 @@ app.use('/api', apiRouter);
 
 // Voice Dictation & Live Transcription Routes
 app.use('/api/voice', voiceRoutes);
+
+// Direct Raw ESC/POS Thermal Printing Routes (Network Port 9100)
+app.use('/api/print', printRoutes);
 
 // --- LAN DOMAIN RESOLVER (NBNS/DNS) ---
 // This allows other computers on the LAN to find this server by typing 'lunaeyehospital'

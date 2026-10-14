@@ -3,7 +3,7 @@ import { X, Printer, RefreshCcw } from 'lucide-react';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
-import { buildReceiptHtml, printReceiptContent } from '../utils/printHelpers';
+import { dispatchReceiptPrint } from '../utils/thermalPrinter';
 import './PrintReceipt.css';
 
 interface ReprintReceiptModalProps {
@@ -66,10 +66,12 @@ const ReprintReceiptModal: React.FC<ReprintReceiptModalProps> = ({ receipt_numbe
         reprinted_by_user_id: user.id
       });
 
-      const receiptHtml = buildReceiptHtml(data, user, true);
-      printReceiptContent(receiptHtml);
-      
-      notify('success', 'Reprint logged and sent to printer');
+      const printRes = await dispatchReceiptPrint(data, user, { isReprint: true });
+      if (printRes.fallbackUsed) {
+        notify('info', printRes.message);
+      } else {
+        notify('success', 'Reprint dispatched to printer successfully');
+      }
     } catch (error) {
       console.error('Reprint logging error:', error);
       notify('error', 'Failed to log reprint activity');

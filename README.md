@@ -231,7 +231,35 @@ Doctors can dictate into whichever clinical field they are currently focused on 
 
 ---
 
-## 📦 Stage 5: Updating and Building New Releases
+## 🖨️ Stage 5: Setting Up Silent Thermal Receipt Printing (80mm & 58mm ESC/POS)
+
+In a busy eye clinic, waiting for the browser's slow Windows print popup wastes cashier and patient time. VisionCare EMR includes **direct, silent hardware printing** using industry-standard **ESC/POS** commands. Receipts print in **under 1 second** the moment a payment is confirmed!
+
+### 1. Supported Connection Types
+1. **Network (LAN / Wi-Fi) — Recommended for Speed**:
+   - Plug your thermal receipt printer (e.g. Epson TM-T20, Xprinter, Rongta, Zywell) into the router using an Ethernet cable, or connect it to clinic Wi-Fi.
+   - The printer connects via raw TCP on **Port 9100**. Any computer on the hospital network can print to it instantly!
+2. **USB (WebUSB Direct)**:
+   - Plug the thermal printer into the cashier's computer using a USB cable.
+   - In Chrome or Edge, pair it once using the **"Pair USB Device"** button.
+3. **Browser Fallback**:
+   - If the printer runs out of paper, is turned off, or disconnected, the system automatically falls back to the standard browser print dialog so transactions are never interrupted.
+
+### 2. How to Configure Your Printer
+1. Go to **Settings ➔ Thermal Receipt Printer** (or click the **"Thermal Setup"** button in the top-right of the **Billing** screen).
+2. Choose your connection mode:
+   - **Network TCP**: Enter the printer's local IP address (e.g. `192.168.1.200`) and port (`9100`).
+   - **WebUSB Direct**: Click *Pair New USB Printer* and select your device from the browser prompt.
+3. Select your paper roll width:
+   - **80mm (Standard)**: 48 columns per line (default for hospital desks).
+   - **58mm (Compact)**: 32 columns per line (for compact portable units).
+4. Turn on **"Auto-Print on Payment"** if you want receipts to shoot out automatically the instant "Process Payment" is clicked.
+5. Click **"Test Print Slip"** to test! A receipt slip with hospital header and cut command will immediately print out.
+6. Click **"Save Configuration"**. Your settings are saved on that computer.
+
+---
+
+## 📦 Stage 6: Updating and Building New Releases
 
 If a developer makes changes to the app and you want to update the standalone package:
 
@@ -255,7 +283,7 @@ This automatically tags the version, pushes to GitHub, and triggers **GitHub Act
 
 ---
 
-## 💾 Stage 6: Backing Up Hospital Records (Saving Your Progress)
+## 💾 Stage 7: Backing Up Hospital Records (Saving Your Progress)
 
 Because VisionCare EMR uses a reliable local SQLite database, backing up your clinic records is as simple as copying a file!
 
@@ -268,7 +296,7 @@ Because VisionCare EMR uses a reliable local SQLite database, backing up your cl
 
 ---
 
-## 🛠️ Stage 7: Troubleshooting (FAQ)
+## 🛠️ Stage 8: Troubleshooting (FAQ)
 
 ### ❓ "This site can't be reached" when connecting from another computer
 1. **Check the Wi-Fi**: Are both computers connected to the exact same Wi-Fi network? (Not one on phone hotspot and one on router).
