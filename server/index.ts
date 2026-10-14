@@ -764,7 +764,7 @@ app.get('/api/patients', validateRequest({ query: PatientListQuerySchema }), (re
 });
 
 // GET patient by ID (supports file numbers with slashes like 0001/26/LETH or 0024/26/LEH)
-app.get('/api/patients/:id(*)', (req, res) => {
+app.get('/api/patients/{*id}', (req, res) => {
   patientController.getPatientById(req, res);
 });
 

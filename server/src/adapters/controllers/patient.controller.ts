@@ -30,7 +30,10 @@ export class PatientController {
 
   async getPatientById(req: Request, res: Response): Promise<void> {
     try {
-      const rawId = (req.params as any).id || (req.params as any)[0] || req.query.id;
+      let rawId = (req.params as any).id ?? (req.params as any)[0] ?? req.query.id;
+      if (Array.isArray(rawId)) {
+        rawId = rawId.join('/');
+      }
       if (!rawId) {
         res.status(400).json({ error: 'Patient ID is required' });
         return;
