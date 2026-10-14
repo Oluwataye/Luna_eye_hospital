@@ -19,6 +19,37 @@ import { buildReceiptHtml, printReceiptContent } from '../utils/printHelpers';
 import { formatDateStandard } from '../utils/date';
 import './Billing.css';
 
+export interface BillingSession {
+  id: string;
+  selectedPatient: any;
+  selectedVisitId: string | null;
+  cart: any[];
+  discountPercent: number;
+  manualDiscount: number;
+  isManualDiscountUnlocked: boolean;
+  amountTendred: number;
+  paymentMethod: 'Cash' | 'POS' | 'Transfer' | 'Mixed';
+  mixedBreakdown: { cash: number; bank: number };
+  createdAt: number;
+}
+
+const BILLING_SESSIONS_STORAGE_KEY = 'luna_billing_multi_sessions_v2';
+const LEGACY_DRAFT_KEY = 'luna_billing_active_draft_v1';
+
+const createDefaultSession = (id = 'sess-1'): BillingSession => ({
+  id,
+  selectedPatient: null,
+  selectedVisitId: null,
+  cart: [],
+  discountPercent: 0,
+  manualDiscount: 0,
+  isManualDiscountUnlocked: false,
+  amountTendred: 0,
+  paymentMethod: 'Cash',
+  mixedBreakdown: { cash: 0, bank: 0 },
+  createdAt: Date.now()
+});
+
 export const Billing: React.FC = () => {
   const { user } = useAuth();
   const { notify } = useNotification();
@@ -61,10 +92,12 @@ export const Billing: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [pendingInvestigations, setPendingInvestigations] = useState<any[]>([]);
 
-  // Draft & Persistence State
-  const BILLING_DRAFT_KEY = 'luna_billing_active_draft_v1';
+  // Concurrent Multi-Session State
+  const [sessions, setSessions] = useState<BillingSession[]>([createDefaultSession('sess-1')]);
+  const [activeSessionId, setActiveSessionId] = useState<string>('sess-1');
   const [isRestoredFromDraft, setIsRestoredFromDraft] = useState(false);
   const isDraftHydratedRef = useRef(false);
+  const handleProcessPaymentRef = useRef<() => void>(() => {});
   
   // History State
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -74,11 +107,16 @@ export const Billing: React.FC = () => {
 
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  // Global Keyboard Shortcuts (F2: Search, F9 / Ctrl+Enter: Quick Checkout)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'F2') {
         e.preventDefault();
         searchInputRef.current?.focus();
+      }
+      if (e.key === 'F9' || ((e.ctrlKey || e.metaKey) && e.key === 'Enter')) {
+        e.preventDefault();
+        handleProcessPaymentRef.current();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -112,67 +150,145 @@ export const Billing: React.FC = () => {
     }
   };
 
-  // Hydrate draft from localStorage on initial mount if not overriding via URL
+  // Helper: Snapshot active states into a BillingSession
+  const getActiveSessionSnapshot = (id = activeSessionId): BillingSession => ({
+    id,
+    selectedPatient,
+    selectedVisitId,
+    cart,
+    discountPercent,
+    manualDiscount,
+    isManualDiscountUnlocked,
+    amountTendred,
+    paymentMethod,
+    mixedBreakdown,
+    createdAt: Date.now()
+  });
+
+  // Helper: Apply session into React states
+  const applySessionToState = (s: BillingSession) => {
+    setSelectedPatient(s.selectedPatient);
+    setSelectedVisitId(s.selectedVisitId);
+    setCart(Array.isArray(s.cart) ? s.cart : []);
+    setDiscountPercent(s.discountPercent || 0);
+    setManualDiscount(s.manualDiscount || 0);
+    setIsManualDiscountUnlocked(s.isManualDiscountUnlocked || false);
+    setAmountTendred(s.amountTendred || 0);
+    setPaymentMethod(s.paymentMethod || 'Cash');
+    setMixedBreakdown(s.mixedBreakdown || { cash: 0, bank: 0 });
+    setActiveSessionId(s.id);
+  };
+
+  const switchSession = (targetId: string) => {
+    if (targetId === activeSessionId) return;
+    const currentSnap = getActiveSessionSnapshot();
+    const updated = sessions.map(s => s.id === activeSessionId ? currentSnap : s);
+    const target = updated.find(s => s.id === targetId);
+    if (!target) return;
+    setSessions(updated);
+    applySessionToState(target);
+  };
+
+  const addNewSession = () => {
+    if (sessions.length >= 5) {
+      return notify('warning', 'Maximum 5 concurrent billing sessions allowed');
+    }
+    const currentSnap = getActiveSessionSnapshot();
+    const newSession = createDefaultSession(`sess-${Date.now()}`);
+    const updated = [...sessions.map(s => s.id === activeSessionId ? currentSnap : s), newSession];
+    setSessions(updated);
+    applySessionToState(newSession);
+    notify('info', `Session ${updated.length} created`);
+  };
+
+  const closeSession = (idToClose: string) => {
+    if (sessions.length <= 1) {
+      const cleared = createDefaultSession('sess-1');
+      setSessions([cleared]);
+      applySessionToState(cleared);
+      notify('info', 'Session reset');
+      return;
+    }
+
+    if (idToClose === activeSessionId) {
+      const remaining = sessions.filter(s => s.id !== idToClose);
+      const nextSession = remaining[0];
+      setSessions(remaining);
+      applySessionToState(nextSession);
+    } else {
+      setSessions(prev => prev.filter(s => s.id !== idToClose));
+    }
+    notify('info', 'Billing session closed');
+  };
+
+  // Hydrate sessions from localStorage on mount (supports multi-sessions & legacy single draft)
   useEffect(() => {
     const urlPatientId = searchParams.get('patient_id') || searchParams.get('patientId');
     const autoSelect = searchParams.get('auto_select') || searchParams.get('autoSelect');
 
-    // Only restore draft if URL has no explicit new patient assignment
-    if (!urlPatientId && !autoSelect) {
-      try {
-        const raw = localStorage.getItem(BILLING_DRAFT_KEY);
-        if (raw) {
-          const draft = JSON.parse(raw);
-          if (draft && (draft.selectedPatient || (Array.isArray(draft.cart) && draft.cart.length > 0))) {
-            if (draft.selectedPatient) setSelectedPatient(draft.selectedPatient);
-            if (draft.selectedVisitId) setSelectedVisitId(draft.selectedVisitId);
-            if (Array.isArray(draft.cart)) setCart(draft.cart);
-            if (draft.discountPercent !== undefined) setDiscountPercent(draft.discountPercent);
-            if (draft.manualDiscount !== undefined) setManualDiscount(draft.manualDiscount);
-            if (draft.isManualDiscountUnlocked !== undefined) setIsManualDiscountUnlocked(draft.isManualDiscountUnlocked);
-            if (draft.amountTendred !== undefined) setAmountTendred(draft.amountTendred);
-            if (draft.paymentMethod) setPaymentMethod(draft.paymentMethod);
-            if (draft.mixedBreakdown) setMixedBreakdown(draft.mixedBreakdown);
+    try {
+      const rawMulti = localStorage.getItem(BILLING_SESSIONS_STORAGE_KEY);
+      if (rawMulti) {
+        const parsed = JSON.parse(rawMulti);
+        if (parsed && Array.isArray(parsed.sessions) && parsed.sessions.length > 0) {
+          setSessions(parsed.sessions);
+          const targetId = parsed.activeSessionId || parsed.sessions[0].id;
+          const active = parsed.sessions.find((s: any) => s.id === targetId) || parsed.sessions[0];
+          setActiveSessionId(active.id);
+          if (!urlPatientId && !autoSelect) {
+            applySessionToState(active);
             setIsRestoredFromDraft(true);
-            notify('info', 'Active billing session restored from draft');
+            notify('info', 'Restored open billing sessions');
           }
         }
-      } catch (err) {
-        console.warn('[Billing] Error reading draft from localStorage:', err);
+      } else {
+        // Fallback check for legacy single draft
+        const rawSingle = localStorage.getItem(LEGACY_DRAFT_KEY);
+        if (rawSingle) {
+          const draft = JSON.parse(rawSingle);
+          if (draft && (draft.selectedPatient || (Array.isArray(draft.cart) && draft.cart.length > 0))) {
+            const initialSession: BillingSession = {
+              id: 'sess-1',
+              selectedPatient: draft.selectedPatient || null,
+              selectedVisitId: draft.selectedVisitId || null,
+              cart: Array.isArray(draft.cart) ? draft.cart : [],
+              discountPercent: draft.discountPercent || 0,
+              manualDiscount: draft.manualDiscount || 0,
+              isManualDiscountUnlocked: !!draft.isManualDiscountUnlocked,
+              amountTendred: draft.amountTendred || 0,
+              paymentMethod: draft.paymentMethod || 'Cash',
+              mixedBreakdown: draft.mixedBreakdown || { cash: 0, bank: 0 },
+              createdAt: Date.now()
+            };
+            setSessions([initialSession]);
+            if (!urlPatientId && !autoSelect) {
+              applySessionToState(initialSession);
+              setIsRestoredFromDraft(true);
+            }
+          }
+        }
       }
+    } catch (err) {
+      console.warn('[Billing] Error loading sessions from storage:', err);
     }
     isDraftHydratedRef.current = true;
   }, []);
 
-  // Autosave active session draft to localStorage
+  // Autosave multi-sessions to localStorage
   useEffect(() => {
     if (!isDraftHydratedRef.current) return;
 
-    const hasContent = (cart && cart.length > 0) || selectedPatient !== null || discountPercent > 0 || manualDiscount > 0;
-    if (hasContent) {
-      const draft = {
-        selectedPatient,
-        selectedVisitId,
-        cart,
-        discountPercent,
-        manualDiscount,
-        isManualDiscountUnlocked,
-        amountTendred,
-        paymentMethod,
-        mixedBreakdown,
-        savedAt: new Date().toISOString()
-      };
-      try {
-        localStorage.setItem(BILLING_DRAFT_KEY, JSON.stringify(draft));
-      } catch (e) {
-        console.warn('[Billing] Unable to persist draft:', e);
-      }
-    } else {
-      try {
-        localStorage.removeItem(BILLING_DRAFT_KEY);
-      } catch {}
+    const currentSnap = getActiveSessionSnapshot();
+    const updated = sessions.map(s => s.id === activeSessionId ? currentSnap : s);
+    try {
+      localStorage.setItem(BILLING_SESSIONS_STORAGE_KEY, JSON.stringify({
+        sessions: updated,
+        activeSessionId
+      }));
+    } catch (e) {
+      console.warn('[Billing] Storage write failed:', e);
     }
-  }, [cart, selectedPatient, selectedVisitId, discountPercent, manualDiscount, isManualDiscountUnlocked, amountTendred, paymentMethod, mixedBreakdown]);
+  }, [sessions, activeSessionId, cart, selectedPatient, selectedVisitId, discountPercent, manualDiscount, isManualDiscountUnlocked, amountTendred, paymentMethod, mixedBreakdown]);
 
   // Synchronize patient context from URL parameters dynamically
   useEffect(() => {
@@ -515,16 +631,18 @@ export const Billing: React.FC = () => {
         printReceiptContent(receiptHtml);
       }
 
-      // Reset & Clear Draft
-      localStorage.removeItem(BILLING_DRAFT_KEY);
+      // Close completed session or reset
+      localStorage.removeItem(LEGACY_DRAFT_KEY);
       setIsRestoredFromDraft(false);
-      setCart([]);
-      setDiscountPercent(0);
-      setManualDiscount(0);
-      setIsManualDiscountUnlocked(false);
-      setAmountTendred(0);
-      setSelectedPatient(null);
-      setSelectedVisitId(null);
+      if (sessions.length > 1) {
+        const remaining = sessions.filter(s => s.id !== activeSessionId);
+        setSessions(remaining);
+        applySessionToState(remaining[0]);
+      } else {
+        const cleared = createDefaultSession('sess-1');
+        setSessions([cleared]);
+        applySessionToState(cleared);
+      }
       setActiveTab('history');
     } catch (err: any) {
       notify('error', err.message);
@@ -586,17 +704,19 @@ export const Billing: React.FC = () => {
                 className="leh-btn-primary"
                 style={{ flex: 1, height: '48px', background: 'var(--leh-red)' }}
                 onClick={() => {
-                  localStorage.removeItem(BILLING_DRAFT_KEY);
+                  localStorage.removeItem(LEGACY_DRAFT_KEY);
                   setIsRestoredFromDraft(false);
-                  setCart([]);
-                  setDiscountPercent(0);
-                  setManualDiscount(0);
-                  setIsManualDiscountUnlocked(false);
-                  setAmountTendred(0);
-                  setSelectedPatient(null);
-                  setSelectedVisitId(null);
+                  if (sessions.length > 1) {
+                    const remaining = sessions.filter(s => s.id !== activeSessionId);
+                    setSessions(remaining);
+                    applySessionToState(remaining[0]);
+                  } else {
+                    const cleared = createDefaultSession('sess-1');
+                    setSessions([cleared]);
+                    applySessionToState(cleared);
+                  }
                   setShowCancelModal(false);
-                  notify('info', 'Billing session terminated and draft discarded');
+                  notify('info', 'Billing session terminated');
                 }}
               >
                 CONFIRM TERMINATION
@@ -802,6 +922,100 @@ export const Billing: React.FC = () => {
           BILLING HISTORY
         </button>
       </div>
+
+      {/* CONCURRENT SESSIONS BAR */}
+      {activeTab === 'inventory' && (
+        <div className="billing-sessions-bar" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 16px 0', overflowX: 'auto', padding: '4px 0' }}>
+          <span style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginRight: '4px' }}>
+            Sessions:
+          </span>
+          {sessions.map((sess, idx) => {
+            const isActive = sess.id === activeSessionId;
+            const title = sess.selectedPatient 
+              ? `${sess.selectedPatient.full_name || 'Patient'} (#${sess.selectedPatient.id})`
+              : `Session ${idx + 1}`;
+            const itemCount = (sess.cart || []).reduce((acc: number, item: any) => acc + (item.qty || 1), 0);
+            
+            return (
+              <div
+                key={sess.id}
+                onClick={() => switchSession(sess.id)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '6px 14px',
+                  borderRadius: '10px',
+                  background: isActive ? 'var(--leh-primary)' : '#f8fafc',
+                  color: isActive ? '#ffffff' : '#334155',
+                  fontWeight: isActive ? 800 : 600,
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  border: isActive ? '1px solid var(--leh-primary)' : '1px solid #e2e8f0',
+                  boxShadow: isActive ? '0 2px 4px rgba(0,0,0,0.06)' : 'none',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <span>{title}</span>
+                {itemCount > 0 && (
+                  <span style={{
+                    background: isActive ? 'rgba(255, 255, 255, 0.25)' : '#e2e8f0',
+                    color: isActive ? '#ffffff' : '#475569',
+                    borderRadius: '999px',
+                    padding: '1px 6px',
+                    fontSize: '10px',
+                    fontWeight: 800
+                  }}>
+                    {itemCount}
+                  </span>
+                )}
+                {sessions.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeSession(sess.id);
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: isActive ? 'rgba(255,255,255,0.7)' : '#94a3b8',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '0 2px',
+                      lineHeight: 1
+                    }}
+                    title="Close session tab"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+
+          {sessions.length < 5 && (
+            <button
+              type="button"
+              onClick={addNewSession}
+              className="leh-btn-secondary"
+              style={{
+                height: '32px',
+                padding: '0 12px',
+                fontSize: '11px',
+                borderRadius: '10px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+              title="Open new concurrent billing session (Max 5)"
+            >
+              <Plus size={14} /> New Session
+            </button>
+          )}
+        </div>
+      )}
 
       {/* PATIENT CONTEXT BAR */}
       <section className="patient-context-bar">
@@ -1181,11 +1395,12 @@ export const Billing: React.FC = () => {
                           className={`btn-finalize ${isProcessing ? 'processing' : ''}`} 
                           disabled={isProcessing || cart.length === 0 || (paymentMethod === 'Mixed' && Math.abs((mixedBreakdown.cash + mixedBreakdown.bank) - totalPayable) > 0.01)} 
                           onClick={handleProcessPayment} 
-                          data-tooltip={paymentMethod === 'Mixed' && Math.abs((mixedBreakdown.cash + mixedBreakdown.bank) - totalPayable) > 0.01 ? "Mixed payment amounts must match total payable" : "Process this transaction"}
+                          data-tooltip={paymentMethod === 'Mixed' && Math.abs((mixedBreakdown.cash + mixedBreakdown.bank) - totalPayable) > 0.01 ? "Mixed payment amounts must match total payable" : "Process this transaction (Quick Checkout: F9 or Ctrl+Enter)"}
                         >
                            <div className="btn-finalize-inner">
                               {isProcessing ? <RefreshCcw className="animate-spin" size={20} /> : <ShieldCheck size={20} />}
                               <span>{balance > 0 ? 'RECORD PARTIAL PAYMENT' : 'PROCESS PAYMENT'}</span>
+                              <span style={{ fontSize: '10px', background: 'rgba(255,255,255,0.22)', padding: '2px 6px', borderRadius: '4px', letterSpacing: '0.04em' }}>F9</span>
                            </div>
                            {!isProcessing && (
                              <div className="btn-finalize-amount">
