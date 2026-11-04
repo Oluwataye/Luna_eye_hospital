@@ -248,29 +248,28 @@ export const InsuranceClaimDetail: React.FC = () => {
   return (
     <div className="insurance-container">
       {/* Top Controls (Hidden on Print) */}
-      <div className="insurance-header no-print">
+      <div className="insurance-header no-print" style={{ alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <button className="btn btn-outline-secondary" onClick={() => navigate('/insurance/claims')}>
-            <ArrowLeft size={16} /> Back
+          <button className="btn-leh-secondary" style={{ padding: '0.45rem 1rem' }} onClick={() => navigate('/insurance/claims')}>
+            <ArrowLeft size={15} /> Back
           </button>
           <div>
-            <h1 className="insurance-title">{claim.claim_number}</h1>
+            <h1 className="insurance-title" style={{ fontSize: '1.4rem' }}>{claim.claim_number}</h1>
             <p className="insurance-subtitle">
               Payer: <strong>{claim.payer_name}</strong> &bull; Plan: {claim.plan_name || 'Standard'} &bull; Service Date: {claim.service_date}
             </p>
           </div>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary" onClick={triggerPrint}>
-            <Printer size={16} /> Print Claim Form
+          <button className="btn-leh-secondary" onClick={triggerPrint}>
+            <Printer size={15} /> Print Claim Form
           </button>
           {!isLocked && (
             <>
               {availableTransitions.map((st) => (
                 <button
                   key={st}
-                  className="btn btn-primary"
-                  style={{ background: 'var(--leh-forest)' }}
+                  className="btn-leh-forest"
                   onClick={() => setTransitionDialog({ open: true, toStatus: st, reason: '', note: '' })}
                 >
                   Mark as {st.replace('_', ' ')}
@@ -278,7 +277,7 @@ export const InsuranceClaimDetail: React.FC = () => {
               ))}
               {['SUBMITTED', 'UNDER_REVIEW', 'REJECTED', 'PARTIALLY_APPROVED'].includes(claim.status) && (
                 <button
-                  className="btn btn-outline-danger"
+                  className="btn-leh-danger"
                   onClick={() => setWriteOffDialog({ open: true, reason: '' })}
                 >
                   Write-off Balance
@@ -370,10 +369,11 @@ export const InsuranceClaimDetail: React.FC = () => {
         {/* Claim Items Table */}
         <div className="insurance-card" style={{ marginBottom: '1.5rem' }}>
           <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--leh-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h4 style={{ margin: 0, color: 'var(--leh-ink)' }}>Billed Service & Medication Items</h4>
+            <h4 style={{ margin: 0, color: 'var(--leh-ink)', fontWeight: 700 }}>Billed Service & Medication Items</h4>
             {!isLocked && (
               <button
-                className="btn btn-sm btn-outline-primary no-print"
+                className="btn-leh-forest no-print"
+                style={{ padding: '0.45rem 0.9rem', fontSize: '0.82rem' }}
                 onClick={() => setNewItemDialog({ open: true, item_type: 'SERVICE', item_code: '', description: '', quantity: 1, unit_price: 0 })}
               >
                 <Plus size={14} /> Add Item
@@ -483,7 +483,7 @@ export const InsuranceClaimDetail: React.FC = () => {
                 onChange={(e) => setNewNote(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddNote()}
               />
-              <button className="btn btn-secondary" onClick={handleAddNote}>
+              <button className="btn-leh-secondary" style={{ padding: '0.45rem 1.1rem' }} onClick={handleAddNote}>
                 Add Note
               </button>
             </div>
@@ -541,10 +541,10 @@ export const InsuranceClaimDetail: React.FC = () => {
               </div>
             </div>
             <div className="ins-modal-footer">
-              <button className="btn btn-secondary" onClick={() => setTransitionDialog({ ...transitionDialog, open: false })}>
+              <button className="btn-leh-secondary" onClick={() => setTransitionDialog({ ...transitionDialog, open: false })}>
                 Cancel
               </button>
-              <button className="btn btn-primary" onClick={handleTransition}>
+              <button className="btn-leh-forest" onClick={handleTransition}>
                 Confirm
               </button>
             </div>
@@ -557,7 +557,7 @@ export const InsuranceClaimDetail: React.FC = () => {
         <div className="ins-modal-overlay">
           <div className="ins-modal">
             <div className="ins-modal-header">
-              <h3 style={{ margin: 0, fontSize: '1.25rem' }}>Write Off Claim Balance</h3>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>Write Off Claim Balance</h3>
               <button className="btn btn-sm btn-link" onClick={() => setWriteOffDialog({ open: false, reason: '' })}>
                 <X size={20} />
               </button>
@@ -578,10 +578,10 @@ export const InsuranceClaimDetail: React.FC = () => {
               </div>
             </div>
             <div className="ins-modal-footer">
-              <button className="btn btn-secondary" onClick={() => setWriteOffDialog({ open: false, reason: '' })}>
+              <button className="btn-leh-secondary" onClick={() => setWriteOffDialog({ open: false, reason: '' })}>
                 Cancel
               </button>
-              <button className="btn btn-danger" onClick={handleWriteOff}>
+              <button className="btn-leh-danger" onClick={handleWriteOff}>
                 Confirm Write-Off
               </button>
             </div>
@@ -594,7 +594,7 @@ export const InsuranceClaimDetail: React.FC = () => {
         <div className="ins-modal-overlay">
           <div className="ins-modal">
             <div className="ins-modal-header">
-              <h3 style={{ margin: 0, fontSize: '1.25rem' }}>Add Service / Item</h3>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>Add Service / Item</h3>
               <button className="btn btn-sm btn-link" onClick={() => setNewItemDialog({ ...newItemDialog, open: false })}>
                 <X size={20} />
               </button>
@@ -659,10 +659,10 @@ export const InsuranceClaimDetail: React.FC = () => {
               </div>
             </div>
             <div className="ins-modal-footer">
-              <button className="btn btn-secondary" onClick={() => setNewItemDialog({ ...newItemDialog, open: false })}>
+              <button className="btn-leh-secondary" onClick={() => setNewItemDialog({ ...newItemDialog, open: false })}>
                 Cancel
               </button>
-              <button className="btn btn-primary" onClick={handleAddItem}>
+              <button className="btn-leh-forest" onClick={handleAddItem}>
                 Add to Claim
               </button>
             </div>

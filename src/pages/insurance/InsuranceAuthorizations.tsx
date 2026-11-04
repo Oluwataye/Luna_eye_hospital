@@ -6,7 +6,7 @@ import {
 import { api } from '../../api';
 import { useNotification } from '../../context/NotificationContext';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
-import { StatCard } from '../../components/StatCard';
+import { InsuranceNavHeader } from './InsuranceNavHeader';
 import './Insurance.css';
 
 export const InsuranceAuthorizations: React.FC = () => {
@@ -162,55 +162,69 @@ export const InsuranceAuthorizations: React.FC = () => {
   return (
     <div className="insurance-container">
       {/* Header */}
-      <div className="insurance-header">
-        <div>
-          <h1 className="insurance-title">Pre-Authorizations</h1>
-          <p className="insurance-subtitle">Manage procedure approvals and HMO authorization codes</p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button
-            className="btn btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--leh-forest)' }}
-            onClick={() => setIsCreateModalOpen(true)}
-          >
-            <Plus size={16} /> Request Pre-Auth
-          </button>
-          <button className="btn btn-secondary" onClick={loadData}>
-            <RefreshCw size={16} /> Refresh
-          </button>
-        </div>
-      </div>
+      <InsuranceNavHeader
+        title="Pre-Authorizations"
+        subtitle="Manage procedure approvals and HMO authorization codes"
+        actions={
+          <>
+            <button
+              className="btn-leh-forest"
+              onClick={() => setIsCreateModalOpen(true)}
+            >
+              <Plus size={15} /> Request Pre-Auth
+            </button>
+            <button className="btn-leh-secondary" onClick={loadData}>
+              <RefreshCw size={15} /> Refresh
+            </button>
+          </>
+        }
+      />
 
       {/* Summary Cards */}
       <div className="insurance-grid-stats">
-        <StatCard
-          title="Pending Requests"
-          value={auths.filter(a => a.status === 'PENDING').length}
-          subtitle="Awaiting HMO response"
-          icon={Clock}
-          colorClass="amber"
-        />
-        <StatCard
-          title="Approved"
-          value={auths.filter(a => a.status === 'APPROVED').length}
-          subtitle="Valid for billing"
-          icon={CheckCircle2}
-          colorClass="green"
-        />
-        <StatCard
-          title="Partially Approved"
-          value={auths.filter(a => a.status === 'PARTIAL').length}
-          subtitle="Reduced coverage"
-          icon={AlertCircle}
-          colorClass="blue"
-        />
-        <StatCard
-          title="Denied"
-          value={auths.filter(a => a.status === 'DENIED').length}
-          subtitle="Payer rejected"
-          icon={XCircle}
-          colorClass="red"
-        />
+        <div className="insurance-stat-card-modern">
+          <div className="ins-stat-header">
+            <span className="ins-stat-label">Pending Requests</span>
+            <div className="ins-stat-icon-wrap" style={{ background: '#fef3c7', color: '#b45309' }}>
+              <Clock size={18} />
+            </div>
+          </div>
+          <div className="ins-stat-value">{auths.filter(a => a.status === 'PENDING').length}</div>
+          <div className="ins-stat-footer">Awaiting HMO response</div>
+        </div>
+
+        <div className="insurance-stat-card-modern">
+          <div className="ins-stat-header">
+            <span className="ins-stat-label">Approved</span>
+            <div className="ins-stat-icon-wrap" style={{ background: '#dcfce7', color: '#15803d' }}>
+              <CheckCircle2 size={18} />
+            </div>
+          </div>
+          <div className="ins-stat-value">{auths.filter(a => a.status === 'APPROVED').length}</div>
+          <div className="ins-stat-footer">Valid for billing</div>
+        </div>
+
+        <div className="insurance-stat-card-modern">
+          <div className="ins-stat-header">
+            <span className="ins-stat-label">Partially Approved</span>
+            <div className="ins-stat-icon-wrap" style={{ background: '#e0e7ff', color: '#4338ca' }}>
+              <AlertCircle size={18} />
+            </div>
+          </div>
+          <div className="ins-stat-value">{auths.filter(a => a.status === 'PARTIAL').length}</div>
+          <div className="ins-stat-footer">Reduced coverage approved</div>
+        </div>
+
+        <div className="insurance-stat-card-modern">
+          <div className="ins-stat-header">
+            <span className="ins-stat-label">Denied</span>
+            <div className="ins-stat-icon-wrap" style={{ background: '#fee2e2', color: '#b91c1c' }}>
+              <XCircle size={18} />
+            </div>
+          </div>
+          <div className="ins-stat-value">{auths.filter(a => a.status === 'DENIED').length}</div>
+          <div className="ins-stat-footer">Payer rejected request</div>
+        </div>
       </div>
 
       {/* Main Table Card */}
@@ -218,11 +232,9 @@ export const InsuranceAuthorizations: React.FC = () => {
         {/* Filter bar */}
         <div className="insurance-filter-bar">
           <div className="insurance-search-input">
-            <Search size={16} style={{ position: 'absolute', left: '12px', top: '10px', color: 'var(--leh-muted)' }} />
+            <Search size={15} />
             <input
               type="text"
-              className="form-control"
-              style={{ paddingLeft: '36px', height: '36px' }}
               placeholder="Search patient, auth code, procedure..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -230,8 +242,7 @@ export const InsuranceAuthorizations: React.FC = () => {
           </div>
 
           <select
-            className="form-select"
-            style={{ width: '160px', height: '36px' }}
+            className="insurance-filter-select"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
@@ -244,8 +255,7 @@ export const InsuranceAuthorizations: React.FC = () => {
           </select>
 
           <select
-            className="form-select"
-            style={{ width: '180px', height: '36px' }}
+            className="insurance-filter-select"
             value={payerFilter}
             onChange={(e) => setPayerFilter(e.target.value)}
           >
@@ -257,7 +267,8 @@ export const InsuranceAuthorizations: React.FC = () => {
 
           {(search || statusFilter || payerFilter) && (
             <button
-              className="btn btn-sm btn-outline-secondary"
+              className="btn-leh-secondary"
+              style={{ padding: '0.45rem 0.9rem', fontSize: '0.82rem' }}
               onClick={() => {
                 setSearch('');
                 setStatusFilter('');
@@ -458,10 +469,10 @@ export const InsuranceAuthorizations: React.FC = () => {
               </div>
             </div>
             <div className="ins-modal-footer">
-              <button className="btn btn-secondary" onClick={() => setIsCreateModalOpen(false)}>
+              <button className="btn-leh-secondary" onClick={() => setIsCreateModalOpen(false)}>
                 Cancel
               </button>
-              <button className="btn btn-primary" onClick={handleCreate}>
+              <button className="btn-leh-forest" onClick={handleCreate}>
                 Submit Request
               </button>
             </div>
@@ -474,7 +485,7 @@ export const InsuranceAuthorizations: React.FC = () => {
         <div className="ins-modal-overlay">
           <div className="ins-modal">
             <div className="ins-modal-header">
-              <h3 style={{ margin: 0, fontSize: '1.25rem' }}>Record HMO Decision</h3>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>Record HMO Decision</h3>
               <button className="btn btn-sm btn-link" onClick={() => setDecisionModal({ ...decisionModal, open: false })}>
                 <X size={20} />
               </button>
@@ -545,10 +556,10 @@ export const InsuranceAuthorizations: React.FC = () => {
               )}
             </div>
             <div className="ins-modal-footer">
-              <button className="btn btn-secondary" onClick={() => setDecisionModal({ ...decisionModal, open: false })}>
+              <button className="btn-leh-secondary" onClick={() => setDecisionModal({ ...decisionModal, open: false })}>
                 Cancel
               </button>
-              <button className="btn btn-primary" onClick={handleRecordDecision}>
+              <button className="btn-leh-forest" onClick={handleRecordDecision}>
                 Save Decision
               </button>
             </div>

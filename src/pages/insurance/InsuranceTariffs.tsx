@@ -7,6 +7,7 @@ import {
 import { api } from '../../api';
 import { useNotification } from '../../context/NotificationContext';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { InsuranceNavHeader } from './InsuranceNavHeader';
 import './Insurance.css';
 
 // ─── RFC 4180 Quote-Aware CSV Parser (browser-safe, zero deps) ────────────
@@ -314,63 +315,62 @@ export const InsuranceTariffs: React.FC = () => {
 
   return (
     <div className="insurance-container">
-      <div className="insurance-header">
-        <div>
-          <h1 className="insurance-title">Payer Tariff Schedules</h1>
-          <p className="insurance-subtitle">Agreed pricing contracts and pre-authorization requirements per HMO</p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button
-            className="btn btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--leh-forest)' }}
-            onClick={() => setModal({ ...EMPTY_MODAL, open: true, payer_id: payers[0]?.id ? String(payers[0].id) : '' })}
-          >
-            <Plus size={16} /> Add Tariff Rate
-          </button>
-          <button
-            className="btn btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-            onClick={() => setImportModal(true)}
-          >
-            <Upload size={16} /> Bulk Import CSV
-          </button>
-          <button className="btn btn-secondary" onClick={loadData} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <RefreshCw size={16} /> Refresh
-          </button>
-        </div>
-      </div>
+      <InsuranceNavHeader
+        title="Payer Tariff Schedules"
+        subtitle="Agreed pricing contracts and pre-authorization requirements per HMO"
+        actions={
+          <>
+            <button
+              className="btn-leh-forest"
+              onClick={() => setModal({ ...EMPTY_MODAL, open: true, payer_id: payers[0]?.id ? String(payers[0].id) : '' })}
+            >
+              <Plus size={15} /> Add Tariff Rate
+            </button>
+            <button
+              className="btn-leh-secondary"
+              onClick={() => setImportModal(true)}
+            >
+              <Upload size={15} /> Bulk Import CSV
+            </button>
+            <button
+              className="btn-leh-secondary"
+              onClick={loadData}
+            >
+              <RefreshCw size={15} /> Refresh
+            </button>
+          </>
+        }
+      />
 
       <div className="insurance-card">
         <div className="insurance-filter-bar">
           <div className="insurance-search-input">
-            <Search size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--leh-muted)' }} />
+            <Search size={15} />
             <input
               type="text"
-              className="form-control"
-              style={{ paddingLeft: '32px', height: '36px' }}
               placeholder="Search by code, procedure, service..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <select className="form-select" style={{ width: '180px', height: '36px' }} value={payerFilter} onChange={(e) => setPayerFilter(e.target.value)}>
+          <select className="insurance-filter-select" style={{ minWidth: '180px' }} value={payerFilter} onChange={(e) => setPayerFilter(e.target.value)}>
             <option value="">All Payers</option>
             {payers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
           {payerFilter && (
-            <select className="form-select" style={{ width: '160px', height: '36px' }} value={planFilter} onChange={(e) => setPlanFilter(e.target.value)}>
+            <select className="insurance-filter-select" style={{ minWidth: '160px' }} value={planFilter} onChange={(e) => setPlanFilter(e.target.value)}>
               <option value="">All Plans</option>
               {plans.filter((pl) => pl.payer_id === parseInt(payerFilter)).map((pl) => (
                 <option key={pl.id} value={pl.id}>{pl.plan_name}</option>
               ))}
             </select>
           )}
-          <select className="form-select" style={{ width: '160px', height: '36px' }} value={itemTypeFilter} onChange={(e) => setItemTypeFilter(e.target.value)}>
+          <select className="insurance-filter-select" style={{ minWidth: '160px' }} value={itemTypeFilter} onChange={(e) => setItemTypeFilter(e.target.value)}>
             <option value="">All Categories</option>
             {ITEM_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
           {(search || payerFilter || planFilter || itemTypeFilter) && (
-            <button className="btn btn-sm btn-outline-secondary" onClick={() => { setSearch(''); setPayerFilter(''); setPlanFilter(''); setItemTypeFilter(''); }}>Clear</button>
+            <button className="btn-leh-secondary" style={{ padding: '0.45rem 0.9rem', fontSize: '0.82rem' }} onClick={() => { setSearch(''); setPayerFilter(''); setPlanFilter(''); setItemTypeFilter(''); }}>Clear</button>
           )}
         </div>
 
@@ -485,8 +485,8 @@ export const InsuranceTariffs: React.FC = () => {
               </div>
             </div>
             <div className="ins-modal-footer">
-              <button className="btn btn-secondary" onClick={() => setModal(EMPTY_MODAL)}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleSave}>Save Tariff</button>
+              <button className="btn-leh-secondary" onClick={() => setModal(EMPTY_MODAL)}>Cancel</button>
+              <button className="btn-leh-forest" onClick={handleSave}>Save Tariff</button>
             </div>
           </div>
         </div>
@@ -498,23 +498,23 @@ export const InsuranceTariffs: React.FC = () => {
           <div className="ins-modal" style={{ maxWidth: '780px', width: '95vw' }}>
             <div className="ins-modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <Upload size={20} />
-                <h3 style={{ margin: 0, fontSize: '1.2rem' }}>Bulk Tariff Import \u2014 HMO CSV Upload</h3>
+                <Upload size={20} color="var(--leh-forest)" />
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Bulk Tariff Import — HMO CSV Upload</h3>
               </div>
               <button className="btn btn-sm btn-link" onClick={closeImportModal}><X size={20} /></button>
             </div>
 
             <div className="ins-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {/* Step 1 */}
-              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '0.9rem 1.1rem' }}>
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '0.9rem 1.1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <strong style={{ fontSize: '0.9rem' }}>Step 1 \u2014 Download the CSV template</strong>
+                    <strong style={{ fontSize: '0.9rem', color: '#14532d' }}>Step 1 — Download the CSV template</strong>
                     <p style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: '#166534' }}>Open in Excel, fill tariff rows, then save as CSV before uploading.</p>
                   </div>
                   <button
-                    className="btn btn-sm"
-                    style={{ background: '#16a34a', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}
+                    className="btn-leh-forest"
+                    style={{ padding: '0.45rem 1rem', fontSize: '0.82rem', whiteSpace: 'nowrap' }}
                     onClick={() => api.insurance.downloadTariffTemplate().catch((e: any) => notify('error', e.message))}
                   >
                     <Download size={14} /> Download Template
@@ -525,7 +525,7 @@ export const InsuranceTariffs: React.FC = () => {
               {/* Step 2 */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Step 2 \u2014 Select Payer *</label>
+                  <label className="form-label" style={{ fontWeight: 600 }}>Step 2 — Select Payer *</label>
                   <select className="form-select" value={importPayerId} onChange={(e) => { setImportPayerId(e.target.value); setImportPlanId(''); }}>
                     <option value="">-- Choose HMO / Payer --</option>
                     {payers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -542,27 +542,27 @@ export const InsuranceTariffs: React.FC = () => {
 
               {/* Step 3 */}
               <div>
-                <label className="form-label" style={{ fontWeight: 600 }}>Step 3 \u2014 Upload CSV File</label>
+                <label className="form-label" style={{ fontWeight: 600 }}>Step 3 — Upload CSV File</label>
                 <div
-                  style={{ border: '2px dashed #cbd5e1', borderRadius: '8px', padding: '1.5rem', textAlign: 'center', cursor: 'pointer', background: '#f8fafc' }}
+                  style={{ border: '2px dashed var(--leh-border, #cbd5e1)', borderRadius: '12px', padding: '1.5rem', textAlign: 'center', cursor: 'pointer', background: 'var(--leh-card-bg, #f8fafc)', transition: 'border-color 0.2s' }}
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <FileText size={28} style={{ color: '#94a3b8', marginBottom: '0.5rem' }} />
-                  <p style={{ margin: 0, color: '#64748b', fontSize: '0.9rem' }}>Click to browse or drag a <strong>.csv</strong> file here</p>
-                  <p style={{ margin: '0.2rem 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>Columns: item_type, item_ref_id, item_description, payer_price_naira, covered, requires_preauth</p>
+                  <FileText size={28} style={{ color: 'var(--leh-forest)', marginBottom: '0.5rem' }} />
+                  <p style={{ margin: 0, color: 'var(--leh-ink)', fontSize: '0.9rem', fontWeight: 500 }}>Click to browse or drag a <strong>.csv</strong> file here</p>
+                  <p style={{ margin: '0.2rem 0 0', fontSize: '0.78rem', color: 'var(--leh-muted)' }}>Columns: item_type, item_ref_id, item_description, payer_price_naira, covered, requires_preauth</p>
                   <input ref={fileInputRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={handleFileChange} />
                 </div>
               </div>
 
               {/* Warnings */}
               {importWarnings.length > 0 && (
-                <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '8px', padding: '0.75rem 1rem' }}>
+                <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '10px', padding: '0.75rem 1rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
                     <AlertTriangle size={16} color="#d97706" />
-                    <strong style={{ fontSize: '0.85rem', color: '#92400e' }}>{importWarnings.length} warning(s) \u2014 valid rows will still be imported</strong>
+                    <strong style={{ fontSize: '0.85rem', color: '#92400e' }}>{importWarnings.length} warning(s) — valid rows will still be imported</strong>
                   </div>
                   {importWarnings.slice(0, 5).map((w, i) => <div key={i} style={{ fontSize: '0.8rem', color: '#78350f' }}>{w}</div>)}
-                  {importWarnings.length > 5 && <div style={{ fontSize: '0.8rem', color: '#92400e', marginTop: '0.3rem' }}>\u2026and {importWarnings.length - 5} more</div>}
+                  {importWarnings.length > 5 && <div style={{ fontSize: '0.8rem', color: '#92400e', marginTop: '0.3rem' }}>…and {importWarnings.length - 5} more</div>}
                 </div>
               )}
 
@@ -570,15 +570,15 @@ export const InsuranceTariffs: React.FC = () => {
               {importRows.length > 0 && (
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                    <strong style={{ fontSize: '0.9rem' }}>Preview \u2014 {importRows.length} row(s) parsed</strong>
+                    <strong style={{ fontSize: '0.9rem' }}>Preview — {importRows.length} row(s) parsed</strong>
                     <span style={{ fontSize: '0.8rem', color: 'var(--leh-muted)' }}>Showing first 5 rows</span>
                   </div>
-                  <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+                  <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
                     <table className="insurance-table" style={{ marginBottom: 0 }}>
                       <thead>
                         <tr>
                           <th>Type</th><th>Code</th><th>Description</th>
-                          <th style={{ textAlign: 'right' }}>Price (\u20a6)</th>
+                          <th style={{ textAlign: 'right' }}>Price (₦)</th>
                           <th style={{ textAlign: 'center' }}>Covered</th>
                           <th style={{ textAlign: 'center' }}>Pre-Auth</th>
                         </tr>
@@ -587,15 +587,15 @@ export const InsuranceTariffs: React.FC = () => {
                         {importRows.slice(0, 5).map((row, i) => (
                           <tr key={i}>
                             <td><span style={{ fontSize: '0.75rem', background: '#f1f5f9', padding: '2px 5px', borderRadius: '4px' }}>{(row.item_type || 'SERVICE').toUpperCase()}</span></td>
-                            <td style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{row.item_ref_id || row.item_code || '\u2014'}</td>
-                            <td>{row.item_description || row.description || '\u2014'}</td>
+                            <td style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{row.item_ref_id || row.item_code || '—'}</td>
+                            <td>{row.item_description || row.description || '—'}</td>
                             <td style={{ textAlign: 'right' }}>{parseFloat(row.payer_price_naira || row.price || '0').toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                             <td style={{ textAlign: 'center' }}>{(row.covered === '0' || row.is_covered === '0') ? <XCircle size={14} color="#dc2626" /> : <CheckCircle size={14} color="#16a34a" />}</td>
                             <td style={{ textAlign: 'center' }}>{(row.requires_preauth === '1' || row.requires_authorization === '1') ? <CheckCircle size={14} color="#d97706" /> : <span style={{ color: 'var(--leh-muted)', fontSize: '0.8rem' }}>No</span>}</td>
                           </tr>
                         ))}
                         {importRows.length > 5 && (
-                          <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--leh-muted)', fontSize: '0.82rem', padding: '0.5rem' }}>\u2026{importRows.length - 5} more rows not shown</td></tr>
+                          <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--leh-muted)', fontSize: '0.82rem', padding: '0.5rem' }}>…{importRows.length - 5} more rows not shown</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -605,7 +605,7 @@ export const InsuranceTariffs: React.FC = () => {
 
               {/* Streaming Progress Bar */}
               {importProgress && (
-                <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '0.9rem 1.1rem' }}>
+                <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '0.9rem 1.1rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', fontSize: '0.85rem' }}>
                     <span style={{ fontWeight: 600, color: '#334155' }}>{importProgress.statusText}</span>
                     <span style={{ fontWeight: 700, color: 'var(--leh-forest)' }}>{importProgress.percent}%</span>
@@ -630,7 +630,7 @@ export const InsuranceTariffs: React.FC = () => {
 
               {/* Result */}
               {importResult && (
-                <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', padding: '0.9rem 1.1rem' }}>
+                <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '10px', padding: '0.9rem 1.1rem' }}>
                   <strong style={{ color: '#15803d' }}>✓ Import Completed</strong>
                   <div style={{ marginTop: '0.4rem', fontSize: '0.88rem', display: 'flex', gap: '1.5rem' }}>
                     <span>Total: <strong>{importResult.total}</strong></span>
@@ -647,15 +647,14 @@ export const InsuranceTariffs: React.FC = () => {
 
             <div className="ins-modal-footer">
               {importing ? (
-                <button className="btn btn-secondary" style={{ color: '#dc2626' }} onClick={handleAbortImport}>
+                <button className="btn-leh-danger" onClick={handleAbortImport}>
                   Stop Import
                 </button>
               ) : (
-                <button className="btn btn-secondary" onClick={closeImportModal}>Close</button>
+                <button className="btn-leh-secondary" onClick={closeImportModal}>Close</button>
               )}
               <button
-                className="btn btn-primary"
-                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--leh-forest)' }}
+                className="btn-leh-forest"
                 disabled={!importPayerId || importRows.length === 0 || importing}
                 onClick={handleRunImport}
               >

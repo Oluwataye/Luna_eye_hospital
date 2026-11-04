@@ -7,8 +7,8 @@ import {
 } from 'lucide-react';
 import { api } from '../../api';
 import { useNotification } from '../../context/NotificationContext';
-import { StatCard } from '../../components/StatCard';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { InsuranceNavHeader } from './InsuranceNavHeader';
 import './Insurance.css';
 
 export const InsuranceClaims: React.FC = () => {
@@ -284,69 +284,84 @@ export const InsuranceClaims: React.FC = () => {
 
   return (
     <div className="insurance-container">
-      {/* Header */}
-      <div className="insurance-header">
-        <div>
-          <h1 className="insurance-title">Insurance Claims Management</h1>
-          <p className="insurance-subtitle">Track, batch, and process HMO & NHIA medical claims</p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          {selectedClaimIds.length > 0 && (
+      {/* Unified Nav Header */}
+      <InsuranceNavHeader
+        title="Insurance Claims Management"
+        subtitle="Adjudication tracking, batching, and automated HMO clearinghouse dispatch"
+        actions={
+          <>
+            {selectedClaimIds.length > 0 && (
+              <button
+                type="button"
+                className="btn-leh-forest"
+                onClick={() => setIsBatchModalOpen(true)}
+              >
+                <Layers size={15} /> Create Batch ({selectedClaimIds.length})
+              </button>
+            )}
             <button
-              className="btn btn-primary"
-              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--leh-forest)' }}
-              onClick={() => setIsBatchModalOpen(true)}
+              type="button"
+              className="btn-leh-indigo"
+              onClick={() => { setEdiModal(true); loadEdiData(); }}
             >
-              <Layers size={16} /> Create Batch ({selectedClaimIds.length})
+              <Network size={15} /> EDI Clearinghouse
             </button>
-          )}
-          <button
-            className="btn btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#6366f1' }}
-            onClick={() => { setEdiModal(true); loadEdiData(); }}
-          >
-            <Network size={16} /> EDI Clearinghouse
-          </button>
-          <button
-            className="btn btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-            onClick={loadData}
-          >
-            <RefreshCw size={16} /> Refresh
-          </button>
-        </div>
-      </div>
+            <button
+              type="button"
+              className="btn-leh-secondary"
+              onClick={loadData}
+            >
+              <RefreshCw size={15} /> Refresh
+            </button>
+          </>
+        }
+      />
 
-      {/* Summary Cards */}
+      {/* Summary KPI Cards */}
       <div className="insurance-grid-stats">
-        <StatCard
-          title="Draft / Ready"
-          value={claims.filter(c => ['DRAFT', 'READY'].includes(c.status)).length}
-          subtitle="Pending submission"
-          icon={FileText}
-          colorClass="blue"
-        />
-        <StatCard
-          title="Submitted / Review"
-          value={claims.filter(c => ['SUBMITTED', 'UNDER_REVIEW', 'RESUBMITTED'].includes(c.status)).length}
-          subtitle="Awaiting adjudication"
-          icon={Clock}
-          colorClass="amber"
-        />
-        <StatCard
-          title="Approved / Paid"
-          value={claims.filter(c => ['APPROVED', 'PAID', 'PARTIALLY_PAID', 'PARTIALLY_APPROVED'].includes(c.status)).length}
-          subtitle="Settled or confirmed"
-          icon={CheckCircle2}
-          colorClass="green"
-        />
-        <StatCard
-          title="Queried / Rejected"
-          value={claims.filter(c => ['QUERIED', 'REJECTED'].includes(c.status)).length}
-          subtitle="Requires attention"
-          icon={AlertCircle}
-          colorClass="red"
-        />
+        <div className="insurance-stat-card-modern insurance-stat-card-modern--blue">
+          <div className="insurance-stat-icon-wrapper insurance-stat-icon-wrapper--blue">
+            <FileText size={22} />
+          </div>
+          <div className="insurance-stat-content">
+            <span className="insurance-stat-label">Draft / Ready</span>
+            <span className="insurance-stat-value">{claims.filter(c => ['DRAFT', 'READY'].includes(c.status)).length}</span>
+            <span className="insurance-stat-subtext">Pending batch submission</span>
+          </div>
+        </div>
+
+        <div className="insurance-stat-card-modern insurance-stat-card-modern--amber">
+          <div className="insurance-stat-icon-wrapper insurance-stat-icon-wrapper--amber">
+            <Clock size={22} />
+          </div>
+          <div className="insurance-stat-content">
+            <span className="insurance-stat-label">Submitted / In Review</span>
+            <span className="insurance-stat-value">{claims.filter(c => ['SUBMITTED', 'UNDER_REVIEW', 'RESUBMITTED'].includes(c.status)).length}</span>
+            <span className="insurance-stat-subtext">Awaiting HMO adjudication</span>
+          </div>
+        </div>
+
+        <div className="insurance-stat-card-modern insurance-stat-card-modern--green">
+          <div className="insurance-stat-icon-wrapper insurance-stat-icon-wrapper--green">
+            <CheckCircle2 size={22} />
+          </div>
+          <div className="insurance-stat-content">
+            <span className="insurance-stat-label">Approved & Paid</span>
+            <span className="insurance-stat-value">{claims.filter(c => ['APPROVED', 'PAID', 'PARTIALLY_PAID', 'PARTIALLY_APPROVED'].includes(c.status)).length}</span>
+            <span className="insurance-stat-subtext">Settled or confirmed</span>
+          </div>
+        </div>
+
+        <div className="insurance-stat-card-modern insurance-stat-card-modern--red">
+          <div className="insurance-stat-icon-wrapper insurance-stat-icon-wrapper--red">
+            <AlertCircle size={22} />
+          </div>
+          <div className="insurance-stat-content">
+            <span className="insurance-stat-label">Queried / Rejected</span>
+            <span className="insurance-stat-value">{claims.filter(c => ['QUERIED', 'REJECTED'].includes(c.status)).length}</span>
+            <span className="insurance-stat-subtext">Requires staff attention</span>
+          </div>
+        </div>
       </div>
 
       {/* Main Table Card */}
@@ -354,11 +369,9 @@ export const InsuranceClaims: React.FC = () => {
         {/* Filters */}
         <div className="insurance-filter-bar">
           <div className="insurance-search-input">
-            <Search size={16} style={{ position: 'absolute', left: '12px', top: '10px', color: 'var(--leh-muted)' }} />
+            <Search size={16} style={{ position: 'absolute', left: '14px', top: '11px', color: 'var(--leh-muted)' }} />
             <input
               type="text"
-              className="form-control"
-              style={{ paddingLeft: '36px', height: '36px' }}
               placeholder="Search claim #, patient, enrollee..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -366,8 +379,8 @@ export const InsuranceClaims: React.FC = () => {
           </div>
 
           <select
-            className="form-select"
-            style={{ width: '160px', height: '36px' }}
+            className="insurance-filter-select"
+            style={{ minWidth: '150px' }}
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
@@ -384,8 +397,8 @@ export const InsuranceClaims: React.FC = () => {
           </select>
 
           <select
-            className="form-select"
-            style={{ width: '180px', height: '36px' }}
+            className="insurance-filter-select"
+            style={{ minWidth: '170px' }}
             value={payerFilter}
             onChange={(e) => setPayerFilter(e.target.value)}
           >
@@ -397,16 +410,14 @@ export const InsuranceClaims: React.FC = () => {
 
           <input
             type="date"
-            className="form-control"
-            style={{ width: '140px', height: '36px' }}
+            className="insurance-filter-date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
             title="Service Date From"
           />
           <input
             type="date"
-            className="form-control"
-            style={{ width: '140px', height: '36px' }}
+            className="insurance-filter-date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
             title="Service Date To"
@@ -414,7 +425,9 @@ export const InsuranceClaims: React.FC = () => {
 
           {(search || statusFilter || payerFilter || dateFrom || dateTo) && (
             <button
-              className="btn btn-sm btn-outline-secondary"
+              type="button"
+              className="btn-leh-secondary"
+              style={{ padding: '6px 14px', fontSize: '12px' }}
               onClick={() => {
                 setSearch('');
                 setStatusFilter('');
@@ -423,7 +436,7 @@ export const InsuranceClaims: React.FC = () => {
                 setDateTo('');
               }}
             >
-              Clear
+              Reset Filters
             </button>
           )}
         </div>
@@ -581,11 +594,11 @@ export const InsuranceClaims: React.FC = () => {
               </div>
             </div>
             <div className="ins-modal-footer">
-              <button className="btn btn-secondary" onClick={() => setIsBatchModalOpen(false)}>
+              <button type="button" className="btn-leh-secondary" onClick={() => setIsBatchModalOpen(false)}>
                 Cancel
               </button>
-              <button className="btn btn-primary" onClick={handleCreateBatch}>
-                Create Batch
+              <button type="button" className="btn-leh-forest" onClick={handleCreateBatch}>
+                <Layers size={14} /> Create Batch
               </button>
             </div>
           </div>
@@ -601,6 +614,7 @@ export const InsuranceClaims: React.FC = () => {
                 Update Status to {transitionModal.targetStatus}
               </h3>
               <button
+                type="button"
                 className="btn btn-sm btn-link"
                 onClick={() => setTransitionModal({ open: false, claim: null, targetStatus: '', reason: '', note: '' })}
               >
@@ -636,12 +650,13 @@ export const InsuranceClaims: React.FC = () => {
             </div>
             <div className="ins-modal-footer">
               <button
-                className="btn btn-secondary"
+                type="button"
+                className="btn-leh-secondary"
                 onClick={() => setTransitionModal({ open: false, claim: null, targetStatus: '', reason: '', note: '' })}
               >
                 Cancel
               </button>
-              <button className="btn btn-primary" onClick={executeTransition}>
+              <button type="button" className="btn-leh-forest" onClick={executeTransition}>
                 Confirm Transition
               </button>
             </div>

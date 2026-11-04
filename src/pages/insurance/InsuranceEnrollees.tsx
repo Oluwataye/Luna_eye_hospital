@@ -6,7 +6,7 @@ import {
 import { api } from '../../api';
 import { useNotification } from '../../context/NotificationContext';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
-import { StatCard } from '../../components/StatCard';
+import { InsuranceNavHeader } from './InsuranceNavHeader';
 import './Insurance.css';
 
 export const InsuranceEnrollees: React.FC = () => {
@@ -146,81 +146,93 @@ export const InsuranceEnrollees: React.FC = () => {
   return (
     <div className="insurance-container">
       {/* Header */}
-      <div className="insurance-header">
-        <div>
-          <h1 className="insurance-title">Insurance Enrollees Directory</h1>
-          <p className="insurance-subtitle">Manage patient HMO policy linkages, relationships, and verification</p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button
-            className="btn btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--leh-forest)' }}
-            onClick={() => {
-              setEditingId(null);
-              setFormData({
-                patient_id: '',
-                payer_id: '',
-                plan_id: '',
-                enrollee_number: '',
-                relationship: 'PRINCIPAL',
-                valid_from: '',
-                valid_to: '',
-                copay_type: 'PERCENTAGE',
-                copay_value: 0,
-                status: 'ACTIVE'
-              });
-              setIsModalOpen(true);
-            }}
-          >
-            <Plus size={16} /> Link Enrollee
-          </button>
-          <button className="btn btn-secondary" onClick={loadData}>
-            <RefreshCw size={16} /> Refresh
-          </button>
-        </div>
-      </div>
+      <InsuranceNavHeader
+        title="Insurance Enrollees Directory"
+        subtitle="Manage patient HMO policy linkages, relationships, and verification"
+        actions={
+          <>
+            <button
+              className="btn-leh-forest"
+              onClick={() => {
+                setEditingId(null);
+                setFormData({
+                  patient_id: '',
+                  payer_id: '',
+                  plan_id: '',
+                  enrollee_number: '',
+                  relationship: 'PRINCIPAL',
+                  valid_from: '',
+                  valid_to: '',
+                  copay_type: 'PERCENTAGE',
+                  copay_value: 0,
+                  status: 'ACTIVE'
+                });
+                setIsModalOpen(true);
+              }}
+            >
+              <Plus size={15} /> Link Enrollee
+            </button>
+            <button className="btn-leh-secondary" onClick={loadData}>
+              <RefreshCw size={15} /> Refresh
+            </button>
+          </>
+        }
+      />
 
       {/* Stats */}
       <div className="insurance-grid-stats">
-        <StatCard
-          title="Total Enrollees"
-          value={enrollees.length}
-          subtitle="Registered across all HMOs"
-          icon={Users}
-          colorClass="green"
-        />
-        <StatCard
-          title="Verified"
-          value={enrollees.filter(e => e.verification_status === 'VERIFIED').length}
-          subtitle="Eligibility active"
-          icon={CheckCircle}
-          colorClass="blue"
-        />
-        <StatCard
-          title="Pending Verification"
-          value={enrollees.filter(e => e.verification_status === 'PENDING').length}
-          subtitle="Requires ID or card check"
-          icon={AlertTriangle}
-          colorClass="amber"
-        />
-        <StatCard
-          title="Payers Represented"
-          value={new Set(enrollees.map(e => e.payer_id)).size}
-          subtitle="Distinct HMO networks"
-          icon={Shield}
-          colorClass="purple"
-        />
+        <div className="insurance-stat-card-modern">
+          <div className="ins-stat-header">
+            <span className="ins-stat-label">Total Enrollees</span>
+            <div className="ins-stat-icon-wrap" style={{ background: '#dcfce7', color: '#15803d' }}>
+              <Users size={18} />
+            </div>
+          </div>
+          <div className="ins-stat-value">{enrollees.length}</div>
+          <div className="ins-stat-footer">Registered across all HMOs</div>
+        </div>
+
+        <div className="insurance-stat-card-modern">
+          <div className="ins-stat-header">
+            <span className="ins-stat-label">Verified</span>
+            <div className="ins-stat-icon-wrap" style={{ background: '#e0e7ff', color: '#4338ca' }}>
+              <CheckCircle size={18} />
+            </div>
+          </div>
+          <div className="ins-stat-value">{enrollees.filter(e => e.verification_status === 'VERIFIED').length}</div>
+          <div className="ins-stat-footer">Eligibility active</div>
+        </div>
+
+        <div className="insurance-stat-card-modern">
+          <div className="ins-stat-header">
+            <span className="ins-stat-label">Pending Verification</span>
+            <div className="ins-stat-icon-wrap" style={{ background: '#fef3c7', color: '#b45309' }}>
+              <AlertTriangle size={18} />
+            </div>
+          </div>
+          <div className="ins-stat-value">{enrollees.filter(e => e.verification_status === 'PENDING').length}</div>
+          <div className="ins-stat-footer">Requires ID or card check</div>
+        </div>
+
+        <div className="insurance-stat-card-modern">
+          <div className="ins-stat-header">
+            <span className="ins-stat-label">Payers Represented</span>
+            <div className="ins-stat-icon-wrap" style={{ background: '#f3e8ff', color: '#7e22ce' }}>
+              <Shield size={18} />
+            </div>
+          </div>
+          <div className="ins-stat-value">{new Set(enrollees.map(e => e.payer_id)).size}</div>
+          <div className="ins-stat-footer">Distinct HMO networks</div>
+        </div>
       </div>
 
       {/* Filter and Table */}
       <div className="insurance-card">
         <div className="insurance-filter-bar">
           <div className="insurance-search-input">
-            <Search size={16} style={{ position: 'absolute', left: '12px', top: '10px', color: 'var(--leh-muted)' }} />
+            <Search size={15} />
             <input
               type="text"
-              className="form-control"
-              style={{ paddingLeft: '36px', height: '36px' }}
               placeholder="Search by patient name, file #, policy #..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -228,8 +240,7 @@ export const InsuranceEnrollees: React.FC = () => {
           </div>
 
           <select
-            className="form-select"
-            style={{ width: '180px', height: '36px' }}
+            className="insurance-filter-select"
             value={payerFilter}
             onChange={(e) => setPayerFilter(e.target.value)}
           >
@@ -240,8 +251,7 @@ export const InsuranceEnrollees: React.FC = () => {
           </select>
 
           <select
-            className="form-select"
-            style={{ width: '160px', height: '36px' }}
+            className="insurance-filter-select"
             value={verificationFilter}
             onChange={(e) => setVerificationFilter(e.target.value)}
           >
@@ -253,7 +263,8 @@ export const InsuranceEnrollees: React.FC = () => {
 
           {(search || payerFilter || verificationFilter) && (
             <button
-              className="btn btn-sm btn-outline-secondary"
+              className="btn-leh-secondary"
+              style={{ padding: '0.45rem 0.9rem', fontSize: '0.82rem' }}
               onClick={() => {
                 setSearch('');
                 setPayerFilter('');
@@ -460,10 +471,10 @@ export const InsuranceEnrollees: React.FC = () => {
               </div>
             </div>
             <div className="ins-modal-footer">
-              <button className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>
+              <button className="btn-leh-secondary" onClick={() => setIsModalOpen(false)}>
                 Cancel
               </button>
-              <button className="btn btn-primary" onClick={handleSave}>
+              <button className="btn-leh-forest" onClick={handleSave}>
                 {editingId ? 'Save Changes' : 'Register Enrollee'}
               </button>
             </div>

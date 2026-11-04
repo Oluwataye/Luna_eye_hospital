@@ -6,7 +6,7 @@ import {
 import { api } from '../../api';
 import { useNotification } from '../../context/NotificationContext';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
-import { StatCard } from '../../components/StatCard';
+import { InsuranceNavHeader } from './InsuranceNavHeader';
 import './Insurance.css';
 
 export const InsuranceRemittances: React.FC = () => {
@@ -193,56 +193,66 @@ export const InsuranceRemittances: React.FC = () => {
   return (
     <div className="insurance-container">
       {/* Header */}
-      <div className="insurance-header">
-        <div>
-          <h1 className="insurance-title">Remittances & Settlements</h1>
-          <p className="insurance-subtitle">Record HMO bank payments and reconcile claim reimbursements</p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button
-            className="btn btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--leh-forest)' }}
-            onClick={() => setIsRecordModalOpen(true)}
-          >
-            <Plus size={16} /> Record Remittance
-          </button>
-          <button className="btn btn-secondary" onClick={loadData}>
-            <RefreshCw size={16} /> Refresh
-          </button>
-        </div>
-      </div>
+      <InsuranceNavHeader
+        title="Remittances & Settlements"
+        subtitle="Record HMO bank payments and reconcile claim reimbursements"
+        actions={
+          <>
+            <button
+              className="btn-leh-forest"
+              onClick={() => setIsRecordModalOpen(true)}
+            >
+              <Plus size={15} /> Record Remittance
+            </button>
+            <button className="btn-leh-secondary" onClick={loadData}>
+              <RefreshCw size={15} /> Refresh
+            </button>
+          </>
+        }
+      />
 
       {/* Stats */}
       <div className="insurance-grid-stats">
-        <StatCard
-          title="Total Received"
-          value={formatNaira(remittances.reduce((s, r) => s + (r.total_amount || 0), 0))}
-          subtitle="All recorded payer inflows"
-          icon={CreditCard}
-          colorClass="green"
-        />
-        <StatCard
-          title="Fully Allocated"
-          value={remittances.filter(r => (r.unallocated_amount || 0) === 0).length}
-          subtitle="Reconciled to claims"
-          icon={CheckCircle2}
-          colorClass="blue"
-        />
-        <StatCard
-          title="Pending Allocation"
-          value={remittances.filter(r => (r.unallocated_amount || 0) > 0).length}
-          subtitle="Contains unassigned credit"
-          icon={Clock}
-          colorClass="amber"
-        />
+        <div className="insurance-stat-card-modern">
+          <div className="ins-stat-header">
+            <span className="ins-stat-label">Total Received</span>
+            <div className="ins-stat-icon-wrap" style={{ background: '#dcfce7', color: '#15803d' }}>
+              <CreditCard size={18} />
+            </div>
+          </div>
+          <div className="ins-stat-value">{formatNaira(remittances.reduce((s, r) => s + (r.total_amount || 0), 0))}</div>
+          <div className="ins-stat-footer">All recorded payer inflows</div>
+        </div>
+
+        <div className="insurance-stat-card-modern">
+          <div className="ins-stat-header">
+            <span className="ins-stat-label">Fully Allocated</span>
+            <div className="ins-stat-icon-wrap" style={{ background: '#e0e7ff', color: '#4338ca' }}>
+              <CheckCircle2 size={18} />
+            </div>
+          </div>
+          <div className="ins-stat-value">{remittances.filter(r => (r.unallocated_amount || 0) === 0).length}</div>
+          <div className="ins-stat-footer">Reconciled to claims</div>
+        </div>
+
+        <div className="insurance-stat-card-modern">
+          <div className="ins-stat-header">
+            <span className="ins-stat-label">Pending Allocation</span>
+            <div className="ins-stat-icon-wrap" style={{ background: '#fef3c7', color: '#b45309' }}>
+              <Clock size={18} />
+            </div>
+          </div>
+          <div className="ins-stat-value">{remittances.filter(r => (r.unallocated_amount || 0) > 0).length}</div>
+          <div className="ins-stat-footer">Contains unassigned credit</div>
+        </div>
       </div>
 
       {/* Remittances Table Card */}
       <div className="insurance-card">
         <div className="insurance-filter-bar">
           <select
-            className="form-select"
-            style={{ width: '220px', height: '36px' }}
+            className="insurance-filter-select"
+            style={{ minWidth: '220px' }}
             value={payerFilter}
             onChange={(e) => setPayerFilter(e.target.value)}
           >
@@ -253,7 +263,11 @@ export const InsuranceRemittances: React.FC = () => {
           </select>
 
           {payerFilter && (
-            <button className="btn btn-sm btn-outline-secondary" onClick={() => setPayerFilter('')}>
+            <button
+              className="btn-leh-secondary"
+              style={{ padding: '0.45rem 0.9rem', fontSize: '0.82rem' }}
+              onClick={() => setPayerFilter('')}
+            >
               Clear
             </button>
           )}
@@ -426,10 +440,10 @@ export const InsuranceRemittances: React.FC = () => {
               </div>
             </div>
             <div className="ins-modal-footer">
-              <button className="btn btn-secondary" onClick={() => setIsRecordModalOpen(false)}>
+              <button className="btn-leh-secondary" onClick={() => setIsRecordModalOpen(false)}>
                 Cancel
               </button>
-              <button className="btn btn-primary" onClick={handleCreateRemittance}>
+              <button className="btn-leh-forest" onClick={handleCreateRemittance}>
                 Save Remittance
               </button>
             </div>
@@ -531,11 +545,11 @@ export const InsuranceRemittances: React.FC = () => {
             </div>
 
             <div className="ins-modal-footer">
-              <button className="btn btn-secondary" onClick={() => setAllocationModal({ ...allocationModal, open: false })}>
+              <button className="btn-leh-secondary" onClick={() => setAllocationModal({ ...allocationModal, open: false })}>
                 Cancel
               </button>
               <button
-                className="btn btn-primary"
+                className="btn-leh-forest"
                 disabled={totalAllocatedInModal <= 0 || remainingUnallocatedInModal < 0}
                 onClick={executeAllocation}
               >

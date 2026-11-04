@@ -5,6 +5,7 @@ import {
 import { api } from '../../api';
 import { useNotification } from '../../context/NotificationContext';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { InsuranceNavHeader } from './InsuranceNavHeader';
 import './Insurance.css';
 
 export const PayersPlans: React.FC = () => {
@@ -198,15 +199,12 @@ export const PayersPlans: React.FC = () => {
   return (
     <div className="insurance-container">
       {/* Header */}
-      <div className="insurance-header">
-        <div>
-          <h1 className="insurance-title">Payers & Insurance Plans</h1>
-          <p className="insurance-subtitle">Configure HMO networks, NHIA schemes, and plan coverage policies</p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
+      <InsuranceNavHeader
+        title="Payers & Insurance Plans"
+        subtitle="Configure HMO networks, NHIA schemes, and plan coverage policies"
+        actions={
           <button
-            className="btn btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--leh-forest)' }}
+            className="btn-leh-forest"
             onClick={() => setPayerModal({
               open: true,
               editingId: null,
@@ -220,10 +218,10 @@ export const PayersPlans: React.FC = () => {
               portal_url: ''
             })}
           >
-            <Plus size={16} /> Add Payer
+            <Plus size={15} /> Add Payer
           </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Two-Panel Layout */}
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1fr) 2fr', gap: '1.5rem' }}>
@@ -231,11 +229,9 @@ export const PayersPlans: React.FC = () => {
         <div className="insurance-card">
           <div style={{ padding: '1rem', borderBottom: '1px solid var(--leh-border)' }}>
             <div className="insurance-search-input">
-              <Search size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--leh-muted)' }} />
+              <Search size={15} />
               <input
                 type="text"
-                className="form-control form-control-sm"
-                style={{ paddingLeft: '32px' }}
                 placeholder="Search payers..."
                 value={payerSearch}
                 onChange={(e) => setPayerSearch(e.target.value)}
@@ -300,7 +296,8 @@ export const PayersPlans: React.FC = () => {
                     </div>
                   </div>
                   <button
-                    className="btn btn-sm btn-outline-secondary"
+                    className="btn-leh-secondary"
+                    style={{ padding: '0.45rem 0.9rem', fontSize: '0.82rem' }}
                     onClick={() => setPayerModal({
                       open: true,
                       editingId: selectedPayer.id,
@@ -314,7 +311,7 @@ export const PayersPlans: React.FC = () => {
                       portal_url: selectedPayer.portal_url || ''
                     })}
                   >
-                    <Edit2 size={14} /> Edit Payer Info
+                    <Edit2 size={13} /> Edit Payer Info
                   </button>
                 </div>
 
@@ -330,9 +327,10 @@ export const PayersPlans: React.FC = () => {
               {/* Plans Card */}
               <div className="insurance-card">
                 <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--leh-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Registered Health Benefit Plans</h3>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--leh-forest)' }}>Registered Health Benefit Plans</h3>
                   <button
-                    className="btn btn-sm btn-outline-primary"
+                    className="btn-leh-forest"
+                    style={{ padding: '0.45rem 0.9rem', fontSize: '0.82rem' }}
                     onClick={() => setPlanModal({
                       open: true,
                       editingId: null,
@@ -511,10 +509,10 @@ export const PayersPlans: React.FC = () => {
               </div>
             </div>
             <div className="ins-modal-footer">
-              <button className="btn btn-secondary" onClick={() => setPayerModal({ ...payerModal, open: false })}>
+              <button className="btn-leh-secondary" onClick={() => setPayerModal({ ...payerModal, open: false })}>
                 Cancel
               </button>
-              <button className="btn btn-primary" onClick={handleSavePayer}>
+              <button className="btn-leh-forest" onClick={handleSavePayer}>
                 Save Payer
               </button>
             </div>
@@ -527,7 +525,7 @@ export const PayersPlans: React.FC = () => {
         <div className="ins-modal-overlay">
           <div className="ins-modal">
             <div className="ins-modal-header">
-              <h3 style={{ margin: 0, fontSize: '1.25rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>
                 {planModal.editingId ? 'Edit Plan' : `Add Plan to ${selectedPayer?.name}`}
               </h3>
               <button className="btn btn-sm btn-link" onClick={() => setPlanModal({ ...planModal, open: false })}>
@@ -593,10 +591,10 @@ export const PayersPlans: React.FC = () => {
               </div>
             </div>
             <div className="ins-modal-footer">
-              <button className="btn btn-secondary" onClick={() => setPlanModal({ ...planModal, open: false })}>
+              <button className="btn-leh-secondary" onClick={() => setPlanModal({ ...planModal, open: false })}>
                 Cancel
               </button>
-              <button className="btn btn-primary" onClick={handleSavePlan}>
+              <button className="btn-leh-forest" onClick={handleSavePlan}>
                 Save Plan
               </button>
             </div>

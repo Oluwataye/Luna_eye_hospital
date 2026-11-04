@@ -1,52 +1,344 @@
-﻿/* Medical Insurance & Claims Module Styles */
+/* ==========================================================================
+   VisionCare EMR — Luna Eye Hospital Brand Insurance & Managed Care Module
+   Design System v3.0 (Forest Green #2E5A26, Lime Accent #C0FF72, Pill Controls)
+   ========================================================================== */
+
+/* ── Container Layout ── */
 .insurance-container {
-  padding: 1.5rem;
-  max-width: 1400px;
+  padding: 24px 36px;
+  max-width: 1440px;
   margin: 0 auto;
+  min-height: calc(100vh - 80px);
+  background-color: var(--leh-bg);
+  font-family: var(--leh-font);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
-.insurance-header {
+/* ── Module Unified Header ── */
+.insurance-module-header {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 4px;
+}
+
+.insurance-header-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: 16px;
+}
+
+.insurance-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.insurance-badge-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--leh-forest-tint);
+  color: var(--leh-forest);
+  border: 1px solid var(--leh-border);
+  border-radius: var(--leh-radius-pill);
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  width: fit-content;
 }
 
 .insurance-title {
-  font-size: 1.75rem;
-  font-weight: 700;
+  font-size: 26px;
+  font-weight: 900;
   color: var(--leh-ink);
   margin: 0;
+  letter-spacing: -0.02em;
+  font-family: var(--leh-font);
 }
 
 .insurance-subtitle {
-  font-size: 0.875rem;
+  font-size: 13px;
   color: var(--leh-muted);
-  margin-top: 0.25rem;
+  margin: 0;
 }
 
+.insurance-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ── Unified Pill Navigation Tabs ── */
+.insurance-nav-tabs-container {
+  display: inline-flex;
+  align-items: center;
+  background: #ffffff;
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid var(--leh-border);
+  box-shadow: 0 2px 8px rgba(46, 90, 38, 0.04);
+  gap: 4px;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.insurance-nav-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  color: var(--leh-muted);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: var(--leh-font);
+}
+
+.insurance-nav-tab:hover {
+  background: var(--leh-forest-tint);
+  color: var(--leh-forest);
+}
+
+.insurance-nav-tab--active {
+  background: var(--leh-forest) !important;
+  color: #ffffff !important;
+  box-shadow: 0 3px 10px rgba(46, 90, 38, 0.22);
+}
+
+.insurance-nav-tab--active svg {
+  color: var(--leh-lime) !important;
+}
+
+.insurance-nav-tab-badge {
+  background: var(--leh-lime);
+  color: var(--leh-ink);
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 99px;
+  margin-left: 2px;
+}
+
+.insurance-nav-tab--active .insurance-nav-tab-badge {
+  background: var(--leh-lime);
+  color: var(--leh-ink);
+}
+
+/* ── Modern Pill Buttons ── */
+.btn-leh-forest {
+  background: var(--leh-forest);
+  color: #ffffff;
+  border: none;
+  padding: 9px 20px;
+  border-radius: 9999px;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(46, 90, 38, 0.22);
+  font-family: var(--leh-font);
+  text-decoration: none;
+}
+
+.btn-leh-forest:hover:not(:disabled) {
+  background: var(--leh-forest-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(46, 90, 38, 0.30);
+  color: var(--leh-lime);
+}
+
+.btn-leh-forest:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-leh-secondary {
+  background: #ffffff;
+  color: var(--leh-muted);
+  border: 1.5px solid var(--leh-border);
+  padding: 8px 18px;
+  border-radius: 9999px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: var(--leh-font);
+}
+
+.btn-leh-secondary:hover:not(:disabled) {
+  background: var(--leh-forest-tint);
+  border-color: var(--leh-forest);
+  color: var(--leh-forest);
+  transform: translateY(-1px);
+}
+
+.btn-leh-indigo {
+  background: #6366f1;
+  color: #ffffff;
+  border: none;
+  padding: 9px 20px;
+  border-radius: 9999px;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+  font-family: var(--leh-font);
+}
+
+.btn-leh-indigo:hover:not(:disabled) {
+  background: #4f46e5;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.35);
+}
+
+.btn-leh-danger {
+  background: #ffffff;
+  color: var(--leh-danger);
+  border: 1.5px solid var(--leh-danger-border);
+  padding: 8px 18px;
+  border-radius: 9999px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+  font-family: var(--leh-font);
+}
+
+.btn-leh-danger:hover:not(:disabled) {
+  background: var(--leh-danger-bg);
+  border-color: var(--leh-danger);
+}
+
+/* ── KPI Stat Cards ── */
 .insurance-grid-stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px;
 }
 
+.insurance-stat-card-modern {
+  background: #ffffff;
+  border: 1px solid var(--leh-border);
+  border-radius: var(--leh-radius-card);
+  padding: 18px 20px;
+  box-shadow: var(--leh-shadow);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.insurance-stat-card-modern::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 4px;
+  background: transparent;
+  transition: background 0.25s ease;
+}
+
+.insurance-stat-card-modern:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--leh-shadow-md);
+  border-color: var(--leh-border);
+}
+
+.insurance-stat-card-modern--blue:hover::before { background: var(--leh-info); }
+.insurance-stat-card-modern--amber:hover::before { background: var(--leh-warning); }
+.insurance-stat-card-modern--green:hover::before { background: var(--leh-success); }
+.insurance-stat-card-modern--red:hover::before { background: var(--leh-danger); }
+.insurance-stat-card-modern--forest:hover::before { background: var(--leh-forest); }
+
+.insurance-stat-icon-wrapper {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.insurance-stat-icon-wrapper--blue { background: var(--leh-info-bg); color: var(--leh-info); }
+.insurance-stat-icon-wrapper--amber { background: var(--leh-warning-bg); color: var(--leh-warning); }
+.insurance-stat-icon-wrapper--green { background: var(--leh-success-bg); color: var(--leh-success); }
+.insurance-stat-icon-wrapper--red { background: var(--leh-danger-bg); color: var(--leh-danger); }
+.insurance-stat-icon-wrapper--forest { background: var(--leh-forest-tint); color: var(--leh-forest); }
+
+.insurance-stat-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.insurance-stat-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--leh-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.insurance-stat-value {
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--leh-ink);
+  line-height: 1.2;
+  margin: 2px 0;
+  letter-spacing: -0.02em;
+}
+
+.insurance-stat-subtext {
+  font-size: 11px;
+  color: var(--leh-placeholder);
+}
+
+/* ── Content Card & Filter Bar ── */
 .insurance-card {
   background: var(--leh-surface);
   border-radius: var(--leh-radius-card);
   border: 1px solid var(--leh-border);
   box-shadow: var(--leh-shadow);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .insurance-filter-bar {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 1rem 1.25rem;
+  gap: 12px;
+  padding: 14px 18px;
   border-bottom: 1px solid var(--leh-border-light);
   flex-wrap: wrap;
   background: var(--leh-forest-tint);
@@ -54,149 +346,255 @@
 
 .insurance-search-input {
   flex: 1;
-  min-width: 220px;
+  min-width: 240px;
   position: relative;
 }
 
+.insurance-search-input input {
+  width: 100%;
+  height: 38px;
+  padding-left: 38px;
+  padding-right: 14px;
+  border-radius: 9999px;
+  border: 1.5px solid var(--leh-border);
+  background: #ffffff;
+  font-size: 13px;
+  color: var(--leh-ink);
+  transition: all 0.2s ease;
+  outline: none;
+  font-family: var(--leh-font);
+}
+
+.insurance-search-input input:focus {
+  border-color: var(--leh-forest);
+  box-shadow: 0 0 0 3px rgba(46, 90, 38, 0.12);
+}
+
+.insurance-filter-select {
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 9999px;
+  border: 1.5px solid var(--leh-border);
+  background: #ffffff;
+  font-size: 13px;
+  color: var(--leh-ink);
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--leh-font);
+}
+
+.insurance-filter-select:focus {
+  border-color: var(--leh-forest);
+  box-shadow: 0 0 0 3px rgba(46, 90, 38, 0.12);
+}
+
+.insurance-filter-date {
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  border: 1.5px solid var(--leh-border);
+  background: #ffffff;
+  font-size: 12px;
+  color: var(--leh-ink);
+  font-family: var(--leh-font);
+  outline: none;
+}
+
+.insurance-filter-date:focus {
+  border-color: var(--leh-forest);
+  box-shadow: 0 0 0 3px rgba(46, 90, 38, 0.12);
+}
+
+/* ── Modern Table Styling ── */
 .insurance-table-container {
   overflow-x: auto;
-  background: var(--leh-surface);
+  background: #ffffff;
 }
 
 .insurance-table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
-  font-size: 0.875rem;
+  font-size: 13px;
+  font-family: var(--leh-font);
 }
 
 .insurance-table th {
   background: var(--leh-forest-tint);
-  color: var(--leh-ink);
-  font-weight: 600;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--leh-border);
+  color: var(--leh-forest);
+  font-weight: 800;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 12px 16px;
+  border-bottom: 1.5px solid var(--leh-border);
   white-space: nowrap;
 }
 
 .insurance-table td {
-  padding: 0.875rem 1rem;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--leh-border-light);
   color: var(--leh-ink);
+  vertical-align: middle;
 }
 
-.insurance-table tr:hover td {
-  background: #fbfdf9;
+.insurance-table tbody tr {
+  transition: background-color 0.15s ease;
 }
 
-/* Status Badges */
+.insurance-table tbody tr:hover td {
+  background-color: #f7faf5;
+}
+
+/* ── Status Badges (WCAG Compliant) ── */
 .ins-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.25rem 0.65rem;
+  gap: 4px;
+  padding: 3px 10px;
   border-radius: var(--leh-radius-pill);
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.025em;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .ins-badge--draft { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
 .ins-badge--ready { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
-.ins-badge--submitted { background: #e0e7ff; color: #4338ca; border: 1px solid #c7d2fe; }
-.ins-badge--under_review { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+.ins-badge--submitted { background: #ede9fe; color: #5b21b6; border: 1px solid #ddd6fe; }
+.ins-badge--under_review { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
 .ins-badge--approved { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
-.ins-badge--partially_approved { background: #fef9c3; color: #a16207; border: 1px solid #fef08a; }
+.ins-badge--partially_approved { background: #fef9c3; color: #854d0e; border: 1px solid #fef08a; }
 .ins-badge--paid { background: #ccfbf1; color: #0f766e; border: 1px solid #99f6e4; }
 .ins-badge--partially_paid { background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; }
-.ins-badge--queried { background: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; }
+.ins-badge--queried { background: #ffedd5; color: #9a3412; border: 1px solid #fed7aa; }
 .ins-badge--rejected { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
-.ins-badge--written_off { background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; }
+.ins-badge--written_off { background: #f3f4f6; color: #4b5563; border: 1px solid #e5e7eb; }
 .ins-badge--cancelled { background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; }
-.ins-badge--overdue { background: #fef2f2; color: #dc2626; border: 1px solid #f87171; font-weight: 700; }
+.ins-badge--overdue { background: #fee2e2; color: #dc2626; border: 1px solid #f87171; font-weight: 800; }
 
-/* Tabs */
-.ins-tabs {
-  display: flex;
-  gap: 0.5rem;
-  border-bottom: 2px solid var(--leh-border);
-  margin-bottom: 1.5rem;
-  overflow-x: auto;
-}
-
-.ins-tab-btn {
-  padding: 0.75rem 1.25rem;
-  font-weight: 600;
-  font-size: 0.875rem;
-  border: none;
-  background: transparent;
-  color: var(--leh-muted);
-  cursor: pointer;
-  border-bottom: 3px solid transparent;
-  margin-bottom: -2px;
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: all 0.2s ease;
-}
-
-.ins-tab-btn:hover {
-  color: var(--leh-forest);
-}
-
-.ins-tab-btn.active {
-  color: var(--leh-forest);
-  border-bottom-color: var(--leh-forest);
-  background: var(--leh-forest-tint);
-  border-radius: 6px 6px 0 0;
-}
-
-/* Modals */
+/* ── Modals & Glassmorphic Scrim ── */
 .ins-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(20, 33, 15, 0.5);
+  background: rgba(20, 33, 15, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 1rem;
+  padding: 16px;
+  animation: insFadeIn 0.15s ease-out;
 }
 
 .ins-modal {
-  background: var(--leh-surface);
-  border-radius: var(--leh-radius-card);
+  background: #ffffff;
+  border-radius: 18px;
   width: 100%;
-  max-width: 650px;
+  max-width: 680px;
   max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(20, 33, 15, 0.35);
+  border: 1px solid var(--leh-border);
+  display: flex;
+  flex-direction: column;
+  animation: insModalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .ins-modal-header {
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid var(--leh-border);
+  padding: 18px 24px;
+  border-bottom: 1.5px solid var(--leh-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background: var(--leh-forest-tint);
+}
+
+.ins-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--leh-ink);
+  font-family: var(--leh-font);
 }
 
 .ins-modal-body {
-  padding: 1.5rem;
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .ins-modal-footer {
-  padding: 1rem 1.5rem;
-  border-top: 1px solid var(--leh-border);
+  padding: 16px 24px;
+  border-top: 1.5px solid var(--leh-border);
   display: flex;
   justify-content: flex-end;
-  gap: 0.75rem;
+  align-items: center;
+  gap: 12px;
   background: #fbfdf9;
 }
 
-/* Printable Claim */
+/* ── Report / Module Internal Tabs ── */
+.ins-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px;
+  margin-bottom: 1rem;
+  scrollbar-width: thin;
+}
+
+.ins-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: var(--leh-radius-pill);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--leh-ink);
+  background: var(--leh-surface);
+  border: 1px solid var(--leh-border);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 2px rgba(20, 33, 15, 0.04);
+}
+
+.ins-tab-btn:hover {
+  background: #f1f8eb;
+  border-color: var(--leh-forest);
+  color: var(--leh-forest);
+  transform: translateY(-1px);
+}
+
+.ins-tab-btn.active {
+  background: var(--leh-forest);
+  color: #ffffff;
+  border-color: var(--leh-forest);
+  box-shadow: 0 2px 6px rgba(46, 90, 38, 0.25);
+}
+
+.ins-tab-btn.active svg {
+  color: var(--leh-lime);
+}
+
+/* ── Animations ── */
+@keyframes insFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes insModalPop {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ── Print Styles ── */
 @media print {
   body * {
     visibility: hidden;

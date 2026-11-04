@@ -6,6 +6,7 @@ import {
 import { api } from '../../api';
 import { useNotification } from '../../context/NotificationContext';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { InsuranceNavHeader } from './InsuranceNavHeader';
 import './Insurance.css';
 
 type ReportTab = 
@@ -101,24 +102,23 @@ export const InsuranceReports: React.FC = () => {
   return (
     <div className="insurance-container">
       {/* Header */}
-      <div className="insurance-header">
-        <div>
-          <h1 className="insurance-title">Insurance Analytics & Reports</h1>
-          <p className="insurance-subtitle">Financial audit, ageing analysis, HMO reconciliation, and revenue splits</p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button
-            className="btn btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-            onClick={exportToCsv}
-          >
-            <Download size={16} /> Export CSV
-          </button>
-          <button className="btn btn-secondary" onClick={loadData}>
-            <RefreshCw size={16} /> Refresh
-          </button>
-        </div>
-      </div>
+      <InsuranceNavHeader
+        title="Insurance Analytics & Reports"
+        subtitle="Financial audit, ageing analysis, HMO reconciliation, and revenue splits"
+        actions={
+          <>
+            <button
+              className="btn-leh-forest"
+              onClick={exportToCsv}
+            >
+              <Download size={15} /> Export CSV
+            </button>
+            <button className="btn-leh-secondary" onClick={loadData}>
+              <RefreshCw size={15} /> Refresh
+            </button>
+          </>
+        }
+      />
 
       {/* Tabs */}
       <div className="ins-tabs">
@@ -126,43 +126,43 @@ export const InsuranceReports: React.FC = () => {
           className={`ins-tab-btn ${activeTab === 'register' ? 'active' : ''}`}
           onClick={() => setActiveTab('register')}
         >
-          <FileText size={16} /> Claims Register
+          <FileText size={15} /> Claims Register
         </button>
         <button
           className={`ins-tab-btn ${activeTab === 'ageing' ? 'active' : ''}`}
           onClick={() => setActiveTab('ageing')}
         >
-          <Calendar size={16} /> Ageing Buckets
+          <Calendar size={15} /> Ageing Buckets
         </button>
         <button
           className={`ins-tab-btn ${activeTab === 'reconciliation' ? 'active' : ''}`}
           onClick={() => setActiveTab('reconciliation')}
         >
-          <Shield size={16} /> Payer Reconciliation
+          <Shield size={15} /> Payer Reconciliation
         </button>
         <button
           className={`ins-tab-btn ${activeTab === 'rejections' ? 'active' : ''}`}
           onClick={() => setActiveTab('rejections')}
         >
-          <AlertTriangle size={16} /> Rejection Analysis
+          <AlertTriangle size={15} /> Rejection Analysis
         </button>
         <button
           className={`ins-tab-btn ${activeTab === 'authorizations' ? 'active' : ''}`}
           onClick={() => setActiveTab('authorizations')}
         >
-          <Shield size={16} /> Pre-Authorizations
+          <Shield size={15} /> Pre-Authorizations
         </button>
         <button
           className={`ins-tab-btn ${activeTab === 'revenue_split' ? 'active' : ''}`}
           onClick={() => setActiveTab('revenue_split')}
         >
-          <PieChart size={16} /> Cash vs Insurance
+          <PieChart size={15} /> Cash vs Insurance
         </button>
         <button
           className={`ins-tab-btn ${activeTab === 'remittances' ? 'active' : ''}`}
           onClick={() => setActiveTab('remittances')}
         >
-          <CreditCard size={16} /> Remittance Log
+          <CreditCard size={15} /> Remittance Log
         </button>
       </div>
 
@@ -171,27 +171,25 @@ export const InsuranceReports: React.FC = () => {
         {/* Filter bar */}
         <div className="insurance-filter-bar">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Period:</span>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--leh-ink)' }}>Period:</span>
             <input
               type="date"
-              className="form-control"
-              style={{ width: '145px', height: '36px' }}
+              className="insurance-filter-date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
             />
-            <span>to</span>
+            <span style={{ fontSize: '0.82rem', color: 'var(--leh-muted)' }}>to</span>
             <input
               type="date"
-              className="form-control"
-              style={{ width: '145px', height: '36px' }}
+              className="insurance-filter-date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
             />
           </div>
 
           <select
-            className="form-select"
-            style={{ width: '200px', height: '36px' }}
+            className="insurance-filter-select"
+            style={{ minWidth: '200px' }}
             value={payerFilter}
             onChange={(e) => setPayerFilter(e.target.value)}
           >
