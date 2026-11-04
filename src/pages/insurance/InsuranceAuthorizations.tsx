@@ -1,12 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   ShieldCheck, Plus, Search, CheckCircle2, XCircle, 
-  Clock, AlertCircle, RefreshCw, X
+  Clock, AlertCircle, RefreshCw
 } from 'lucide-react';
 import { api } from '../../api';
 import { useNotification } from '../../context/NotificationContext';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { InsuranceNavHeader } from './InsuranceNavHeader';
+import {
+  InsuranceModal,
+  FormField,
+  FormInput,
+  FormSelect,
+  FormDate,
+  FormTextarea,
+  FormButton,
+  FormGrid,
+  FormSection,
+  PatientPicker
+} from '../../components/insurance';
 import './Insurance.css';
 
 export const InsuranceAuthorizations: React.FC = () => {
@@ -386,186 +398,246 @@ export const InsuranceAuthorizations: React.FC = () => {
       </div>
 
       {/* Create Pre-Auth Modal */}
-      {isCreateModalOpen && (
-        <div className="ins-modal-overlay">
-          <div className="ins-modal">
-            <div className="ins-modal-header">
-              <h3 style={{ margin: 0, fontSize: '1.25rem' }}>Request Pre-Authorization</h3>
-              <button className="btn btn-sm btn-link" onClick={() => setIsCreateModalOpen(false)}>
-                <X size={20} />
-              </button>
-            </div>
-            <div className="ins-modal-body">
-              <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>Patient ID / File No *</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="e.g. PAT-00102"
-                  value={formData.patient_id}
-                  onChange={(e) => setFormData({ ...formData, patient_id: e.target.value })}
-                />
-              </div>
+      <InsuranceModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        title="Request Pre-Authorization"
+        subtitle="Submit clinical authorization request to patient's HMO"
+        icon={<ShieldCheck size={20} />}
+        size="md"
+        isDirty={Boolean(formData.patient_id || formData.payer_id || formData.service_description)}
+        footer={
+          <>
+            <FormButton
+              type="button"
+              variant="secondary"
+              onClick={() => setIsCreateModalOpen(false)}
+            >
+              Cancel
+            </FormButton>
+            <FormButton
+              type="button"
+              variant="primary"
+              disabled={!formData.patient_id || !formData.payer_id || !formData.service_description.trim()}
+              onClick={handleCreate}
+            >
+              Submit Pre-Auth Request
+            </FormButton>
+          </>
+        }
+      >
+        <FormSection title="Patient & Urgency">
+          <FormGrid>
+            <FormField id="auth-patient" label="Patient" required fullWidth>
+              <PatientPicker
+                id="auth-patient"
+                value={formData.patient_id}
+                required
+                onChange={(patient) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    patient_id: patient ? patient.patient_id || patient.file_no || patient.id : ''
+                  }))
+                }
+              />
+            </FormField>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Payer *</label>
-                  <select
-                    className="form-select"
-                    value={formData.payer_id}
-                    onChange={(e) => setFormData({ ...formData, payer_id: e.target.value })}
-                  >
-                    <option value="">-- Select Payer --</option>
-                    {payers.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Urgency</label>
-                  <select
-                    className="form-select"
-                    value={formData.urgency}
-                    onChange={(e) => setFormData({ ...formData, urgency: e.target.value })}
-                  >
-                    <option value="ROUTINE">Routine</option>
-                    <option value="URGENT">Urgent (24h)</option>
-                    <option value="EMERGENCY">Emergency</option>
-                  </select>
-                </div>
-              </div>
+            <FormField id="auth-payer" label="Payer / HMO" required>
+              <FormSelect
+                id="auth-payer"
+                value={formData.payer_id}
+                onChange={(e) => setFormData({ ...formData, payer_id: e.target.value })}
+                placeholderOption="Select Payer"
+              >
+                {payers.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </FormSelect>
+            </FormField>
 
-              <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>Procedure / Service Description *</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="e.g. Phacoemulsification with Foldable IOL (Right Eye)"
-                  value={formData.service_description}
-                  onChange={(e) => setFormData({ ...formData, service_description: e.target.value })}
-                />
-              </div>
+            <FormField id="auth-urgency" label="Clinical Urgency">
+              <FormSelect
+                id="auth-urgency"
+                value={formData.urgency}
+                onChange={(e) => setFormData({ ...formData, urgency: e.target.value })}
+              >
+                <option value="ROUTINE">Routine</option>
+                <option value="URGENT">Urgent (24h)</option>
+                <option value="EMERGENCY">Emergency</option>
+              </FormSelect>
+            </FormField>
+          </FormGrid>
+        </FormSection>
 
-              <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>Estimated Tariff / Requested Amount (₦)</label>
-                <input
-                  type="number"
-                  className="form-control"
-                  placeholder="e.g. 150000"
-                  value={formData.requested_amount}
-                  onChange={(e) => setFormData({ ...formData, requested_amount: e.target.value })}
-                />
-              </div>
+        <FormSection title="Clinical Procedure & Tariff">
+          <FormGrid>
+            <FormField id="auth-service" label="Procedure / Service Description" required fullWidth>
+              <FormInput
+                id="auth-service"
+                type="text"
+                placeholder="e.g. Phacoemulsification with Foldable IOL (Right Eye)"
+                value={formData.service_description}
+                onChange={(e) => setFormData({ ...formData, service_description: e.target.value })}
+              />
+            </FormField>
 
-              <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>Clinical Notes / Justification</label>
-                <textarea
-                  className="form-control"
-                  rows={3}
-                  placeholder="Diagnosis, severity, visual acuity, previous treatments failed..."
-                  value={formData.clinical_notes}
-                  onChange={(e) => setFormData({ ...formData, clinical_notes: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="ins-modal-footer">
-              <button className="btn-leh-secondary" onClick={() => setIsCreateModalOpen(false)}>
-                Cancel
-              </button>
-              <button className="btn-leh-forest" onClick={handleCreate}>
-                Submit Request
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            <FormField id="auth-amount" label="Estimated Tariff / Requested Amount (₦)" fullWidth>
+              <FormInput
+                id="auth-amount"
+                type="number"
+                currency
+                min={0}
+                placeholder="0.00"
+                value={formData.requested_amount}
+                onChange={(e) => setFormData({ ...formData, requested_amount: e.target.value })}
+              />
+            </FormField>
+
+            <FormField id="auth-notes" label="Clinical Notes / Justification" fullWidth>
+              <FormTextarea
+                id="auth-notes"
+                rows={3}
+                placeholder="Diagnosis, visual acuity impairment, conservative treatment history..."
+                value={formData.clinical_notes}
+                onChange={(e) => setFormData({ ...formData, clinical_notes: e.target.value })}
+              />
+            </FormField>
+          </FormGrid>
+        </FormSection>
+      </InsuranceModal>
 
       {/* Decision Modal */}
-      {decisionModal.open && (
-        <div className="ins-modal-overlay">
-          <div className="ins-modal">
-            <div className="ins-modal-header">
-              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>Record HMO Decision</h3>
-              <button className="btn btn-sm btn-link" onClick={() => setDecisionModal({ ...decisionModal, open: false })}>
-                <X size={20} />
-              </button>
-            </div>
-            <div className="ins-modal-body">
-              <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>Payer Decision *</label>
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  {(['APPROVED', 'PARTIAL', 'DENIED'] as const).map((dec) => (
-                    <label key={dec} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+      <InsuranceModal
+        isOpen={decisionModal.open}
+        onClose={() => setDecisionModal({ ...decisionModal, open: false })}
+        title="Record HMO Decision"
+        subtitle="Document approved pre-auth code, approved amount, and validity"
+        icon={<CheckCircle2 size={20} />}
+        size="md"
+        isDirty={Boolean(decisionModal.auth_code || decisionModal.denial_reason)}
+        footer={
+          <>
+            <FormButton
+              type="button"
+              variant="secondary"
+              onClick={() => setDecisionModal({ ...decisionModal, open: false })}
+            >
+              Cancel
+            </FormButton>
+            <FormButton
+              type="button"
+              variant="primary"
+              disabled={
+                decisionModal.status === 'DENIED'
+                  ? !decisionModal.denial_reason.trim()
+                  : !decisionModal.auth_code.trim()
+              }
+              onClick={handleRecordDecision}
+            >
+              Save Decision
+            </FormButton>
+          </>
+        }
+      >
+        <FormSection title="Adjudication Outcome">
+          <FormGrid>
+            <FormField id="auth-decision" label="Payer Decision" required fullWidth>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', width: '100%' }}>
+                {(['APPROVED', 'PARTIAL', 'DENIED'] as const).map((dec) => {
+                  const isChecked = decisionModal.status === dec;
+                  return (
+                    <label
+                      key={dec}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        padding: '10px',
+                        borderRadius: '8px',
+                        border: isChecked
+                          ? '2px solid var(--leh-forest)'
+                          : '1px solid #cbd5e1',
+                        background: isChecked ? 'var(--leh-forest-tint)' : '#ffffff',
+                        color: isChecked ? 'var(--leh-forest)' : 'var(--leh-ink)',
+                        fontWeight: 700,
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
                       <input
                         type="radio"
                         name="auth_decision"
-                        checked={decisionModal.status === dec}
+                        checked={isChecked}
                         onChange={() => setDecisionModal({ ...decisionModal, status: dec })}
+                        style={{ accentColor: 'var(--leh-forest)' }}
                       />
                       <span>{dec}</span>
                     </label>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
+            </FormField>
 
-              {decisionModal.status !== 'DENIED' ? (
-                <>
-                  <div style={{ marginBottom: '1rem' }}>
-                    <label className="form-label" style={{ fontWeight: 600 }}>HMO Pre-Auth Code *</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="e.g. AUTH-2026-9921"
-                      value={decisionModal.auth_code}
-                      onChange={(e) => setDecisionModal({ ...decisionModal, auth_code: e.target.value })}
-                    />
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                    <div>
-                      <label className="form-label" style={{ fontWeight: 600 }}>Approved Amount (₦)</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        value={decisionModal.approved_amount || ''}
-                        onChange={(e) => setDecisionModal({ ...decisionModal, approved_amount: parseFloat(e.target.value) || 0 })}
-                      />
-                    </div>
-                    <div>
-                      <label className="form-label" style={{ fontWeight: 600 }}>Valid Until Date</label>
-                      <input
-                        type="date"
-                        className="form-control"
-                        value={decisionModal.valid_until}
-                        onChange={(e) => setDecisionModal({ ...decisionModal, valid_until: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div style={{ marginBottom: '1rem' }}>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Denial Reason *</label>
-                  <textarea
-                    className="form-control"
-                    rows={3}
-                    placeholder="Provide payer denial reason code or explanation..."
-                    value={decisionModal.denial_reason}
-                    onChange={(e) => setDecisionModal({ ...decisionModal, denial_reason: e.target.value })}
+            {decisionModal.status !== 'DENIED' ? (
+              <>
+                <FormField id="auth-code" label="HMO Pre-Auth Code" required fullWidth>
+                  <FormInput
+                    id="auth-code"
+                    type="text"
+                    placeholder="e.g. AUTH-2026-9921"
+                    value={decisionModal.auth_code}
+                    onChange={(e) => setDecisionModal({ ...decisionModal, auth_code: e.target.value })}
                   />
-                </div>
-              )}
-            </div>
-            <div className="ins-modal-footer">
-              <button className="btn-leh-secondary" onClick={() => setDecisionModal({ ...decisionModal, open: false })}>
-                Cancel
-              </button>
-              <button className="btn-leh-forest" onClick={handleRecordDecision}>
-                Save Decision
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                </FormField>
+
+                <FormField id="auth-app-amt" label="Approved Amount (₦)">
+                  <FormInput
+                    id="auth-app-amt"
+                    type="number"
+                    currency
+                    min={0}
+                    placeholder="0.00"
+                    value={decisionModal.approved_amount || ''}
+                    onChange={(e) =>
+                      setDecisionModal({
+                        ...decisionModal,
+                        approved_amount: parseFloat(e.target.value) || 0
+                      })
+                    }
+                  />
+                </FormField>
+
+                <FormField id="auth-valid" label="Valid Until Date" helperText="Expiration of authorization">
+                  <FormDate
+                    id="auth-valid"
+                    value={decisionModal.valid_until}
+                    onChange={(e) =>
+                      setDecisionModal({ ...decisionModal, valid_until: e.target.value })
+                    }
+                  />
+                </FormField>
+              </>
+            ) : (
+              <FormField id="auth-denial" label="Denial Reason" required fullWidth>
+                <FormTextarea
+                  id="auth-denial"
+                  rows={3}
+                  placeholder="Provide payer denial reason code or clinical explanation..."
+                  value={decisionModal.denial_reason}
+                  onChange={(e) =>
+                    setDecisionModal({ ...decisionModal, denial_reason: e.target.value })
+                  }
+                />
+              </FormField>
+            )}
+          </FormGrid>
+        </FormSection>
+      </InsuranceModal>
     </div>
   );
 };
+

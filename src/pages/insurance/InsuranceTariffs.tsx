@@ -1,13 +1,22 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   DollarSign, Plus, Search, Edit2, Trash2,
-  CheckCircle, XCircle, RefreshCw, X,
+  CheckCircle, XCircle, RefreshCw,
   Upload, Download, AlertTriangle, FileText
 } from 'lucide-react';
 import { api } from '../../api';
 import { useNotification } from '../../context/NotificationContext';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { InsuranceNavHeader } from './InsuranceNavHeader';
+import {
+  InsuranceModal,
+  FormField,
+  FormInput,
+  FormSelect,
+  FormButton,
+  FormGrid,
+  FormSection
+} from '../../components/insurance';
 import './Insurance.css';
 
 // ─── RFC 4180 Quote-Aware CSV Parser (browser-safe, zero deps) ────────────
@@ -429,295 +438,520 @@ export const InsuranceTariffs: React.FC = () => {
       </div>
 
       {/* Add / Edit Modal */}
-      {modal.open && (
-        <div className="ins-modal-overlay">
-          <div className="ins-modal">
-            <div className="ins-modal-header">
-              <div className="ins-modal-header-left">
-                <div className="ins-modal-icon-badge ins-modal-icon-badge--forest">
-                  <DollarSign size={22} />
-                </div>
-                <div className="ins-modal-title-wrap">
-                  <h3 className="ins-modal-title">{modal.editingId ? 'Edit Agreed Tariff' : 'Add Agreed Tariff Rate'}</h3>
-                  <div className="ins-modal-subtitle">Define contracted fee schedule and pre-authorization policy</div>
-                </div>
-              </div>
-              <button 
-                type="button" 
-                className="ins-modal-close-btn" 
-                onClick={() => setModal(EMPTY_MODAL)}
-                title="Close modal"
+      <InsuranceModal
+        isOpen={modal.open}
+        onClose={() => setModal(EMPTY_MODAL)}
+        title={modal.editingId ? 'Edit Agreed Tariff' : 'Add Agreed Tariff Rate'}
+        subtitle="Define contracted fee schedule and pre-authorization policy"
+        icon={<DollarSign size={20} />}
+        size="md"
+        isDirty={Boolean(modal.payer_id || modal.item_description || modal.payer_price > 0)}
+        footer={
+          <>
+            <FormButton
+              type="button"
+              variant="secondary"
+              onClick={() => setModal(EMPTY_MODAL)}
+            >
+              Cancel
+            </FormButton>
+            <FormButton
+              type="button"
+              variant="primary"
+              disabled={!modal.payer_id || !modal.item_description.trim() || modal.payer_price < 0}
+              onClick={handleSave}
+            >
+              {modal.editingId ? 'Save Changes' : 'Save Tariff'}
+            </FormButton>
+          </>
+        }
+      >
+        <FormSection title="Payer & Plan Classification">
+          <FormGrid>
+            <FormField id="tariff-payer" label="Payer / HMO" required>
+              <FormSelect
+                id="tariff-payer"
+                value={modal.payer_id}
+                onChange={(e) => setModal({ ...modal, payer_id: e.target.value, plan_id: '' })}
+                placeholderOption="Choose Payer"
               >
-                <X size={18} />
-              </button>
+                {payers.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </FormSelect>
+            </FormField>
+
+            <FormField id="tariff-plan" label="Plan (Optional)" helperText="Applies to all plans if unselected">
+              <FormSelect
+                id="tariff-plan"
+                value={modal.plan_id}
+                onChange={(e) => setModal({ ...modal, plan_id: e.target.value })}
+                placeholderOption="All Plans Under Payer"
+              >
+                {availablePlans.map((pl) => (
+                  <option key={pl.id} value={pl.id}>
+                    {pl.plan_name}
+                  </option>
+                ))}
+              </FormSelect>
+            </FormField>
+
+            <FormField id="tariff-cat" label="Service Category">
+              <FormSelect
+                id="tariff-cat"
+                value={modal.item_type}
+                onChange={(e) => setModal({ ...modal, item_type: e.target.value })}
+              >
+                {ITEM_TYPE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </FormSelect>
+            </FormField>
+
+            <FormField id="tariff-code" label="Item Code / Ref ID" helperText="Internal code or NHIA tariff ref">
+              <FormInput
+                id="tariff-code"
+                type="text"
+                placeholder="e.g. VIS-OCT-01"
+                value={modal.item_ref_id}
+                onChange={(e) => setModal({ ...modal, item_ref_id: e.target.value })}
+              />
+            </FormField>
+          </FormGrid>
+        </FormSection>
+
+        <FormSection title="Description & Agreed Rate">
+          <FormGrid>
+            <FormField id="tariff-desc" label="Procedure / Item Description" required fullWidth>
+              <FormInput
+                id="tariff-desc"
+                type="text"
+                placeholder="e.g. Visual Field Analysis (Humphrey)"
+                value={modal.item_description}
+                onChange={(e) => setModal({ ...modal, item_description: e.target.value })}
+              />
+            </FormField>
+
+            <FormField id="tariff-price" label="Payer Agreed Price (₦)" required fullWidth>
+              <FormInput
+                id="tariff-price"
+                type="number"
+                currency
+                min={0}
+                placeholder="0.00"
+                value={modal.payer_price || ''}
+                onChange={(e) => setModal({ ...modal, payer_price: parseFloat(e.target.value) || 0 })}
+              />
+            </FormField>
+
+            <div
+              className="ins-col-span-2"
+              style={{
+                display: 'flex',
+                gap: '24px',
+                padding: '12px 16px',
+                background: '#f8fafc',
+                borderRadius: '8px',
+                border: '1px solid #e2e8f0',
+                flexWrap: 'wrap'
+              }}
+            >
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  fontSize: '13.5px',
+                  fontWeight: 600,
+                  color: 'var(--leh-ink)'
+                }}
+              >
+                <input
+                  type="checkbox"
+                  style={{ width: '16px', height: '16px', accentColor: 'var(--leh-forest)' }}
+                  checked={modal.covered}
+                  onChange={(e) => setModal({ ...modal, covered: e.target.checked })}
+                />
+                <span>Covered by Payer</span>
+              </label>
+
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  fontSize: '13.5px',
+                  fontWeight: 600,
+                  color: 'var(--leh-ink)'
+                }}
+              >
+                <input
+                  type="checkbox"
+                  style={{ width: '16px', height: '16px', accentColor: 'var(--leh-forest)' }}
+                  checked={modal.requires_preauth}
+                  onChange={(e) => setModal({ ...modal, requires_preauth: e.target.checked })}
+                />
+                <span>Requires Pre-Authorization</span>
+              </label>
             </div>
+          </FormGrid>
+        </FormSection>
+      </InsuranceModal>
 
-            <div className="ins-modal-body">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                <div className="ins-form-group">
-                  <label className="ins-form-label">
-                    Payer / HMO <span className="ins-form-label-required">*</span>
-                  </label>
-                  <select className="ins-form-select" value={modal.payer_id} onChange={(e) => setModal({ ...modal, payer_id: e.target.value, plan_id: '' })}>
-                    <option value="">-- Choose Payer --</option>
-                    {payers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                </div>
-                <div className="ins-form-group">
-                  <label className="ins-form-label">Plan (Optional)</label>
-                  <select className="ins-form-select" value={modal.plan_id} onChange={(e) => setModal({ ...modal, plan_id: e.target.value })}>
-                    <option value="">-- All Plans Under Payer --</option>
-                    {availablePlans.map((pl) => <option key={pl.id} value={pl.id}>{pl.plan_name}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                <div className="ins-form-group">
-                  <label className="ins-form-label">Category</label>
-                  <select className="ins-form-select" value={modal.item_type} onChange={(e) => setModal({ ...modal, item_type: e.target.value })}>
-                    {ITEM_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                </div>
-                <div className="ins-form-group">
-                  <label className="ins-form-label">Item Code / Ref ID</label>
-                  <input type="text" className="ins-form-input" placeholder="e.g. VIS-OCT-01" value={modal.item_ref_id} onChange={(e) => setModal({ ...modal, item_ref_id: e.target.value })} />
-                </div>
-              </div>
-
-              <div className="ins-form-group">
-                <label className="ins-form-label">
-                  Item / Procedure Description <span className="ins-form-label-required">*</span>
-                </label>
-                <input type="text" className="ins-form-input" placeholder="e.g. Visual Field Analysis (Humphrey)" value={modal.item_description} onChange={(e) => setModal({ ...modal, item_description: e.target.value })} />
-              </div>
-
-              <div className="ins-form-group">
-                <label className="ins-form-label">
-                  Payer Agreed Price (₦) <span className="ins-form-label-required">*</span>
-                </label>
-                <div className="ins-currency-input-wrap">
-                  <span className="ins-currency-prefix">₦</span>
-                  <input 
-                    type="number" 
-                    min={0} 
-                    className="ins-form-input ins-form-input--currency" 
-                    placeholder="0.00" 
-                    value={modal.payer_price || ''} 
-                    onChange={(e) => setModal({ ...modal, payer_price: parseFloat(e.target.value) || 0 })} 
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '2rem', padding: '10px 14px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
-                  <input type="checkbox" checked={modal.covered} onChange={(e) => setModal({ ...modal, covered: e.target.checked })} />
-                  <span>Covered by Payer</span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
-                  <input type="checkbox" checked={modal.requires_preauth} onChange={(e) => setModal({ ...modal, requires_preauth: e.target.checked })} />
-                  <span>Requires Pre-Authorization</span>
-                </label>
-              </div>
-            </div>
-
-            <div className="ins-modal-footer">
-              <button type="button" className="btn-leh-secondary" onClick={() => setModal(EMPTY_MODAL)}>Cancel</button>
-              <button type="button" className="btn-leh-forest" onClick={handleSave}>Save Tariff</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Bulk Import Modal */}
-      {importModal && (
-        <div className="ins-modal-overlay">
-          <div className="ins-modal" style={{ maxWidth: '820px', width: '95vw' }}>
-            <div className="ins-modal-header">
-              <div className="ins-modal-header-left">
-                <div className="ins-modal-icon-badge ins-modal-icon-badge--blue">
-                  <Upload size={22} />
-                </div>
-                <div className="ins-modal-title-wrap">
-                  <h3 className="ins-modal-title">Bulk Tariff Import — HMO CSV Upload</h3>
-                  <div className="ins-modal-subtitle">Upload contracted pricing catalog from Excel / CSV template</div>
-                </div>
-              </div>
-              <button 
-                type="button" 
-                className="ins-modal-close-btn" 
-                onClick={closeImportModal}
-                title="Close modal"
-              >
-                <X size={18} />
-              </button>
+      <InsuranceModal
+        isOpen={importModal}
+        onClose={closeImportModal}
+        title="Bulk Tariff Import — HMO CSV Upload"
+        subtitle="Upload contracted pricing catalog from Excel / CSV template"
+        icon={<Upload size={20} />}
+        size="lg"
+        isDirty={importRows.length > 0}
+        footer={
+          <>
+            {importing ? (
+              <FormButton variant="danger" type="button" onClick={handleAbortImport}>
+                Stop Import
+              </FormButton>
+            ) : (
+              <FormButton variant="secondary" type="button" onClick={closeImportModal}>
+                Close
+              </FormButton>
+            )}
+            <FormButton
+              variant="primary"
+              type="button"
+              disabled={!importPayerId || importRows.length === 0 || importing}
+              onClick={handleRunImport}
+              loading={importing}
+              icon={!importing ? <Upload size={15} /> : undefined}
+            >
+              {importing
+                ? `Processing Chunk ${importProgress?.currentChunk || 1}…`
+                : `Run Import (${importRows.length} rows)`}
+            </FormButton>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Step 1 */}
+          <div
+            style={{
+              background: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              borderRadius: '10px',
+              padding: '14px 18px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '12px'
+            }}
+          >
+            <div>
+              <strong style={{ fontSize: '14px', color: '#14532d' }}>Step 1 — Download the CSV template</strong>
+              <p style={{ margin: '3px 0 0', fontSize: '13px', color: '#166534' }}>
+                Open in Excel, fill tariff rows, then save as CSV before uploading.
+              </p>
             </div>
-
-            <div className="ins-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {/* Step 1 */}
-              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '0.9rem 1.1rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <strong style={{ fontSize: '0.9rem', color: '#14532d' }}>Step 1 — Download the CSV template</strong>
-                    <p style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: '#166534' }}>Open in Excel, fill tariff rows, then save as CSV before uploading.</p>
-                  </div>
-                  <button
-                    className="btn-leh-forest"
-                    style={{ padding: '0.45rem 1rem', fontSize: '0.82rem', whiteSpace: 'nowrap' }}
-                    onClick={() => api.insurance.downloadTariffTemplate().catch((e: any) => notify('error', e.message))}
-                  >
-                    <Download size={14} /> Download Template
-                  </button>
-                </div>
-              </div>
-
-              {/* Step 2 */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div className="ins-form-group">
-                  <label className="ins-form-label">
-                    Step 2 — Select Payer <span className="ins-form-label-required">*</span>
-                  </label>
-                  <select className="ins-form-select" value={importPayerId} onChange={(e) => { setImportPayerId(e.target.value); setImportPlanId(''); }}>
-                    <option value="">-- Choose HMO / Payer --</option>
-                    {payers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                </div>
-                <div className="ins-form-group">
-                  <label className="ins-form-label">Plan (Optional)</label>
-                  <select className="ins-form-select" value={importPlanId} onChange={(e) => setImportPlanId(e.target.value)} disabled={!importPayerId}>
-                    <option value="">-- Apply to All Plans --</option>
-                    {importAvailablePlans.map((pl) => <option key={pl.id} value={pl.id}>{pl.plan_name}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              {/* Step 3 */}
-              <div>
-                <label className="ins-form-label" style={{ fontWeight: 600 }}>Step 3 — Upload CSV File</label>
-                <div
-                  style={{ border: '2px dashed var(--leh-border, #cbd5e1)', borderRadius: '12px', padding: '1.5rem', textAlign: 'center', cursor: 'pointer', background: 'var(--leh-card-bg, #f8fafc)', transition: 'border-color 0.2s' }}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <FileText size={28} style={{ color: 'var(--leh-forest)', marginBottom: '0.5rem' }} />
-                  <p style={{ margin: 0, color: 'var(--leh-ink)', fontSize: '0.9rem', fontWeight: 500 }}>Click to browse or drag a <strong>.csv</strong> file here</p>
-                  <p style={{ margin: '0.2rem 0 0', fontSize: '0.78rem', color: 'var(--leh-muted)' }}>Columns: item_type, item_ref_id, item_description, payer_price_naira, covered, requires_preauth</p>
-                  <input ref={fileInputRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={handleFileChange} />
-                </div>
-              </div>
-
-              {/* Warnings */}
-              {importWarnings.length > 0 && (
-                <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '10px', padding: '0.75rem 1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
-                    <AlertTriangle size={16} color="#d97706" />
-                    <strong style={{ fontSize: '0.85rem', color: '#92400e' }}>{importWarnings.length} warning(s) — valid rows will still be imported</strong>
-                  </div>
-                  {importWarnings.slice(0, 5).map((w, i) => <div key={i} style={{ fontSize: '0.8rem', color: '#78350f' }}>{w}</div>)}
-                  {importWarnings.length > 5 && <div style={{ fontSize: '0.8rem', color: '#92400e', marginTop: '0.3rem' }}>…and {importWarnings.length - 5} more</div>}
-                </div>
-              )}
-
-              {/* Preview */}
-              {importRows.length > 0 && (
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                    <strong style={{ fontSize: '0.9rem' }}>Preview — {importRows.length} row(s) parsed</strong>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--leh-muted)' }}>Showing first 5 rows</span>
-                  </div>
-                  <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-                    <table className="insurance-table" style={{ marginBottom: 0 }}>
-                      <thead>
-                        <tr>
-                          <th>Type</th><th>Code</th><th>Description</th>
-                          <th style={{ textAlign: 'right' }}>Price (₦)</th>
-                          <th style={{ textAlign: 'center' }}>Covered</th>
-                          <th style={{ textAlign: 'center' }}>Pre-Auth</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {importRows.slice(0, 5).map((row, i) => (
-                          <tr key={i}>
-                            <td><span style={{ fontSize: '0.75rem', background: '#f1f5f9', padding: '2px 5px', borderRadius: '4px' }}>{(row.item_type || 'SERVICE').toUpperCase()}</span></td>
-                            <td style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{row.item_ref_id || row.item_code || '—'}</td>
-                            <td>{row.item_description || row.description || '—'}</td>
-                            <td style={{ textAlign: 'right' }}>{parseFloat(row.payer_price_naira || row.price || '0').toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                            <td style={{ textAlign: 'center' }}>{(row.covered === '0' || row.is_covered === '0') ? <XCircle size={14} color="#dc2626" /> : <CheckCircle size={14} color="#16a34a" />}</td>
-                            <td style={{ textAlign: 'center' }}>{(row.requires_preauth === '1' || row.requires_authorization === '1') ? <CheckCircle size={14} color="#d97706" /> : <span style={{ color: 'var(--leh-muted)', fontSize: '0.8rem' }}>No</span>}</td>
-                          </tr>
-                        ))}
-                        {importRows.length > 5 && (
-                          <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--leh-muted)', fontSize: '0.82rem', padding: '0.5rem' }}>…{importRows.length - 5} more rows not shown</td></tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* Streaming Progress Bar */}
-              {importProgress && (
-                <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '0.9rem 1.1rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', fontSize: '0.85rem' }}>
-                    <span style={{ fontWeight: 600, color: '#334155' }}>{importProgress.statusText}</span>
-                    <span style={{ fontWeight: 700, color: 'var(--leh-forest)' }}>{importProgress.percent}%</span>
-                  </div>
-                  <div style={{ width: '100%', height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div
-                      style={{
-                        width: `${importProgress.percent}%`,
-                        height: '100%',
-                        background: 'var(--leh-forest)',
-                        transition: 'width 0.25s ease',
-                      }}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', gap: '1.25rem', marginTop: '0.5rem', fontSize: '0.82rem' }}>
-                    <span style={{ color: '#15803d' }}>+ <strong>{importProgress.created}</strong> created</span>
-                    <span style={{ color: '#1d4ed8' }}>~ <strong>{importProgress.updated}</strong> updated</span>
-                    {importProgress.failed > 0 && <span style={{ color: '#dc2626' }}>! <strong>{importProgress.failed}</strong> failed</span>}
-                  </div>
-                </div>
-              )}
-
-              {/* Result */}
-              {importResult && (
-                <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '10px', padding: '0.9rem 1.1rem' }}>
-                  <strong style={{ color: '#15803d' }}>✓ Import Completed</strong>
-                  <div style={{ marginTop: '0.4rem', fontSize: '0.88rem', display: 'flex', gap: '1.5rem' }}>
-                    <span>Total: <strong>{importResult.total}</strong></span>
-                    <span style={{ color: '#15803d' }}>Created: <strong>{importResult.created}</strong></span>
-                    <span style={{ color: '#1d4ed8' }}>Updated: <strong>{importResult.updated}</strong></span>
-                    {importResult.failed > 0 && <span style={{ color: '#dc2626' }}>Failed: <strong>{importResult.failed}</strong></span>}
-                  </div>
-                  {importResult.errors?.length > 0 && importResult.errors.map((e: string, i: number) => (
-                    <div key={i} style={{ fontSize: '0.8rem', color: '#dc2626', marginTop: '0.3rem' }}>{e}</div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="ins-modal-footer">
-              {importing ? (
-                <button className="btn-leh-danger" onClick={handleAbortImport}>
-                  Stop Import
-                </button>
-              ) : (
-                <button className="btn-leh-secondary" onClick={closeImportModal}>Close</button>
-              )}
-              <button
-                className="btn-leh-forest"
-                disabled={!importPayerId || importRows.length === 0 || importing}
-                onClick={handleRunImport}
-              >
-                {importing
-                  ? <><RefreshCw size={15} style={{ animation: 'spin 1s linear infinite' }} /> Processing Chunk {importProgress?.currentChunk || 1}…</>
-                  : <><Upload size={15} /> Run Import ({importRows.length} rows)</>
-                }
-              </button>
-            </div>
+            <FormButton
+              variant="secondary"
+              type="button"
+              icon={<Download size={14} />}
+              onClick={() => api.insurance.downloadTariffTemplate().catch((e: any) => notify('error', e.message))}
+            >
+              Download Template
+            </FormButton>
           </div>
+
+          {/* Step 2 */}
+          <FormSection title="Step 2 — Select Payer & Target Plan">
+            <FormGrid>
+              <FormField id="import-payer" label="Select Payer" required>
+                <FormSelect
+                  id="import-payer"
+                  value={importPayerId}
+                  onChange={(e) => {
+                    setImportPayerId(e.target.value);
+                    setImportPlanId('');
+                  }}
+                  placeholderOption="Choose HMO / Payer"
+                >
+                  {payers.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </FormSelect>
+              </FormField>
+
+              <FormField id="import-plan" label="Target Plan (Optional)">
+                <FormSelect
+                  id="import-plan"
+                  value={importPlanId}
+                  onChange={(e) => setImportPlanId(e.target.value)}
+                  disabled={!importPayerId}
+                  placeholderOption="Apply to All Plans Under Payer"
+                >
+                  {importAvailablePlans.map((pl) => (
+                    <option key={pl.id} value={pl.id}>
+                      {pl.plan_name}
+                    </option>
+                  ))}
+                </FormSelect>
+              </FormField>
+            </FormGrid>
+          </FormSection>
+
+          {/* Step 3 */}
+          <FormSection title="Step 3 — Upload CSV File">
+            <div
+              style={{
+                border: '2px dashed var(--leh-border, #cbd5e1)',
+                borderRadius: '12px',
+                padding: '24px',
+                textAlign: 'center',
+                cursor: 'pointer',
+                background: '#f8fafc',
+                transition: 'border-color 0.2s'
+              }}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <FileText size={32} style={{ color: 'var(--leh-forest)', margin: '0 auto 8px auto' }} />
+              <p style={{ margin: 0, color: 'var(--leh-ink)', fontSize: '14.5px', fontWeight: 600 }}>
+                Click to browse or drag a <strong>.csv</strong> file here
+              </p>
+              <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: 'var(--leh-muted)' }}>
+                Columns: item_type, item_ref_id, item_description, payer_price_naira, covered, requires_preauth
+              </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                style={{ display: 'none' }}
+                onChange={handleFileChange}
+              />
+            </div>
+          </FormSection>
+
+          {/* Warnings */}
+          {importWarnings.length > 0 && (
+            <div
+              style={{
+                background: '#fffbeb',
+                border: '1px solid #fcd34d',
+                borderRadius: '10px',
+                padding: '12px 16px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <AlertTriangle size={16} color="#d97706" />
+                <strong style={{ fontSize: '13.5px', color: '#92400e' }}>
+                  {importWarnings.length} warning(s) — valid rows will still be imported
+                </strong>
+              </div>
+              {importWarnings.slice(0, 5).map((w, i) => (
+                <div key={i} style={{ fontSize: '12.5px', color: '#78350f' }}>
+                  {w}
+                </div>
+              ))}
+              {importWarnings.length > 5 && (
+                <div style={{ fontSize: '12.5px', color: '#92400e', marginTop: '4px' }}>
+                  …and {importWarnings.length - 5} more
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Preview */}
+          {importRows.length > 0 && (
+            <div>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '8px'
+                }}
+              >
+                <strong style={{ fontSize: '14px', color: 'var(--leh-ink)' }}>
+                  Preview — {importRows.length} row(s) parsed
+                </strong>
+                <span style={{ fontSize: '12.5px', color: 'var(--leh-muted)' }}>Showing first 5 rows</span>
+              </div>
+              <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                <table className="insurance-table" style={{ marginBottom: 0 }}>
+                  <thead>
+                    <tr>
+                      <th>Type</th>
+                      <th>Code</th>
+                      <th>Description</th>
+                      <th style={{ textAlign: 'right' }}>Price (₦)</th>
+                      <th style={{ textAlign: 'center' }}>Covered</th>
+                      <th style={{ textAlign: 'center' }}>Pre-Auth</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importRows.slice(0, 5).map((row, i) => (
+                      <tr key={i}>
+                        <td>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              background: '#f1f5f9',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontWeight: 600
+                            }}
+                          >
+                            {(row.item_type || 'SERVICE').toUpperCase()}
+                          </span>
+                        </td>
+                        <td style={{ fontFamily: 'monospace', fontSize: '13px' }}>
+                          {row.item_ref_id || row.item_code || '—'}
+                        </td>
+                        <td>{row.item_description || row.description || '—'}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 600 }}>
+                          ₦{parseFloat(row.payer_price_naira || row.price || '0').toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          {row.covered === '0' || row.is_covered === '0' ? (
+                            <XCircle size={15} color="#dc2626" />
+                          ) : (
+                            <CheckCircle size={15} color="#16a34a" />
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          {row.requires_preauth === '1' || row.requires_authorization === '1' ? (
+                            <CheckCircle size={15} color="#d97706" />
+                          ) : (
+                            <span style={{ color: 'var(--leh-muted)', fontSize: '12px' }}>No</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {importRows.length > 5 && (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          style={{
+                            textAlign: 'center',
+                            color: 'var(--leh-muted)',
+                            fontSize: '12.5px',
+                            padding: '8px'
+                          }}
+                        >
+                          …{importRows.length - 5} more rows not shown
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Streaming Progress Bar */}
+          {importProgress && (
+            <div
+              style={{
+                background: '#f8fafc',
+                border: '1px solid #cbd5e1',
+                borderRadius: '10px',
+                padding: '14px 18px'
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '6px',
+                  fontSize: '13.5px'
+                }}
+              >
+                <span style={{ fontWeight: 600, color: '#334155' }}>{importProgress.statusText}</span>
+                <span style={{ fontWeight: 700, color: 'var(--leh-forest)' }}>{importProgress.percent}%</span>
+              </div>
+              <div
+                style={{
+                  width: '100%',
+                  height: '8px',
+                  background: '#e2e8f0',
+                  borderRadius: '4px',
+                  overflow: 'hidden'
+                }}
+              >
+                <div
+                  style={{
+                    width: `${importProgress.percent}%`,
+                    height: '100%',
+                    background: 'var(--leh-forest)',
+                    transition: 'width 0.25s ease'
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '20px', marginTop: '8px', fontSize: '12.5px' }}>
+                <span style={{ color: '#15803d' }}>
+                  + <strong>{importProgress.created}</strong> created
+                </span>
+                <span style={{ color: '#1d4ed8' }}>
+                  ~ <strong>{importProgress.updated}</strong> updated
+                </span>
+                {importProgress.failed > 0 && (
+                  <span style={{ color: '#dc2626' }}>
+                    ! <strong>{importProgress.failed}</strong> failed
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Result */}
+          {importResult && (
+            <div
+              style={{
+                background: '#f0fdf4',
+                border: '1px solid #86efac',
+                borderRadius: '10px',
+                padding: '14px 18px'
+              }}
+            >
+              <strong style={{ color: '#15803d', fontSize: '14px' }}>✓ Import Completed Successfully</strong>
+              <div style={{ marginTop: '6px', fontSize: '13px', display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+                <span>
+                  Total: <strong>{importResult.total}</strong>
+                </span>
+                <span style={{ color: '#15803d' }}>
+                  Created: <strong>{importResult.created}</strong>
+                </span>
+                <span style={{ color: '#1d4ed8' }}>
+                  Updated: <strong>{importResult.updated}</strong>
+                </span>
+                {importResult.failed > 0 && (
+                  <span style={{ color: '#dc2626' }}>
+                    Failed: <strong>{importResult.failed}</strong>
+                  </span>
+                )}
+              </div>
+              {importResult.errors?.length > 0 &&
+                importResult.errors.map((e: string, i: number) => (
+                  <div key={i} style={{ fontSize: '12px', color: '#dc2626', marginTop: '4px' }}>
+                    {e}
+                  </div>
+                ))}
+            </div>
+          )}
         </div>
-      )}
+      </InsuranceModal>
+
     </div>
   );
 };

@@ -1,11 +1,21 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  ArrowLeft, Printer, Plus, Trash2, X
+  ArrowLeft, Printer, Plus, Trash2,
+  AlertTriangle, ArrowRightCircle
 } from 'lucide-react';
 import { api } from '../../api';
 import { useNotification } from '../../context/NotificationContext';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import {
+  InsuranceModal,
+  FormField,
+  FormInput,
+  FormSelect,
+  FormTextarea,
+  FormButton,
+  FormGrid
+} from '../../components/insurance';
 import './Insurance.css';
 
 export const InsuranceClaimDetail: React.FC = () => {
@@ -492,183 +502,214 @@ export const InsuranceClaimDetail: React.FC = () => {
       </div>
 
       {/* Transition Dialog */}
-      {transitionDialog.open && (
-        <div className="ins-modal-overlay">
-          <div className="ins-modal">
-            <div className="ins-modal-header">
-              <h3 style={{ margin: 0, fontSize: '1.25rem' }}>Transition to {transitionDialog.toStatus}</h3>
-              <button className="btn btn-sm btn-link" onClick={() => setTransitionDialog({ ...transitionDialog, open: false })}>
-                <X size={20} />
-              </button>
-            </div>
-            <div className="ins-modal-body">
-              {['APPROVED', 'PARTIALLY_APPROVED'].includes(transitionDialog.toStatus) && (
-                <div style={{ marginBottom: '1rem' }}>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Approved Amount (₦) *</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    placeholder="Enter approved amount"
-                    value={transitionDialog.approvedAmount || ''}
-                    onChange={(e) => setTransitionDialog({ ...transitionDialog, approvedAmount: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
-              )}
-              {['REJECTED', 'QUERIED'].includes(transitionDialog.toStatus) && (
-                <div style={{ marginBottom: '1rem' }}>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Rejection / Query Reason *</label>
-                  <select
-                    className="form-select"
-                    value={transitionDialog.reason}
-                    onChange={(e) => setTransitionDialog({ ...transitionDialog, reason: e.target.value })}
-                  >
-                    <option value="">-- Select Standard Reason --</option>
-                    {rejectionReasons.map((r) => (
-                      <option key={r.code} value={r.code}>{r.code} - {r.description}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>Audit Note</label>
-                <textarea
-                  className="form-control"
-                  rows={3}
-                  placeholder="Optional details..."
-                  value={transitionDialog.note}
-                  onChange={(e) => setTransitionDialog({ ...transitionDialog, note: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="ins-modal-footer">
-              <button className="btn-leh-secondary" onClick={() => setTransitionDialog({ ...transitionDialog, open: false })}>
-                Cancel
-              </button>
-              <button className="btn-leh-forest" onClick={handleTransition}>
-                Confirm
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <InsuranceModal
+        isOpen={transitionDialog.open}
+        onClose={() => setTransitionDialog({ ...transitionDialog, open: false })}
+        title={`Transition to ${transitionDialog.toStatus}`}
+        subtitle="Update adjudication state with audit trail remarks"
+        icon={
+          ['REJECTED', 'QUERIED'].includes(transitionDialog.toStatus) ? (
+            <AlertTriangle size={18} />
+          ) : (
+            <ArrowRightCircle size={18} />
+          )
+        }
+        size="md"
+        isDirty={Boolean(
+          transitionDialog.approvedAmount ||
+          transitionDialog.reason ||
+          transitionDialog.note.trim()
+        )}
+        footer={
+          <>
+            <FormButton
+              variant="secondary"
+              onClick={() => setTransitionDialog({ ...transitionDialog, open: false })}
+            >
+              Cancel
+            </FormButton>
+            <FormButton
+              variant={['REJECTED', 'QUERIED'].includes(transitionDialog.toStatus) ? 'danger' : 'primary'}
+              onClick={handleTransition}
+            >
+              Confirm Transition
+            </FormButton>
+          </>
+        }
+      >
+        {['APPROVED', 'PARTIALLY_APPROVED'].includes(transitionDialog.toStatus) && (
+          <FormField label="Approved Amount (₦)" required>
+            <FormInput
+              type="number"
+              currency
+              placeholder="0.00"
+              value={transitionDialog.approvedAmount || ''}
+              onChange={(e) => setTransitionDialog({ ...transitionDialog, approvedAmount: parseFloat(e.target.value) || 0 })}
+            />
+          </FormField>
+        )}
+
+        {['REJECTED', 'QUERIED'].includes(transitionDialog.toStatus) && (
+          <FormField label="Rejection / Query Reason" required>
+            <FormSelect
+              value={transitionDialog.reason}
+              onChange={(e) => setTransitionDialog({ ...transitionDialog, reason: e.target.value })}
+            >
+              <option value="">-- Select Standard Reason --</option>
+              {rejectionReasons.map((r) => (
+                <option key={r.code} value={r.code}>{r.code} - {r.description}</option>
+              ))}
+            </FormSelect>
+          </FormField>
+        )}
+
+        <FormField label="Audit Note / Explanation">
+          <FormTextarea
+            rows={3}
+            placeholder="Optional details for audit timeline..."
+            value={transitionDialog.note}
+            onChange={(e) => setTransitionDialog({ ...transitionDialog, note: e.target.value })}
+          />
+        </FormField>
+      </InsuranceModal>
 
       {/* Write-off Dialog */}
-      {writeOffDialog.open && (
-        <div className="ins-modal-overlay">
-          <div className="ins-modal">
-            <div className="ins-modal-header">
-              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>Write Off Claim Balance</h3>
-              <button className="btn btn-sm btn-link" onClick={() => setWriteOffDialog({ open: false, reason: '' })}>
-                <X size={20} />
-              </button>
-            </div>
-            <div className="ins-modal-body">
-              <p style={{ color: 'var(--leh-danger)' }}>
-                Warning: Writing off will permanently close this claim and recognize uncollected payer balance as bad debt expense.
-              </p>
-              <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>Reason for Write-off *</label>
-                <textarea
-                  className="form-control"
-                  rows={3}
-                  placeholder="e.g. Disputed tariff / Payer denied appeal after 90 days..."
-                  value={writeOffDialog.reason}
-                  onChange={(e) => setWriteOffDialog({ ...writeOffDialog, reason: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="ins-modal-footer">
-              <button className="btn-leh-secondary" onClick={() => setWriteOffDialog({ open: false, reason: '' })}>
-                Cancel
-              </button>
-              <button className="btn-leh-danger" onClick={handleWriteOff}>
-                Confirm Write-Off
-              </button>
-            </div>
+      <InsuranceModal
+        isOpen={writeOffDialog.open}
+        onClose={() => setWriteOffDialog({ open: false, reason: '' })}
+        title="Write Off Claim Balance"
+        subtitle="Recognize uncollected balance as bad debt expense"
+        icon={<AlertTriangle size={18} />}
+        size="md"
+        isDirty={Boolean(writeOffDialog.reason.trim())}
+        footer={
+          <>
+            <FormButton
+              variant="secondary"
+              onClick={() => setWriteOffDialog({ open: false, reason: '' })}
+            >
+              Cancel
+            </FormButton>
+            <FormButton
+              variant="danger"
+              disabled={!writeOffDialog.reason.trim()}
+              onClick={handleWriteOff}
+            >
+              Confirm Write-Off
+            </FormButton>
+          </>
+        }
+      >
+        <div style={{
+          background: 'var(--leh-surface-alt, #fef2f2)',
+          border: '1px solid #fecaca',
+          borderRadius: '12px',
+          padding: '12px 16px',
+          marginBottom: '16px',
+          display: 'flex',
+          gap: '12px',
+          alignItems: 'center'
+        }}>
+          <AlertTriangle size={20} color="#dc2626" style={{ flexShrink: 0 }} />
+          <div style={{ fontSize: '13px', color: '#991b1b', lineHeight: 1.4 }}>
+            <strong>Irreversible Action:</strong> Writing off will permanently close this claim and write down the outstanding receivables ledger.
           </div>
         </div>
-      )}
+
+        <FormField label="Reason for Write-off" required>
+          <FormTextarea
+            rows={3}
+            placeholder="e.g. Disputed tariff / Payer denied appeal after 90 days / Contractual compromise..."
+            value={writeOffDialog.reason}
+            onChange={(e) => setWriteOffDialog({ ...writeOffDialog, reason: e.target.value })}
+          />
+        </FormField>
+      </InsuranceModal>
 
       {/* Add Item Dialog */}
-      {newItemDialog.open && (
-        <div className="ins-modal-overlay">
-          <div className="ins-modal">
-            <div className="ins-modal-header">
-              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>Add Service / Item</h3>
-              <button className="btn btn-sm btn-link" onClick={() => setNewItemDialog({ ...newItemDialog, open: false })}>
-                <X size={20} />
-              </button>
-            </div>
-            <div className="ins-modal-body">
-              <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>Item Type</label>
-                <select
-                  className="form-select"
-                  value={newItemDialog.item_type}
-                  onChange={(e) => setNewItemDialog({ ...newItemDialog, item_type: e.target.value })}
-                >
-                  <option value="SERVICE">Medical Service / Consultation</option>
-                  <option value="INVESTIGATION">Laboratory / Diagnostic</option>
-                  <option value="SURGERY">Surgical Procedure</option>
-                  <option value="MEDICATION">Pharmacy / Drug</option>
-                  <option value="FRAME">Optical Frame</option>
-                  <option value="LENS">Optical Lens</option>
-                </select>
-              </div>
-              <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>Item Code</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="e.g. EYE-CONS-01"
-                  value={newItemDialog.item_code}
-                  onChange={(e) => setNewItemDialog({ ...newItemDialog, item_code: e.target.value })}
-                />
-              </div>
-              <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>Description *</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="e.g. Slit lamp examination"
-                  value={newItemDialog.description}
-                  onChange={(e) => setNewItemDialog({ ...newItemDialog, description: e.target.value })}
-                />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Quantity</label>
-                  <input
-                    type="number"
-                    min={1}
-                    className="form-control"
-                    value={newItemDialog.quantity}
-                    onChange={(e) => setNewItemDialog({ ...newItemDialog, quantity: parseInt(e.target.value) || 1 })}
-                  />
-                </div>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Unit Price (₦) *</label>
-                  <input
-                    type="number"
-                    min={0}
-                    className="form-control"
-                    value={newItemDialog.unit_price || ''}
-                    onChange={(e) => setNewItemDialog({ ...newItemDialog, unit_price: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="ins-modal-footer">
-              <button className="btn-leh-secondary" onClick={() => setNewItemDialog({ ...newItemDialog, open: false })}>
-                Cancel
-              </button>
-              <button className="btn-leh-forest" onClick={handleAddItem}>
-                Add to Claim
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <InsuranceModal
+        isOpen={newItemDialog.open}
+        onClose={() => setNewItemDialog({ ...newItemDialog, open: false })}
+        title="Add Service / Item to Claim"
+        subtitle="Append procedure, investigation, drug, or frame tariff line"
+        icon={<Plus size={18} />}
+        size="md"
+        isDirty={Boolean(
+          newItemDialog.description.trim() ||
+          newItemDialog.item_code.trim() ||
+          newItemDialog.unit_price > 0
+        )}
+        footer={
+          <>
+            <FormButton
+              variant="secondary"
+              onClick={() => setNewItemDialog({ ...newItemDialog, open: false })}
+            >
+              Cancel
+            </FormButton>
+            <FormButton
+              variant="primary"
+              disabled={!newItemDialog.description.trim() || newItemDialog.unit_price <= 0}
+              onClick={handleAddItem}
+            >
+              Add to Claim
+            </FormButton>
+          </>
+        }
+      >
+        <FormField label="Item Category" required>
+          <FormSelect
+            value={newItemDialog.item_type}
+            onChange={(e) => setNewItemDialog({ ...newItemDialog, item_type: e.target.value })}
+          >
+            <option value="SERVICE">Medical Service / Consultation</option>
+            <option value="INVESTIGATION">Laboratory / Diagnostic</option>
+            <option value="SURGERY">Surgical Procedure</option>
+            <option value="MEDICATION">Pharmacy / Drug</option>
+            <option value="FRAME">Optical Frame</option>
+            <option value="LENS">Optical Lens</option>
+          </FormSelect>
+        </FormField>
+
+        <FormField label="Item Code">
+          <FormInput
+            type="text"
+            placeholder="e.g. EYE-CONS-01"
+            value={newItemDialog.item_code}
+            onChange={(e) => setNewItemDialog({ ...newItemDialog, item_code: e.target.value })}
+          />
+        </FormField>
+
+        <FormField label="Description" required>
+          <FormInput
+            type="text"
+            placeholder="e.g. Slit lamp examination"
+            value={newItemDialog.description}
+            onChange={(e) => setNewItemDialog({ ...newItemDialog, description: e.target.value })}
+          />
+        </FormField>
+
+        <FormGrid columns={2}>
+          <FormField label="Quantity" required>
+            <FormInput
+              type="number"
+              min={1}
+              value={newItemDialog.quantity}
+              onChange={(e) => setNewItemDialog({ ...newItemDialog, quantity: parseInt(e.target.value) || 1 })}
+            />
+          </FormField>
+          <FormField label="Unit Price (₦)" required>
+            <FormInput
+              type="number"
+              currency
+              min={0}
+              placeholder="0.00"
+              value={newItemDialog.unit_price || ''}
+              onChange={(e) => setNewItemDialog({ ...newItemDialog, unit_price: parseFloat(e.target.value) || 0 })}
+            />
+          </FormField>
+        </FormGrid>
+      </InsuranceModal>
     </div>
   );
 };

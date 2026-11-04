@@ -1,0 +1,741 @@
+/* ==========================================================================
+   VisionCare EMR — Insurance Module Modal & Form Design System
+   Luna Eye Hospital, Minna
+   ========================================================================== */
+
+/* ── Modal Overlay & Backdrop ── */
+.ins-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+  animation: insModalFadeIn 0.2s ease-out;
+}
+
+@keyframes insModalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes insModalSlidePop {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ── Modal Container Shell ── */
+.ins-modal {
+  background: #ffffff;
+  border-radius: 16px;
+  width: 100%;
+  max-height: 90vh;
+  box-shadow: 
+    0 20px 40px -8px rgba(15, 23, 42, 0.22),
+    0 1px 3px 0 rgba(0, 0, 0, 0.08),
+    0 0 0 1px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--leh-border, #d3e6bc);
+  display: flex;
+  flex-direction: column;
+  animation: insModalSlidePop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+  box-sizing: border-box;
+  font-family: var(--leh-font, inherit);
+}
+
+/* Modal Sizes */
+.ins-modal--sm {
+  max-width: 480px;
+}
+
+.ins-modal--md {
+  max-width: 640px;
+}
+
+.ins-modal--lg {
+  max-width: 880px;
+}
+
+.ins-modal--xl {
+  max-width: 1040px;
+}
+
+/* Mobile full-height sheet adaptation */
+@media (max-width: 639px) {
+  .ins-modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .ins-modal {
+    max-width: 100% !important;
+    max-height: 94vh;
+    border-radius: 20px 20px 0 0;
+    border-bottom: none;
+  }
+}
+
+/* ── Three Modal Zones: Header, Body, Footer ── */
+.ins-modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--leh-border, #d3e6bc);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  background: #ffffff;
+  flex-shrink: 0;
+}
+
+.ins-modal-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  flex: 1;
+}
+
+.ins-modal-icon-badge {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: var(--leh-forest-tint, #eaf2e7);
+  color: var(--leh-forest, #2e5a26);
+  border: 1px solid var(--leh-border, #d3e6bc);
+}
+
+.ins-modal-icon-badge--forest {
+  background: #eaf2e7;
+  color: #2e5a26;
+  border-color: #d3e6bc;
+}
+
+.ins-modal-icon-badge--blue {
+  background: #e0f2fe;
+  color: #0284c7;
+  border-color: #bae6fd;
+}
+
+.ins-modal-icon-badge--amber {
+  background: #fef3c7;
+  color: #b45309;
+  border-color: #fde68a;
+}
+
+.ins-modal-icon-badge--red {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.ins-modal-icon-badge--indigo {
+  background: #e0e7ff;
+  color: #4338ca;
+  border-color: #c7d2fe;
+}
+
+.ins-modal-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.ins-modal-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--leh-ink, #14210f);
+  font-family: var(--leh-font, inherit);
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+.ins-modal-subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--leh-muted, #4a5e45);
+  line-height: 1.4;
+  font-weight: 400;
+}
+
+/* 36px Ghost Icon Close Button */
+.ins-modal-close-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  color: var(--leh-muted, #4a5e45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.18s ease;
+  padding: 0;
+}
+
+.ins-modal-close-btn:hover {
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--leh-ink, #14210f);
+}
+
+.ins-modal-close-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--leh-forest, #2e5a26);
+}
+
+/* Modal Body */
+.ins-modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.ins-modal-body::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.ins-modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.ins-modal-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 99px;
+}
+
+/* Modal Footer */
+.ins-modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--leh-border, #d3e6bc);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  background: #fbfdf9;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+/* ── Section Headings & Layout Grid ── */
+.ins-form-section {
+  margin-bottom: 24px;
+}
+
+.ins-form-section:last-child {
+  margin-bottom: 0;
+}
+
+.ins-form-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--leh-muted, #4a5e45);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ins-form-section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--leh-border-light, #e4efda);
+}
+
+.ins-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  column-gap: 20px;
+  row-gap: 18px;
+}
+
+@media (max-width: 639px) {
+  .ins-form-grid {
+    grid-template-columns: 1fr;
+    row-gap: 16px;
+  }
+}
+
+.ins-col-span-2 {
+  grid-column: span 2;
+}
+
+@media (max-width: 639px) {
+  .ins-col-span-2 {
+    grid-column: span 1;
+  }
+}
+
+/* ── Form Field Wrapper (Section 2.1) ── */
+.ins-field-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ins-field-label {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--leh-ink, #14210f);
+  margin-bottom: 6px;
+  line-height: 1.3;
+  font-family: inherit;
+}
+
+.ins-required-star {
+  color: var(--leh-danger, #dc2626);
+  margin-left: 3px;
+  font-weight: 700;
+}
+
+.ins-control-container {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+/* Helper Text & Error Message (Section 2.1) */
+.ins-field-helper {
+  font-size: 12.5px;
+  color: var(--leh-muted, #4a5e45);
+  margin-top: 5px;
+  line-height: 1.3;
+}
+
+.ins-field-error {
+  font-size: 12.5px;
+  color: var(--leh-danger, #dc2626);
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  line-height: 1.3;
+  font-weight: 500;
+}
+
+/* ── Form Controls (Section 2.2) ── */
+.ins-control-input,
+.ins-control-select,
+.ins-control-date {
+  height: 42px;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0 12px;
+  background: #ffffff;
+  font-size: 15px;
+  color: var(--leh-ink, #14210f);
+  font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  outline: none;
+}
+
+.ins-control-textarea {
+  min-height: 96px;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #ffffff;
+  font-size: 15px;
+  color: var(--leh-ink, #14210f);
+  font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  outline: none;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.ins-control-input::placeholder,
+.ins-control-textarea::placeholder {
+  color: var(--leh-placeholder, #8aa887);
+}
+
+/* Hover state */
+.ins-control-input:hover,
+.ins-control-select:hover,
+.ins-control-date:hover,
+.ins-control-textarea:hover {
+  border-color: #94a3b8;
+}
+
+/* Focus state: 2px primary ring with offset, no black outline */
+.ins-control-input:focus,
+.ins-control-select:focus,
+.ins-control-date:focus,
+.ins-control-textarea:focus {
+  border-color: var(--leh-forest, #2e5a26);
+  box-shadow: 0 0 0 2px rgba(46, 90, 38, 0.2);
+  outline: none;
+}
+
+/* Disabled state */
+.ins-control-input:disabled,
+.ins-control-select:disabled,
+.ins-control-date:disabled,
+.ins-control-textarea:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+  border-color: #e2e8f0;
+}
+
+/* Invalid state */
+.ins-control-input--invalid,
+.ins-control-select--invalid,
+.ins-control-date--invalid,
+.ins-control-textarea--invalid {
+  border-color: var(--leh-danger, #dc2626) !important;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2) !important;
+}
+
+/* ── Select Control (Section 2.3) ── */
+.ins-control-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%234A5E45'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  padding-right: 36px;
+  cursor: pointer;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* Date control picker icon alignment */
+.ins-control-date::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: opacity(0.65);
+}
+
+/* Currency input prefix */
+.ins-currency-wrapper {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.ins-currency-symbol {
+  position: absolute;
+  left: 12px;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--leh-forest, #2e5a26);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.ins-control-input--currency {
+  padding-left: 32px !important;
+  font-weight: 600;
+}
+
+/* ── Buttons (Section 2.5) ── */
+.ins-btn-primary {
+  height: 42px;
+  padding: 0 20px;
+  background: var(--leh-forest, #2e5a26);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  box-sizing: border-box;
+}
+
+.ins-btn-primary:hover:not(:disabled) {
+  background: var(--leh-forest-hover, #24471e);
+  box-shadow: 0 2px 6px rgba(46, 90, 38, 0.25);
+}
+
+.ins-btn-primary:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.ins-btn-primary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(46, 90, 38, 0.35);
+}
+
+.ins-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ins-btn-secondary {
+  height: 42px;
+  padding: 0 20px;
+  background: #ffffff;
+  color: var(--leh-forest, #2e5a26);
+  border: 1px solid var(--leh-forest, #2e5a26);
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  box-sizing: border-box;
+}
+
+.ins-btn-secondary:hover:not(:disabled) {
+  background: var(--leh-forest-tint, #eaf2e7);
+}
+
+.ins-btn-secondary:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.ins-btn-secondary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(46, 90, 38, 0.25);
+}
+
+.ins-btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ins-btn-danger {
+  height: 42px;
+  padding: 0 20px;
+  background: var(--leh-danger, #dc2626);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  box-sizing: border-box;
+}
+
+.ins-btn-danger:hover:not(:disabled) {
+  background: #b91c1c;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25);
+}
+
+.ins-btn-danger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.35);
+}
+
+.ins-btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Searchable Combobox & Patient Picker (Section 2.4) ── */
+.ins-combobox {
+  position: relative;
+  width: 100%;
+}
+
+.ins-combobox-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.ins-combobox-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--leh-muted, #4a5e45);
+  pointer-events: none;
+}
+
+.ins-combobox-input {
+  padding-left: 38px !important;
+  padding-right: 36px !important;
+}
+
+.ins-combobox-clear {
+  position: absolute;
+  right: 10px;
+  background: transparent;
+  border: none;
+  color: var(--leh-muted, #4a5e45);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.ins-combobox-clear:hover {
+  color: var(--leh-ink, #14210f);
+  background: #e2e8f0;
+}
+
+.ins-combobox-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid var(--leh-border, #d3e6bc);
+  border-radius: 10px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  max-height: 260px;
+  overflow-y: auto;
+  z-index: 2100;
+  padding: 6px 0;
+}
+
+.ins-combobox-option {
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.ins-combobox-option:hover,
+.ins-combobox-option--highlighted {
+  background: var(--leh-forest-tint, #eaf2e7);
+}
+
+.ins-combobox-option-primary {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--leh-ink, #14210f);
+}
+
+.ins-combobox-option-secondary {
+  font-size: 12px;
+  color: var(--leh-muted, #4a5e45);
+}
+
+.ins-combobox-empty {
+  padding: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--leh-muted, #4a5e45);
+}
+
+/* Patient Selected Chip inside Picker */
+.ins-patient-selected-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--leh-forest-tint, #eaf2e7);
+  border: 1.5px solid var(--leh-border, #d3e6bc);
+  border-radius: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ins-patient-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ins-patient-card-name {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--leh-ink, #14210f);
+}
+
+.ins-patient-card-details {
+  font-size: 12px;
+  color: var(--leh-muted, #4a5e45);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ins-patient-card-tag {
+  background: var(--leh-lime, #c0ff72);
+  color: var(--leh-ink, #14210f);
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.ins-patient-clear-btn {
+  background: #ffffff;
+  border: 1px solid var(--leh-border, #d3e6bc);
+  color: var(--leh-muted, #4a5e45);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ins-patient-clear-btn:hover {
+  background: var(--leh-danger-bg, #fef2f2);
+  color: var(--leh-danger, #dc2626);
+  border-color: var(--leh-danger-border, #fecaca);
+}
+
+/* Top error summary inside modal body */
+.ins-error-summary {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: #991b1b;
+  font-size: 13.5px;
+}
+
+.ins-error-summary svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}

@@ -1,11 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Plus, Edit2, Trash2, Search, Phone, Mail, X
+  Plus, Edit2, Trash2, Search, Phone, Mail,
+  Building2, Shield
 } from 'lucide-react';
 import { api } from '../../api';
 import { useNotification } from '../../context/NotificationContext';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { InsuranceNavHeader } from './InsuranceNavHeader';
+import {
+  InsuranceModal,
+  FormField,
+  FormInput,
+  FormSelect,
+  FormTextarea,
+  FormButton,
+  FormGrid,
+  FormSection
+} from '../../components/insurance';
 import './Insurance.css';
 
 export const PayersPlans: React.FC = () => {
@@ -417,190 +428,247 @@ export const PayersPlans: React.FC = () => {
       </div>
 
       {/* Payer Modal */}
-      {payerModal.open && (
-        <div className="ins-modal-overlay">
-          <div className="ins-modal">
-            <div className="ins-modal-header">
-              <h3 style={{ margin: 0, fontSize: '1.25rem' }}>
-                {payerModal.editingId ? 'Edit Payer' : 'Register New Insurance Payer'}
-              </h3>
-              <button className="btn btn-sm btn-link" onClick={() => setPayerModal({ ...payerModal, open: false })}>
-                <X size={20} />
-              </button>
-            </div>
-            <div className="ins-modal-body">
-              <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>Payer / HMO Name *</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="e.g. Hygeia HMO"
-                  value={payerModal.name}
-                  onChange={(e) => setPayerModal({ ...payerModal, name: e.target.value })}
-                />
-              </div>
+      <InsuranceModal
+        isOpen={payerModal.open}
+        onClose={() => setPayerModal({ ...payerModal, open: false })}
+        title={payerModal.editingId ? 'Edit Insurance Payer' : 'Register New Insurance Payer'}
+        subtitle="Configure HMO corporate details and standard payment terms"
+        icon={<Building2 size={20} />}
+        size="md"
+        isDirty={Boolean(payerModal.name || payerModal.code)}
+        footer={
+          <>
+            <FormButton
+              type="button"
+              variant="secondary"
+              onClick={() => setPayerModal({ ...payerModal, open: false })}
+            >
+              Cancel
+            </FormButton>
+            <FormButton
+              type="button"
+              variant="primary"
+              disabled={!payerModal.name.trim()}
+              onClick={handleSavePayer}
+            >
+              {payerModal.editingId ? 'Save Changes' : 'Save Payer'}
+            </FormButton>
+          </>
+        }
+      >
+        <FormSection title="Corporate Details">
+          <FormGrid>
+            <FormField
+              id="payer-name"
+              label="Payer / HMO Name"
+              required
+              fullWidth
+              helperText="Official corporate entity name recognized by billing"
+            >
+              <FormInput
+                id="payer-name"
+                type="text"
+                placeholder="e.g. Hygeia HMO"
+                value={payerModal.name}
+                onChange={(e) => setPayerModal({ ...payerModal, name: e.target.value })}
+              />
+            </FormField>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Payer Code</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="e.g. HYG"
-                    value={payerModal.code}
-                    onChange={(e) => setPayerModal({ ...payerModal, code: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Type</label>
-                  <select
-                    className="form-select"
-                    value={payerModal.type}
-                    onChange={(e) => setPayerModal({ ...payerModal, type: e.target.value })}
-                  >
-                    <option value="HMO">Private HMO</option>
-                    <option value="NHIA">NHIA (National)</option>
-                    <option value="STATE_SCHEME">State Health Scheme</option>
-                    <option value="CORPORATE">Corporate Direct</option>
-                  </select>
-                </div>
-              </div>
+            <FormField id="payer-code" label="Payer Code" helperText="3-5 character identifier">
+              <FormInput
+                id="payer-code"
+                type="text"
+                placeholder="e.g. HYG"
+                value={payerModal.code}
+                onChange={(e) => setPayerModal({ ...payerModal, code: e.target.value.toUpperCase() })}
+              />
+            </FormField>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Contact Person</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={payerModal.contact_person}
-                    onChange={(e) => setPayerModal({ ...payerModal, contact_person: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Payment Terms (Days)</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    value={payerModal.payment_terms_days}
-                    onChange={(e) => setPayerModal({ ...payerModal, payment_terms_days: parseInt(e.target.value) || 30 })}
-                  />
-                </div>
-              </div>
+            <FormField id="payer-type" label="Scheme Type">
+              <FormSelect
+                id="payer-type"
+                value={payerModal.type}
+                onChange={(e) => setPayerModal({ ...payerModal, type: e.target.value })}
+              >
+                <option value="HMO">Private HMO</option>
+                <option value="NHIA">NHIA (National)</option>
+                <option value="STATE_SCHEME">State Health Scheme</option>
+                <option value="CORPORATE">Corporate Direct</option>
+              </FormSelect>
+            </FormField>
+          </FormGrid>
+        </FormSection>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Phone</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={payerModal.phone}
-                    onChange={(e) => setPayerModal({ ...payerModal, phone: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Email</label>
-                  <input
-                    type="email"
-                    className="form-control"
-                    value={payerModal.email}
-                    onChange={(e) => setPayerModal({ ...payerModal, email: e.target.value })}
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="ins-modal-footer">
-              <button className="btn-leh-secondary" onClick={() => setPayerModal({ ...payerModal, open: false })}>
-                Cancel
-              </button>
-              <button className="btn-leh-forest" onClick={handleSavePayer}>
-                Save Payer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+        <FormSection title="Contact & Settlement Terms">
+          <FormGrid>
+            <FormField id="payer-contact" label="Contact Person">
+              <FormInput
+                id="payer-contact"
+                type="text"
+                placeholder="e.g. Desk Officer / Claims Lead"
+                value={payerModal.contact_person}
+                onChange={(e) => setPayerModal({ ...payerModal, contact_person: e.target.value })}
+              />
+            </FormField>
+
+            <FormField id="payer-terms" label="Payment Terms (Days)" helperText="Contractual settlement timeline">
+              <FormInput
+                id="payer-terms"
+                type="number"
+                min={0}
+                value={payerModal.payment_terms_days}
+                onChange={(e) =>
+                  setPayerModal({
+                    ...payerModal,
+                    payment_terms_days: parseInt(e.target.value) || 30
+                  })
+                }
+              />
+            </FormField>
+
+            <FormField id="payer-phone" label="Phone Number">
+              <FormInput
+                id="payer-phone"
+                type="tel"
+                placeholder="e.g. 08012345678"
+                value={payerModal.phone}
+                onChange={(e) => setPayerModal({ ...payerModal, phone: e.target.value })}
+              />
+            </FormField>
+
+            <FormField id="payer-email" label="Email Address">
+              <FormInput
+                id="payer-email"
+                type="email"
+                placeholder="claims@payer.com"
+                value={payerModal.email}
+                onChange={(e) => setPayerModal({ ...payerModal, email: e.target.value })}
+              />
+            </FormField>
+          </FormGrid>
+        </FormSection>
+      </InsuranceModal>
 
       {/* Plan Modal */}
-      {planModal.open && (
-        <div className="ins-modal-overlay">
-          <div className="ins-modal">
-            <div className="ins-modal-header">
-              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>
-                {planModal.editingId ? 'Edit Plan' : `Add Plan to ${selectedPayer?.name}`}
-              </h3>
-              <button className="btn btn-sm btn-link" onClick={() => setPlanModal({ ...planModal, open: false })}>
-                <X size={20} />
-              </button>
-            </div>
-            <div className="ins-modal-body">
-              <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>Plan Name *</label>
+      <InsuranceModal
+        isOpen={planModal.open}
+        onClose={() => setPlanModal({ ...planModal, open: false })}
+        title={planModal.editingId ? 'Edit Plan' : `Add Plan to ${selectedPayer?.name || 'Payer'}`}
+        subtitle="Define policy copay rates and authorization prerequisites"
+        icon={<Shield size={20} />}
+        size="md"
+        isDirty={Boolean(planModal.name || planModal.code)}
+        footer={
+          <>
+            <FormButton
+              type="button"
+              variant="secondary"
+              onClick={() => setPlanModal({ ...planModal, open: false })}
+            >
+              Cancel
+            </FormButton>
+            <FormButton
+              type="button"
+              variant="primary"
+              disabled={!planModal.name.trim()}
+              onClick={handleSavePlan}
+            >
+              {planModal.editingId ? 'Save Changes' : 'Save Plan'}
+            </FormButton>
+          </>
+        }
+      >
+        <FormSection title="Plan Specification">
+          <FormGrid>
+            <FormField id="plan-name" label="Plan Name" required fullWidth>
+              <FormInput
+                id="plan-name"
+                type="text"
+                placeholder="e.g. Gold Comprehensive Plan"
+                value={planModal.name}
+                onChange={(e) => setPlanModal({ ...planModal, name: e.target.value })}
+              />
+            </FormField>
+
+            <FormField id="plan-code" label="Plan Code" helperText="Short acronym">
+              <FormInput
+                id="plan-code"
+                type="text"
+                placeholder="e.g. GLD"
+                value={planModal.code}
+                onChange={(e) => setPlanModal({ ...planModal, code: e.target.value.toUpperCase() })}
+              />
+            </FormField>
+
+            <FormField id="plan-copay" label="Default Copay %" helperText="0 to 100 percent">
+              <FormInput
+                id="plan-copay"
+                type="number"
+                min={0}
+                max={100}
+                value={planModal.copay_percentage}
+                onChange={(e) =>
+                  setPlanModal({
+                    ...planModal,
+                    copay_percentage: parseInt(e.target.value) || 0
+                  })
+                }
+              />
+            </FormField>
+
+            <FormField
+              id="plan-desc"
+              label="Description & Limitations"
+              fullWidth
+              helperText="Benefit notes, coverage caps, exclusions"
+            >
+              <FormTextarea
+                id="plan-desc"
+                rows={2}
+                placeholder="Benefit notes, coverage limitations, optical caps..."
+                value={planModal.description}
+                onChange={(e) => setPlanModal({ ...planModal, description: e.target.value })}
+              />
+            </FormField>
+
+            <div
+              className="ins-col-span-2"
+              style={{
+                padding: '12px 16px',
+                background: '#f8fafc',
+                borderRadius: '8px',
+                border: '1px solid #e2e8f0'
+              }}
+            >
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  fontSize: '13.5px',
+                  fontWeight: 600,
+                  color: 'var(--leh-ink)'
+                }}
+              >
                 <input
-                  type="text"
-                  className="form-control"
-                  placeholder="e.g. Gold Comprehensive Plan"
-                  value={planModal.name}
-                  onChange={(e) => setPlanModal({ ...planModal, name: e.target.value })}
+                  type="checkbox"
+                  style={{ width: '16px', height: '16px', accentColor: 'var(--leh-forest)' }}
+                  checked={planModal.requires_authorization_default}
+                  onChange={(e) =>
+                    setPlanModal({
+                      ...planModal,
+                      requires_authorization_default: e.target.checked
+                    })
+                  }
                 />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Plan Code</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="e.g. GLD"
-                    value={planModal.code}
-                    onChange={(e) => setPlanModal({ ...planModal, code: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Default Copay %</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    className="form-control"
-                    value={planModal.copay_percentage}
-                    onChange={(e) => setPlanModal({ ...planModal, copay_percentage: parseInt(e.target.value) || 0 })}
-                  />
-                </div>
-              </div>
-
-              <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>Description</label>
-                <textarea
-                  className="form-control"
-                  rows={2}
-                  placeholder="Benefit notes, coverage limitations..."
-                  value={planModal.description}
-                  onChange={(e) => setPlanModal({ ...planModal, description: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={planModal.requires_authorization_default}
-                    onChange={(e) => setPlanModal({ ...planModal, requires_authorization_default: e.target.checked })}
-                  />
-                  <span>By default, procedures under this plan require Pre-Authorization</span>
-                </label>
-              </div>
+                <span>By default, procedures under this plan require Pre-Authorization</span>
+              </label>
             </div>
-            <div className="ins-modal-footer">
-              <button className="btn-leh-secondary" onClick={() => setPlanModal({ ...planModal, open: false })}>
-                Cancel
-              </button>
-              <button className="btn-leh-forest" onClick={handleSavePlan}>
-                Save Plan
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </FormGrid>
+        </FormSection>
+      </InsuranceModal>
     </div>
   );
 };
+
