@@ -560,45 +560,71 @@ export const InsuranceClaims: React.FC = () => {
         <div className="ins-modal-overlay">
           <div className="ins-modal">
             <div className="ins-modal-header">
-              <h3 style={{ margin: 0, fontSize: '1.25rem' }}>Create Claim Batch</h3>
-              <button className="btn btn-sm btn-link" onClick={() => setIsBatchModalOpen(false)}>
-                <X size={20} />
+              <div className="ins-modal-header-left">
+                <div className="ins-modal-icon-badge ins-modal-icon-badge--forest">
+                  <Layers size={22} />
+                </div>
+                <div className="ins-modal-title-wrap">
+                  <h3 className="ins-modal-title">Create Claim Batch</h3>
+                  <div className="ins-modal-subtitle">Package selected claims for formal payer submission</div>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                className="ins-modal-close-btn" 
+                onClick={() => setIsBatchModalOpen(false)}
+                title="Close modal"
+              >
+                <X size={18} />
               </button>
             </div>
+
             <div className="ins-modal-body">
-              <p style={{ fontSize: '0.875rem', color: 'var(--leh-muted)' }}>
-                You are packaging {selectedClaimIds.length} claim(s) into a formal submission batch for an HMO/NHIA payer.
-              </p>
-              <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>Select Payer *</label>
+              {/* Batch scope banner */}
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '12px 16px', marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#15803d', fontWeight: 800, fontSize: '15px' }}>
+                  {selectedClaimIds.length}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '13px', color: '#166534' }}>Packaging {selectedClaimIds.length} Claim(s)</div>
+                  <div style={{ fontSize: '12px', color: '#15803d' }}>Selected claims will be grouped into a single submission batch with unique tracking ref</div>
+                </div>
+              </div>
+
+              <div className="ins-form-group">
+                <label className="ins-form-label">
+                  Select Payer / HMO <span className="ins-form-label-required">*</span>
+                </label>
                 <select
-                  className="form-select"
+                  className="ins-form-select"
                   value={batchPayerId}
                   onChange={(e) => setBatchPayerId(e.target.value)}
                 >
-                  <option value="">-- Choose Payer --</option>
+                  <option value="">-- Choose Payer / Scheme --</option>
                   {payers.map((p) => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
               </div>
-              <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>Batch Notes / Transmission Ref</label>
+
+              <div className="ins-form-group">
+                <label className="ins-form-label">Batch Transmission Notes / Ref</label>
                 <textarea
-                  className="form-control"
+                  className="ins-form-textarea"
                   rows={3}
-                  placeholder="e.g. Month-end physical dispatch via courier ref #..."
+                  placeholder="e.g. Month-end batch dispatch via clearinghouse portal or courier ref #..."
                   value={batchNotes}
                   onChange={(e) => setBatchNotes(e.target.value)}
                 />
               </div>
             </div>
+
             <div className="ins-modal-footer">
               <button type="button" className="btn-leh-secondary" onClick={() => setIsBatchModalOpen(false)}>
                 Cancel
               </button>
               <button type="button" className="btn-leh-forest" onClick={handleCreateBatch}>
-                <Layers size={14} /> Create Batch
+                <Layers size={14} /> Create Batch ({selectedClaimIds.length})
               </button>
             </div>
           </div>
@@ -610,44 +636,71 @@ export const InsuranceClaims: React.FC = () => {
         <div className="ins-modal-overlay">
           <div className="ins-modal">
             <div className="ins-modal-header">
-              <h3 style={{ margin: 0, fontSize: '1.25rem' }}>
-                Update Status to {transitionModal.targetStatus}
-              </h3>
+              <div className="ins-modal-header-left">
+                <div className={`ins-modal-icon-badge ${['REJECTED', 'CANCELLED'].includes(transitionModal.targetStatus) ? 'ins-modal-icon-badge--red' : ['QUERIED'].includes(transitionModal.targetStatus) ? 'ins-modal-icon-badge--amber' : 'ins-modal-icon-badge--forest'}`}>
+                  {['REJECTED', 'CANCELLED'].includes(transitionModal.targetStatus) ? (
+                    <AlertCircle size={22} />
+                  ) : ['QUERIED'].includes(transitionModal.targetStatus) ? (
+                    <RotateCcw size={22} />
+                  ) : (
+                    <CheckCircle2 size={22} />
+                  )}
+                </div>
+                <div className="ins-modal-title-wrap">
+                  <h3 className="ins-modal-title">Transition to {transitionModal.targetStatus}</h3>
+                  <div className="ins-modal-subtitle">Update claim lifecycle status with audit trail notes</div>
+                </div>
+              </div>
               <button
                 type="button"
-                className="btn btn-sm btn-link"
+                className="ins-modal-close-btn"
                 onClick={() => setTransitionModal({ open: false, claim: null, targetStatus: '', reason: '', note: '' })}
+                title="Close modal"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
+
             <div className="ins-modal-body">
-              <p>
-                Claim: <strong>{transitionModal.claim?.claim_number}</strong> ({transitionModal.claim?.patient_name})
-              </p>
+              {/* Claim identifier banner */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--leh-muted)', fontWeight: 700 }}>Claim Reference</div>
+                  <div style={{ fontWeight: 800, fontSize: '14px', color: 'var(--leh-ink)' }}>{transitionModal.claim?.claim_number}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--leh-muted)', fontWeight: 700 }}>Patient</div>
+                  <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--leh-forest)' }}>{transitionModal.claim?.patient_name}</div>
+                </div>
+              </div>
+
               {['REJECTED', 'QUERIED', 'CANCELLED'].includes(transitionModal.targetStatus) && (
-                <div style={{ marginBottom: '1rem' }}>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Reason *</label>
+                <div className="ins-form-group">
+                  <label className="ins-form-label">
+                    Reason Code / Summary <span className="ins-form-label-required">*</span>
+                  </label>
                   <input
                     type="text"
-                    className="form-control"
-                    placeholder="Enter reason code or summary..."
+                    className="ins-form-input"
+                    placeholder="Enter standard denial code or reason..."
                     value={transitionModal.reason}
                     onChange={(e) => setTransitionModal({ ...transitionModal, reason: e.target.value })}
                   />
                 </div>
               )}
-              <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>Notes / Audit Comment</label>
+
+              <div className="ins-form-group">
+                <label className="ins-form-label">Notes / Audit Comment</label>
                 <textarea
-                  className="form-control"
+                  className="ins-form-textarea"
                   rows={3}
-                  placeholder="Optional details for audit trail..."
+                  placeholder="Optional details for audit log and timeline..."
                   value={transitionModal.note}
                   onChange={(e) => setTransitionModal({ ...transitionModal, note: e.target.value })}
                 />
               </div>
             </div>
+
             <div className="ins-modal-footer">
               <button
                 type="button"
@@ -667,38 +720,51 @@ export const InsuranceClaims: React.FC = () => {
       {/* EDI Clearinghouse Bridge Modal */}
       {ediModal && (
         <div className="ins-modal-overlay">
-          <div className="ins-modal" style={{ maxWidth: '900px', width: '96vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+          <div className="ins-modal" style={{ maxWidth: '960px', width: '96vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
             <div className="ins-modal-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <Network size={20} />
-                <h3 style={{ margin: 0, fontSize: '1.2rem' }}>EDI Clearinghouse Bridge</h3>
-                <span
-                  style={{
-                    fontSize: '0.72rem',
-                    fontWeight: 600,
-                    padding: '2px 8px',
-                    borderRadius: '12px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    background: ediWsConnected ? '#dcfce7' : '#f1f5f9',
-                    color: ediWsConnected ? '#15803d' : '#64748b',
-                    marginLeft: '0.5rem',
-                  }}
-                  title={ediWsConnected ? 'Connected to server WebSocket: live queue push active' : 'WebSocket disconnected: 15s fallback poll active'}
-                >
-                  <span
-                    style={{
-                      width: '6px',
-                      height: '6px',
-                      borderRadius: '50%',
-                      background: ediWsConnected ? '#16a34a' : '#94a3b8',
-                    }}
-                  />
-                  {ediWsConnected ? 'Live Push' : 'Fallback Poll'}
-                </span>
+              <div className="ins-modal-header-left">
+                <div className="ins-modal-icon-badge ins-modal-icon-badge--indigo">
+                  <Network size={22} />
+                </div>
+                <div className="ins-modal-title-wrap">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <h3 className="ins-modal-title">EDI Clearinghouse Bridge</h3>
+                    <span
+                      style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        padding: '3px 9px',
+                        borderRadius: '12px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        background: ediWsConnected ? '#dcfce7' : '#f1f5f9',
+                        color: ediWsConnected ? '#15803d' : '#64748b',
+                      }}
+                      title={ediWsConnected ? 'Connected to server WebSocket: live queue push active' : 'WebSocket disconnected: 15s fallback poll active'}
+                    >
+                      <span
+                        style={{
+                          width: '6px',
+                          height: '6px',
+                          borderRadius: '50%',
+                          background: ediWsConnected ? '#16a34a' : '#94a3b8',
+                        }}
+                      />
+                      {ediWsConnected ? 'Live Push' : 'Fallback Poll'}
+                    </span>
+                  </div>
+                  <div className="ins-modal-subtitle">Automated electronic claims transmission & protocol gateway</div>
+                </div>
               </div>
-              <button className="btn btn-sm btn-link" onClick={() => setEdiModal(false)}><X size={20} /></button>
+              <button 
+                type="button" 
+                className="ins-modal-close-btn" 
+                onClick={() => setEdiModal(false)}
+                title="Close modal"
+              >
+                <X size={18} />
+              </button>
             </div>
 
             {/* Tabs */}
@@ -885,84 +951,87 @@ export const InsuranceClaims: React.FC = () => {
                       const edit = ediConfigEdit[cfg.payer_id] ?? cfg;
                       const setEdit = (patch: any) => setEdiConfigEdit((prev) => ({ ...prev, [cfg.payer_id]: { ...(prev[cfg.payer_id] ?? cfg), ...patch } }));
                       return (
-                        <div key={cfg.payer_id} style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '1rem 1.25rem', marginBottom: '1rem' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                            <strong style={{ fontSize: '1rem' }}>{cfg.payer_name} <span style={{ fontSize: '0.78rem', color: 'var(--leh-muted)' }}>({cfg.payer_code})</span></strong>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+                      <div key={cfg.payer_id} className="ins-modal-section-card" style={{ marginBottom: '12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                            <strong style={{ fontSize: '0.95rem', color: 'var(--leh-ink)' }}>
+                              {cfg.payer_name}
+                              <span style={{ fontSize: '0.78rem', color: 'var(--leh-muted)', marginLeft: '6px', fontWeight: 400 }}>({cfg.payer_code})</span>
+                            </strong>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.83rem', fontWeight: 600, color: 'var(--leh-forest)' }}>
                               <input type="checkbox" checked={!!edit.is_enabled} onChange={(e) => setEdit({ is_enabled: e.target.checked ? 1 : 0 })} />
                               Enabled
                             </label>
                           </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                            <div>
-                              <label className="form-label" style={{ fontWeight: 600, fontSize: '0.82rem' }}>Protocol</label>
-                              <select className="form-select" style={{ height: '34px', fontSize: '0.85rem' }} value={edit.protocol || 'LOCAL_FOLDER'} onChange={(e) => setEdit({ protocol: e.target.value })}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                            <div className="ins-form-group" style={{ marginBottom: 0 }}>
+                              <label className="ins-form-label">Protocol</label>
+                              <select className="ins-form-select" value={edit.protocol || 'LOCAL_FOLDER'} onChange={(e) => setEdit({ protocol: e.target.value })}>
                                 <option value="LOCAL_FOLDER">LOCAL_FOLDER (File Drop)</option>
                                 <option value="REST_WEBHOOK">REST_WEBHOOK (HTTP POST)</option>
                                 <option value="SFTP">SFTP</option>
                               </select>
                             </div>
-                            <div>
-                              <label className="form-label" style={{ fontWeight: 600, fontSize: '0.82rem' }}>Format</label>
-                              <select className="form-select" style={{ height: '34px', fontSize: '0.85rem' }} value={edit.format || 'JSON'} onChange={(e) => setEdit({ format: e.target.value })}>
+                            <div className="ins-form-group" style={{ marginBottom: 0 }}>
+                              <label className="ins-form-label">Format</label>
+                              <select className="ins-form-select" value={edit.format || 'JSON'} onChange={(e) => setEdit({ format: e.target.value })}>
                                 <option value="JSON">JSON</option>
                                 <option value="CSV">CSV</option>
                               </select>
                             </div>
-                            <div>
-                              <label className="form-label" style={{ fontWeight: 600, fontSize: '0.82rem' }}>Auto-Dispatch</label>
-                              <select className="form-select" style={{ height: '34px', fontSize: '0.85rem' }} value={edit.auto_dispatch ? '1' : '0'} onChange={(e) => setEdit({ auto_dispatch: e.target.value === '1' ? 1 : 0 })}>
+                            <div className="ins-form-group" style={{ marginBottom: 0 }}>
+                              <label className="ins-form-label">Auto-Dispatch</label>
+                              <select className="ins-form-select" value={edit.auto_dispatch ? '1' : '0'} onChange={(e) => setEdit({ auto_dispatch: e.target.value === '1' ? 1 : 0 })}>
                                 <option value="0">Manual only</option>
                                 <option value="1">Every 30 min (cron)</option>
                               </select>
                             </div>
                           </div>
                           {edit.protocol === 'LOCAL_FOLDER' && (
-                            <div style={{ marginBottom: '0.75rem' }}>
-                              <label className="form-label" style={{ fontWeight: 600, fontSize: '0.82rem' }}>Local Folder Path</label>
-                              <input type="text" className="form-control" style={{ fontSize: '0.85rem' }} placeholder="e.g. C:\\EDI\\Outbox or ./edi_exports" value={edit.local_folder_path || ''} onChange={(e) => setEdit({ local_folder_path: e.target.value })} />
+                            <div className="ins-form-group" style={{ marginBottom: '12px' }}>
+                              <label className="ins-form-label">Local Folder Path</label>
+                              <input type="text" className="ins-form-input" placeholder="e.g. C:\\EDI\\Outbox or ./edi_exports" value={edit.local_folder_path || ''} onChange={(e) => setEdit({ local_folder_path: e.target.value })} />
                             </div>
                           )}
                           {edit.protocol === 'REST_WEBHOOK' && (
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                              <div>
-                                <label className="form-label" style={{ fontWeight: 600, fontSize: '0.82rem' }}>Webhook URL</label>
-                                <input type="text" className="form-control" style={{ fontSize: '0.85rem' }} placeholder="https://hmo-portal.com/api/claims" value={edit.webhook_url || ''} onChange={(e) => setEdit({ webhook_url: e.target.value })} />
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                              <div className="ins-form-group" style={{ marginBottom: 0 }}>
+                                <label className="ins-form-label">Webhook URL</label>
+                                <input type="text" className="ins-form-input" placeholder="https://hmo-portal.com/api/claims" value={edit.webhook_url || ''} onChange={(e) => setEdit({ webhook_url: e.target.value })} />
                               </div>
-                              <div>
-                                <label className="form-label" style={{ fontWeight: 600, fontSize: '0.82rem' }}>Auth Header (optional)</label>
-                                <input type="text" className="form-control" style={{ fontSize: '0.85rem' }} placeholder="Bearer token or API key" value={edit.webhook_auth_header || ''} onChange={(e) => setEdit({ webhook_auth_header: e.target.value })} />
+                              <div className="ins-form-group" style={{ marginBottom: 0 }}>
+                                <label className="ins-form-label">Auth Header (optional)</label>
+                                <input type="text" className="ins-form-input" placeholder="Bearer token or API key" value={edit.webhook_auth_header || ''} onChange={(e) => setEdit({ webhook_auth_header: e.target.value })} />
                               </div>
                             </div>
                           )}
                           {edit.protocol === 'SFTP' && (
-                            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                              <div>
-                                <label className="form-label" style={{ fontWeight: 600, fontSize: '0.82rem' }}>SFTP Host</label>
-                                <input type="text" className="form-control" style={{ fontSize: '0.85rem' }} placeholder="sftp.hmo.com" value={edit.sftp_host || ''} onChange={(e) => setEdit({ sftp_host: e.target.value })} />
+                            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                              <div className="ins-form-group" style={{ marginBottom: 0 }}>
+                                <label className="ins-form-label">SFTP Host</label>
+                                <input type="text" className="ins-form-input" placeholder="sftp.hmo.com" value={edit.sftp_host || ''} onChange={(e) => setEdit({ sftp_host: e.target.value })} />
                               </div>
-                              <div>
-                                <label className="form-label" style={{ fontWeight: 600, fontSize: '0.82rem' }}>Port</label>
-                                <input type="number" className="form-control" style={{ fontSize: '0.85rem' }} placeholder="22" value={edit.sftp_port || 22} onChange={(e) => setEdit({ sftp_port: parseInt(e.target.value) })} />
+                              <div className="ins-form-group" style={{ marginBottom: 0 }}>
+                                <label className="ins-form-label">Port</label>
+                                <input type="number" className="ins-form-input" placeholder="22" value={edit.sftp_port || 22} onChange={(e) => setEdit({ sftp_port: parseInt(e.target.value) })} />
                               </div>
-                              <div>
-                                <label className="form-label" style={{ fontWeight: 600, fontSize: '0.82rem' }}>Username</label>
-                                <input type="text" className="form-control" style={{ fontSize: '0.85rem' }} value={edit.sftp_username || ''} onChange={(e) => setEdit({ sftp_username: e.target.value })} />
+                              <div className="ins-form-group" style={{ marginBottom: 0 }}>
+                                <label className="ins-form-label">Username</label>
+                                <input type="text" className="ins-form-input" value={edit.sftp_username || ''} onChange={(e) => setEdit({ sftp_username: e.target.value })} />
                               </div>
-                              <div>
-                                <label className="form-label" style={{ fontWeight: 600, fontSize: '0.82rem' }}>Password</label>
-                                <input type="password" className="form-control" style={{ fontSize: '0.85rem' }} value={edit.sftp_password || ''} onChange={(e) => setEdit({ sftp_password: e.target.value })} />
+                              <div className="ins-form-group" style={{ marginBottom: 0 }}>
+                                <label className="ins-form-label">Password</label>
+                                <input type="password" className="ins-form-input" value={edit.sftp_password || ''} onChange={(e) => setEdit({ sftp_password: e.target.value })} />
                               </div>
-                              <div style={{ gridColumn: 'span 2' }}>
-                                <label className="form-label" style={{ fontWeight: 600, fontSize: '0.82rem' }}>Remote Path</label>
-                                <input type="text" className="form-control" style={{ fontSize: '0.85rem' }} placeholder="/claims/inbound" value={edit.sftp_remote_path || ''} onChange={(e) => setEdit({ sftp_remote_path: e.target.value })} />
+                              <div className="ins-form-group" style={{ marginBottom: 0, gridColumn: 'span 2' }}>
+                                <label className="ins-form-label">Remote Path</label>
+                                <input type="text" className="ins-form-input" placeholder="/claims/inbound" value={edit.sftp_remote_path || ''} onChange={(e) => setEdit({ sftp_remote_path: e.target.value })} />
                               </div>
                             </div>
                           )}
                           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                             <button
-                              className="btn btn-sm btn-primary"
-                              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: '#6366f1' }}
+                              className="btn-leh-forest"
+                              style={{ fontSize: '0.82rem', padding: '0.4rem 1rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
                               disabled={savingConfigId === cfg.payer_id}
                               onClick={() => handleSaveEdiConfig(cfg.payer_id)}
                             >
@@ -979,10 +1048,10 @@ export const InsuranceClaims: React.FC = () => {
             </div>
 
             <div className="ins-modal-footer">
-              <button className="btn btn-secondary" onClick={() => setEdiModal(false)}>Close</button>
+              <button type="button" className="btn-leh-secondary" onClick={() => setEdiModal(false)}>Close</button>
               {ediTab === 'transmit' && (
-                <button className="btn btn-sm" style={{ background: '#f1f5f9', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.4rem' }} onClick={loadEdiData}>
-                  <RefreshCw size={13} /> Refresh
+                <button type="button" className="btn-leh-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }} onClick={loadEdiData}>
+                  <RefreshCw size={13} /> Refresh Queue
                 </button>
               )}
             </div>

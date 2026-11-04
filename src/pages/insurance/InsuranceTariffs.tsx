@@ -433,60 +433,97 @@ export const InsuranceTariffs: React.FC = () => {
         <div className="ins-modal-overlay">
           <div className="ins-modal">
             <div className="ins-modal-header">
-              <h3 style={{ margin: 0, fontSize: '1.25rem' }}>{modal.editingId ? 'Edit Tariff Schedule' : 'Add Agreed Tariff Rate'}</h3>
-              <button className="btn btn-sm btn-link" onClick={() => setModal(EMPTY_MODAL)}><X size={20} /></button>
+              <div className="ins-modal-header-left">
+                <div className="ins-modal-icon-badge ins-modal-icon-badge--forest">
+                  <DollarSign size={22} />
+                </div>
+                <div className="ins-modal-title-wrap">
+                  <h3 className="ins-modal-title">{modal.editingId ? 'Edit Agreed Tariff' : 'Add Agreed Tariff Rate'}</h3>
+                  <div className="ins-modal-subtitle">Define contracted fee schedule and pre-authorization policy</div>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                className="ins-modal-close-btn" 
+                onClick={() => setModal(EMPTY_MODAL)}
+                title="Close modal"
+              >
+                <X size={18} />
+              </button>
             </div>
+
             <div className="ins-modal-body">
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Payer *</label>
-                  <select className="form-select" value={modal.payer_id} onChange={(e) => setModal({ ...modal, payer_id: e.target.value, plan_id: '' })}>
+                <div className="ins-form-group">
+                  <label className="ins-form-label">
+                    Payer / HMO <span className="ins-form-label-required">*</span>
+                  </label>
+                  <select className="ins-form-select" value={modal.payer_id} onChange={(e) => setModal({ ...modal, payer_id: e.target.value, plan_id: '' })}>
                     <option value="">-- Choose Payer --</option>
                     {payers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Plan (Optional)</label>
-                  <select className="form-select" value={modal.plan_id} onChange={(e) => setModal({ ...modal, plan_id: e.target.value })}>
+                <div className="ins-form-group">
+                  <label className="ins-form-label">Plan (Optional)</label>
+                  <select className="ins-form-select" value={modal.plan_id} onChange={(e) => setModal({ ...modal, plan_id: e.target.value })}>
                     <option value="">-- All Plans Under Payer --</option>
                     {availablePlans.map((pl) => <option key={pl.id} value={pl.id}>{pl.plan_name}</option>)}
                   </select>
                 </div>
               </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Category</label>
-                  <select className="form-select" value={modal.item_type} onChange={(e) => setModal({ ...modal, item_type: e.target.value })}>
+                <div className="ins-form-group">
+                  <label className="ins-form-label">Category</label>
+                  <select className="ins-form-select" value={modal.item_type} onChange={(e) => setModal({ ...modal, item_type: e.target.value })}>
                     {ITEM_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Item Code / Ref ID</label>
-                  <input type="text" className="form-control" placeholder="e.g. VIS-OCT-01" value={modal.item_ref_id} onChange={(e) => setModal({ ...modal, item_ref_id: e.target.value })} />
+                <div className="ins-form-group">
+                  <label className="ins-form-label">Item Code / Ref ID</label>
+                  <input type="text" className="ins-form-input" placeholder="e.g. VIS-OCT-01" value={modal.item_ref_id} onChange={(e) => setModal({ ...modal, item_ref_id: e.target.value })} />
                 </div>
               </div>
-              <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>Item / Procedure Description *</label>
-                <input type="text" className="form-control" placeholder="e.g. Visual Field Analysis (Humphrey)" value={modal.item_description} onChange={(e) => setModal({ ...modal, item_description: e.target.value })} />
+
+              <div className="ins-form-group">
+                <label className="ins-form-label">
+                  Item / Procedure Description <span className="ins-form-label-required">*</span>
+                </label>
+                <input type="text" className="ins-form-input" placeholder="e.g. Visual Field Analysis (Humphrey)" value={modal.item_description} onChange={(e) => setModal({ ...modal, item_description: e.target.value })} />
               </div>
-              <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>Payer Agreed Price (\u20a6) *</label>
-                <input type="number" min={0} className="form-control" placeholder="e.g. 15000" value={modal.payer_price || ''} onChange={(e) => setModal({ ...modal, payer_price: parseFloat(e.target.value) || 0 })} />
+
+              <div className="ins-form-group">
+                <label className="ins-form-label">
+                  Payer Agreed Price (₦) <span className="ins-form-label-required">*</span>
+                </label>
+                <div className="ins-currency-input-wrap">
+                  <span className="ins-currency-prefix">₦</span>
+                  <input 
+                    type="number" 
+                    min={0} 
+                    className="ins-form-input ins-form-input--currency" 
+                    placeholder="0.00" 
+                    value={modal.payer_price || ''} 
+                    onChange={(e) => setModal({ ...modal, payer_price: parseFloat(e.target.value) || 0 })} 
+                  />
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: '2rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+
+              <div style={{ display: 'flex', gap: '2rem', padding: '10px 14px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
                   <input type="checkbox" checked={modal.covered} onChange={(e) => setModal({ ...modal, covered: e.target.checked })} />
                   <span>Covered by Payer</span>
                 </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
                   <input type="checkbox" checked={modal.requires_preauth} onChange={(e) => setModal({ ...modal, requires_preauth: e.target.checked })} />
                   <span>Requires Pre-Authorization</span>
                 </label>
               </div>
             </div>
+
             <div className="ins-modal-footer">
-              <button className="btn-leh-secondary" onClick={() => setModal(EMPTY_MODAL)}>Cancel</button>
-              <button className="btn-leh-forest" onClick={handleSave}>Save Tariff</button>
+              <button type="button" className="btn-leh-secondary" onClick={() => setModal(EMPTY_MODAL)}>Cancel</button>
+              <button type="button" className="btn-leh-forest" onClick={handleSave}>Save Tariff</button>
             </div>
           </div>
         </div>
@@ -495,13 +532,25 @@ export const InsuranceTariffs: React.FC = () => {
       {/* Bulk Import Modal */}
       {importModal && (
         <div className="ins-modal-overlay">
-          <div className="ins-modal" style={{ maxWidth: '780px', width: '95vw' }}>
+          <div className="ins-modal" style={{ maxWidth: '820px', width: '95vw' }}>
             <div className="ins-modal-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <Upload size={20} color="var(--leh-forest)" />
-                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Bulk Tariff Import — HMO CSV Upload</h3>
+              <div className="ins-modal-header-left">
+                <div className="ins-modal-icon-badge ins-modal-icon-badge--blue">
+                  <Upload size={22} />
+                </div>
+                <div className="ins-modal-title-wrap">
+                  <h3 className="ins-modal-title">Bulk Tariff Import — HMO CSV Upload</h3>
+                  <div className="ins-modal-subtitle">Upload contracted pricing catalog from Excel / CSV template</div>
+                </div>
               </div>
-              <button className="btn btn-sm btn-link" onClick={closeImportModal}><X size={20} /></button>
+              <button 
+                type="button" 
+                className="ins-modal-close-btn" 
+                onClick={closeImportModal}
+                title="Close modal"
+              >
+                <X size={18} />
+              </button>
             </div>
 
             <div className="ins-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -524,16 +573,18 @@ export const InsuranceTariffs: React.FC = () => {
 
               {/* Step 2 */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Step 2 — Select Payer *</label>
-                  <select className="form-select" value={importPayerId} onChange={(e) => { setImportPayerId(e.target.value); setImportPlanId(''); }}>
+                <div className="ins-form-group">
+                  <label className="ins-form-label">
+                    Step 2 — Select Payer <span className="ins-form-label-required">*</span>
+                  </label>
+                  <select className="ins-form-select" value={importPayerId} onChange={(e) => { setImportPayerId(e.target.value); setImportPlanId(''); }}>
                     <option value="">-- Choose HMO / Payer --</option>
                     {payers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Plan (Optional)</label>
-                  <select className="form-select" value={importPlanId} onChange={(e) => setImportPlanId(e.target.value)} disabled={!importPayerId}>
+                <div className="ins-form-group">
+                  <label className="ins-form-label">Plan (Optional)</label>
+                  <select className="ins-form-select" value={importPlanId} onChange={(e) => setImportPlanId(e.target.value)} disabled={!importPayerId}>
                     <option value="">-- Apply to All Plans --</option>
                     {importAvailablePlans.map((pl) => <option key={pl.id} value={pl.id}>{pl.plan_name}</option>)}
                   </select>
@@ -542,7 +593,7 @@ export const InsuranceTariffs: React.FC = () => {
 
               {/* Step 3 */}
               <div>
-                <label className="form-label" style={{ fontWeight: 600 }}>Step 3 — Upload CSV File</label>
+                <label className="ins-form-label" style={{ fontWeight: 600 }}>Step 3 — Upload CSV File</label>
                 <div
                   style={{ border: '2px dashed var(--leh-border, #cbd5e1)', borderRadius: '12px', padding: '1.5rem', textAlign: 'center', cursor: 'pointer', background: 'var(--leh-card-bg, #f8fafc)', transition: 'border-color 0.2s' }}
                   onClick={() => fileInputRef.current?.click()}

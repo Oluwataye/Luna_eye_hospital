@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Users, Plus, Search, CheckCircle, Edit2, 
-  RefreshCw, X, Shield, AlertTriangle
+  RefreshCw, X, Shield, AlertTriangle, UserPlus
 } from 'lucide-react';
 import { api } from '../../api';
 import { useNotification } from '../../context/NotificationContext';
@@ -336,7 +336,7 @@ export const InsuranceEnrollees: React.FC = () => {
                       <div style={{ display: 'inline-flex', gap: '0.5rem' }}>
                         {enr.verification_status !== 'VERIFIED' && (
                           <button
-                            className="btn btn-sm btn-outline-success"
+                            className="ins-tbl-action-btn ins-tbl-action-btn--success"
                             title="Verify Enrollee"
                             onClick={() => handleVerify(enr.id, 'VERIFIED')}
                           >
@@ -345,7 +345,7 @@ export const InsuranceEnrollees: React.FC = () => {
                         )}
                         {enr.verification_status === 'PENDING' && (
                           <button
-                            className="btn btn-sm btn-outline-danger"
+                            className="ins-tbl-action-btn ins-tbl-action-btn--danger"
                             title="Reject Enrollee"
                             onClick={() => handleVerify(enr.id, 'REJECTED')}
                           >
@@ -353,7 +353,7 @@ export const InsuranceEnrollees: React.FC = () => {
                           </button>
                         )}
                         <button
-                          className="btn btn-sm btn-outline-secondary"
+                          className="ins-tbl-action-btn"
                           title="Edit Record"
                           onClick={() => openEdit(enr)}
                         >
@@ -374,19 +374,35 @@ export const InsuranceEnrollees: React.FC = () => {
         <div className="ins-modal-overlay">
           <div className="ins-modal">
             <div className="ins-modal-header">
-              <h3 style={{ margin: 0, fontSize: '1.25rem' }}>
-                {editingId ? 'Edit Enrollee Record' : 'Link Patient to Insurance Policy'}
-              </h3>
-              <button className="btn btn-sm btn-link" onClick={() => setIsModalOpen(false)}>
-                <X size={20} />
+              <div className="ins-modal-header-left">
+                <div className="ins-modal-icon-badge ins-modal-icon-badge--blue">
+                  <UserPlus size={22} />
+                </div>
+                <div className="ins-modal-title-wrap">
+                  <h3 className="ins-modal-title">
+                    {editingId ? 'Edit Enrollee Record' : 'Link Patient to Insurance Policy'}
+                  </h3>
+                  <div className="ins-modal-subtitle">Verify policy membership, coverage dates, and beneficiary tier</div>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                className="ins-modal-close-btn" 
+                onClick={() => setIsModalOpen(false)}
+                title="Close modal"
+              >
+                <X size={18} />
               </button>
             </div>
+
             <div className="ins-modal-body">
-              <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>Patient File Number / ID *</label>
+              <div className="ins-form-group">
+                <label className="ins-form-label">
+                  Patient File Number / ID <span className="ins-form-label-required">*</span>
+                </label>
                 <input
                   type="text"
-                  className="form-control"
+                  className="ins-form-input"
                   placeholder="e.g. PAT-00102"
                   disabled={!!editingId}
                   value={formData.patient_id}
@@ -395,10 +411,12 @@ export const InsuranceEnrollees: React.FC = () => {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Payer / HMO *</label>
+                <div className="ins-form-group">
+                  <label className="ins-form-label">
+                    Payer / HMO <span className="ins-form-label-required">*</span>
+                  </label>
                   <select
-                    className="form-select"
+                    className="ins-form-select"
                     value={formData.payer_id}
                     onChange={(e) => setFormData({ ...formData, payer_id: e.target.value, plan_id: '' })}
                   >
@@ -408,10 +426,10 @@ export const InsuranceEnrollees: React.FC = () => {
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Specific Plan</label>
+                <div className="ins-form-group">
+                  <label className="ins-form-label">Specific Plan</label>
                   <select
-                    className="form-select"
+                    className="ins-form-select"
                     value={formData.plan_id}
                     onChange={(e) => setFormData({ ...formData, plan_id: e.target.value })}
                   >
@@ -424,20 +442,22 @@ export const InsuranceEnrollees: React.FC = () => {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Policy / Enrollee Number *</label>
+                <div className="ins-form-group">
+                  <label className="ins-form-label">
+                    Policy / Enrollee Number <span className="ins-form-label-required">*</span>
+                  </label>
                   <input
                     type="text"
-                    className="form-control"
+                    className="ins-form-input"
                     placeholder="e.g. NHIA/2026/88921"
                     value={formData.enrollee_number}
                     onChange={(e) => setFormData({ ...formData, enrollee_number: e.target.value })}
                   />
                 </div>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Relationship</label>
+                <div className="ins-form-group">
+                  <label className="ins-form-label">Relationship</label>
                   <select
-                    className="form-select"
+                    className="ins-form-select"
                     value={formData.relationship}
                     onChange={(e) => setFormData({ ...formData, relationship: e.target.value })}
                   >
@@ -449,32 +469,33 @@ export const InsuranceEnrollees: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Valid From</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="ins-form-group">
+                  <label className="ins-form-label">Valid From</label>
                   <input
                     type="date"
-                    className="form-control"
+                    className="ins-form-input"
                     value={formData.valid_from}
                     onChange={(e) => setFormData({ ...formData, valid_from: e.target.value })}
                   />
                 </div>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Valid Until</label>
+                <div className="ins-form-group">
+                  <label className="ins-form-label">Valid Until</label>
                   <input
                     type="date"
-                    className="form-control"
+                    className="ins-form-input"
                     value={formData.valid_to}
                     onChange={(e) => setFormData({ ...formData, valid_to: e.target.value })}
                   />
                 </div>
               </div>
             </div>
+
             <div className="ins-modal-footer">
-              <button className="btn-leh-secondary" onClick={() => setIsModalOpen(false)}>
+              <button type="button" className="btn-leh-secondary" onClick={() => setIsModalOpen(false)}>
                 Cancel
               </button>
-              <button className="btn-leh-forest" onClick={handleSave}>
+              <button type="button" className="btn-leh-forest" onClick={handleSave}>
                 {editingId ? 'Save Changes' : 'Register Enrollee'}
               </button>
             </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   CreditCard, Plus, CheckCircle2, Clock, 
-  RefreshCw, X
+  RefreshCw, X, Building2, DollarSign
 } from 'lucide-react';
 import { api } from '../../api';
 import { useNotification } from '../../context/NotificationContext';
@@ -325,8 +325,8 @@ export const InsuranceRemittances: React.FC = () => {
                       <td style={{ textAlign: 'center' }}>
                         {unallocated > 0 ? (
                           <button
-                            className="btn btn-sm btn-primary"
-                            style={{ background: 'var(--leh-forest)', fontSize: '0.75rem' }}
+                            className="btn-leh-forest"
+                            style={{ fontSize: '0.78rem', padding: '0.35rem 0.9rem' }}
                             onClick={() => openAllocationModal(rem)}
                           >
                             Allocate ({formatNaira(unallocated)})
@@ -346,105 +346,153 @@ export const InsuranceRemittances: React.FC = () => {
 
       {/* Record Remittance Modal */}
       {isRecordModalOpen && (
-        <div className="ins-modal-overlay">
-          <div className="ins-modal">
+        <div className="ins-modal-overlay" onClick={(e) => e.target === e.currentTarget && setIsRecordModalOpen(false)}>
+          <div className="ins-modal" style={{ maxWidth: '640px' }}>
             <div className="ins-modal-header">
-              <h3 style={{ margin: 0, fontSize: '1.25rem' }}>Record Inflow Remittance</h3>
-              <button className="btn btn-sm btn-link" onClick={() => setIsRecordModalOpen(false)}>
-                <X size={20} />
+              <div className="ins-modal-header-left">
+                <div className="ins-modal-icon-badge ins-modal-icon-badge--forest">
+                  <CreditCard size={22} />
+                </div>
+                <div className="ins-modal-title-wrap">
+                  <h3 className="ins-modal-title">Record Inflow Remittance</h3>
+                  <p className="ins-modal-subtitle">Log HMO electronic bank settlement advice and reconciliation credit</p>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                className="ins-modal-close-btn" 
+                onClick={() => setIsRecordModalOpen(false)}
+                aria-label="Close"
+              >
+                <X size={18} />
               </button>
             </div>
+
             <div className="ins-modal-body">
-              <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>Payer / HMO *</label>
-                <select
-                  className="form-select"
-                  value={recordForm.payer_id}
-                  onChange={(e) => setRecordForm({ ...recordForm, payer_id: e.target.value })}
-                >
-                  <option value="">-- Choose Payer --</option>
-                  {payers.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Payment Reference *</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="e.g. TRF/HYG/2026/01"
-                    value={recordForm.payment_reference}
-                    onChange={(e) => setRecordForm({ ...recordForm, payment_reference: e.target.value })}
-                  />
+              {/* Section 1: Payer & Payment Reference */}
+              <div className="ins-modal-section-card">
+                <div className="ins-modal-section-title">
+                  <Building2 size={14} /> Payer & Transaction Identification
                 </div>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Payment Date</label>
-                  <input
-                    type="date"
-                    className="form-control"
-                    value={recordForm.payment_date}
-                    onChange={(e) => setRecordForm({ ...recordForm, payment_date: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Total Remitted Amount (₦) *</label>
-                  <input
-                    type="number"
-                    min={0}
-                    className="form-control"
-                    placeholder="e.g. 500000"
-                    value={recordForm.total_amount}
-                    onChange={(e) => setRecordForm({ ...recordForm, total_amount: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Payment Method</label>
+                
+                <div className="ins-form-group">
+                  <label className="ins-form-label">
+                    Payer / HMO Network <span className="ins-form-label-required">*</span>
+                  </label>
                   <select
-                    className="form-select"
-                    value={recordForm.payment_method}
-                    onChange={(e) => setRecordForm({ ...recordForm, payment_method: e.target.value })}
+                    className="ins-form-select"
+                    value={recordForm.payer_id}
+                    onChange={(e) => setRecordForm({ ...recordForm, payer_id: e.target.value })}
                   >
-                    <option value="EFT">Electronic Bank Transfer (EFT)</option>
-                    <option value="CHEQUE">Bank Cheque</option>
-                    <option value="DIRECT_DEPOSIT">Direct Deposit</option>
+                    <option value="">-- Choose HMO / Insurance Payer --</option>
+                    {payers.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
                   </select>
                 </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '14px' }}>
+                  <div className="ins-form-group" style={{ marginBottom: 0 }}>
+                    <label className="ins-form-label">
+                      Payment / Bank Reference <span className="ins-form-label-required">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="ins-form-input"
+                      placeholder="e.g. TRF/HYG/2026/01 or NIP-88291"
+                      value={recordForm.payment_reference}
+                      onChange={(e) => setRecordForm({ ...recordForm, payment_reference: e.target.value })}
+                    />
+                  </div>
+                  <div className="ins-form-group" style={{ marginBottom: 0 }}>
+                    <label className="ins-form-label">Payment Date</label>
+                    <input
+                      type="date"
+                      className="ins-form-input"
+                      value={recordForm.payment_date}
+                      onChange={(e) => setRecordForm({ ...recordForm, payment_date: e.target.value })}
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>Hospital Receiving Bank</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="e.g. Zenith Bank - Operations Account"
-                  value={recordForm.bank_name}
-                  onChange={(e) => setRecordForm({ ...recordForm, bank_name: e.target.value })}
-                />
-              </div>
+              {/* Section 2: Financial Amount & Banking Details */}
+              <div className="ins-modal-section-card" style={{ marginBottom: 0 }}>
+                <div className="ins-modal-section-title">
+                  <DollarSign size={14} /> Settlement Amount & Bank Routing
+                </div>
 
-              <div>
-                <label className="form-label" style={{ fontWeight: 600 }}>Notes / Remittance Advice Details</label>
-                <textarea
-                  className="form-control"
-                  rows={2}
-                  placeholder="e.g. Covering claims submitted for January 2026..."
-                  value={recordForm.notes}
-                  onChange={(e) => setRecordForm({ ...recordForm, notes: e.target.value })}
-                />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                  <div className="ins-form-group" style={{ marginBottom: 0 }}>
+                    <label className="ins-form-label">
+                      Total Remitted Amount <span className="ins-form-label-required">*</span>
+                    </label>
+                    <div className="ins-currency-input-wrap">
+                      <span className="ins-currency-prefix">₦</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        className="ins-form-input ins-form-input--currency"
+                        placeholder="0.00"
+                        value={recordForm.total_amount}
+                        onChange={(e) => setRecordForm({ ...recordForm, total_amount: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="ins-form-group" style={{ marginBottom: 0 }}>
+                    <label className="ins-form-label">Settlement Channel</label>
+                    <select
+                      className="ins-form-select"
+                      value={recordForm.payment_method}
+                      onChange={(e) => setRecordForm({ ...recordForm, payment_method: e.target.value })}
+                    >
+                      <option value="EFT">Electronic Bank Transfer (EFT)</option>
+                      <option value="CHEQUE">Bank Cheque / Draft</option>
+                      <option value="DIRECT_DEPOSIT">Direct Over-the-Counter Deposit</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="ins-form-group">
+                  <label className="ins-form-label">Hospital Receiving Bank Account</label>
+                  <input
+                    type="text"
+                    className="ins-form-input"
+                    placeholder="e.g. Zenith Bank - Operations Account (1012998231)"
+                    value={recordForm.bank_name}
+                    onChange={(e) => setRecordForm({ ...recordForm, bank_name: e.target.value })}
+                  />
+                </div>
+
+                <div className="ins-form-group" style={{ marginBottom: 0 }}>
+                  <label className="ins-form-label">Remittance Advice Notes / Description</label>
+                  <textarea
+                    className="ins-form-textarea"
+                    rows={2}
+                    placeholder="e.g. Inflow remittance covering approved claims for January 2026..."
+                    value={recordForm.notes}
+                    onChange={(e) => setRecordForm({ ...recordForm, notes: e.target.value })}
+                  />
+                </div>
               </div>
             </div>
+
             <div className="ins-modal-footer">
-              <button className="btn-leh-secondary" onClick={() => setIsRecordModalOpen(false)}>
+              <button 
+                type="button" 
+                className="btn-leh-secondary" 
+                onClick={() => setIsRecordModalOpen(false)}
+              >
                 Cancel
               </button>
-              <button className="btn-leh-forest" onClick={handleCreateRemittance}>
-                Save Remittance
+              <button 
+                type="button" 
+                className="btn-leh-forest" 
+                onClick={handleCreateRemittance}
+              >
+                <CheckCircle2 size={15} /> Save Inflow Remittance
               </button>
             </div>
           </div>
@@ -453,58 +501,87 @@ export const InsuranceRemittances: React.FC = () => {
 
       {/* Allocation Modal */}
       {allocationModal.open && (
-        <div className="ins-modal-overlay">
-          <div className="ins-modal" style={{ maxWidth: '850px' }}>
+        <div className="ins-modal-overlay" onClick={(e) => e.target === e.currentTarget && setAllocationModal({ ...allocationModal, open: false })}>
+          <div className="ins-modal" style={{ maxWidth: '880px' }}>
             <div className="ins-modal-header">
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.25rem' }}>
-                  Allocate Remittance: {allocationModal.remittance?.payment_reference}
-                </h3>
-                <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--leh-muted)' }}>
-                  Payer: <strong>{allocationModal.remittance?.payer_name}</strong> &bull; Total Available: {formatNaira(allocationModal.remittance?.unallocated_amount)}
-                </p>
+              <div className="ins-modal-header-left">
+                <div className="ins-modal-icon-badge ins-modal-icon-badge--blue">
+                  <CreditCard size={22} />
+                </div>
+                <div className="ins-modal-title-wrap">
+                  <h3 className="ins-modal-title">
+                    Allocate Remittance: {allocationModal.remittance?.payment_reference}
+                  </h3>
+                  <p className="ins-modal-subtitle">
+                    Payer: <strong>{allocationModal.remittance?.payer_name}</strong> &bull; Total Available Remittance: {formatNaira(allocationModal.remittance?.unallocated_amount)}
+                  </p>
+                </div>
               </div>
-              <button className="btn btn-sm btn-link" onClick={() => setAllocationModal({ ...allocationModal, open: false })}>
-                <X size={20} />
+              <button 
+                type="button" 
+                className="ins-modal-close-btn" 
+                onClick={() => setAllocationModal({ ...allocationModal, open: false })}
+                aria-label="Close"
+              >
+                <X size={18} />
               </button>
             </div>
 
             <div className="ins-modal-body">
-              {/* Live allocation counter */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem 1rem', background: '#f8fafc', borderRadius: '8px', marginBottom: '1rem', border: '1px solid #e2e8f0' }}>
-                <div>
-                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Allocating Now:</span>
-                  <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--leh-forest)' }}>
+              {/* Live allocation counter banner */}
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: '1fr 1fr', 
+                gap: '16px', 
+                padding: '16px 20px', 
+                background: '#fbfdf9', 
+                borderRadius: '14px', 
+                marginBottom: '18px', 
+                border: '1.5px solid var(--leh-border)' 
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--leh-muted)' }}>
+                    Allocating to Claims Now
+                  </span>
+                  <div style={{ fontWeight: 900, fontSize: '1.4rem', color: 'var(--leh-forest)', letterSpacing: '-0.02em', marginTop: '2px' }}>
                     ₦{totalAllocatedInModal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Remaining Balance:</span>
-                  <div style={{ fontWeight: 700, fontSize: '1.1rem', color: remainingUnallocatedInModal < 0 ? '#dc2626' : '#15803d' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--leh-muted)' }}>
+                    Remaining Unallocated Balance
+                  </span>
+                  <div style={{ 
+                    fontWeight: 900, 
+                    fontSize: '1.4rem', 
+                    color: remainingUnallocatedInModal < 0 ? '#dc2626' : '#15803d', 
+                    letterSpacing: '-0.02em', 
+                    marginTop: '2px' 
+                  }}>
                     ₦{remainingUnallocatedInModal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                 </div>
               </div>
 
               {allocationModal.loadingClaims ? (
-                <div style={{ padding: '2rem', textAlign: 'center' }}>
+                <div style={{ padding: '3rem', textAlign: 'center' }}>
                   <LoadingSpinner />
                 </div>
               ) : allocationModal.claims.length === 0 ? (
-                <p style={{ textAlign: 'center', color: 'var(--leh-muted)', padding: '2rem' }}>
-                  No open or unpaid claims found for this payer.
-                </p>
+                <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--leh-muted)' }}>
+                  <p style={{ margin: 0, fontWeight: 600 }}>No open or unpaid claims found for this payer.</p>
+                </div>
               ) : (
-                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                  <table className="insurance-table">
+                <div style={{ maxHeight: '380px', overflowY: 'auto', border: '1px solid var(--leh-border)', borderRadius: '14px' }}>
+                  <table className="insurance-table" style={{ margin: 0 }}>
                     <thead>
                       <tr>
-                        <th>Claim #</th>
-                        <th>Patient</th>
+                        <th>Claim Voucher</th>
+                        <th>Patient Name</th>
                         <th>Service Date</th>
                         <th style={{ textAlign: 'right' }}>Claimed</th>
                         <th style={{ textAlign: 'right' }}>Outstanding</th>
-                        <th style={{ width: '160px', textAlign: 'right' }}>Allocate (₦)</th>
+                        <th style={{ width: '170px', textAlign: 'right' }}>Allocate (₦)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -516,24 +593,27 @@ export const InsuranceRemittances: React.FC = () => {
 
                         return (
                           <tr key={clm.id}>
-                            <td style={{ fontWeight: 600 }}>{clm.claim_number}</td>
+                            <td style={{ fontWeight: 700, color: 'var(--leh-ink)' }}>{clm.claim_number}</td>
                             <td>{clm.patient_name || clm.patient_id}</td>
-                            <td>{clm.service_date}</td>
+                            <td style={{ color: 'var(--leh-muted)' }}>{clm.service_date}</td>
                             <td style={{ textAlign: 'right' }}>₦{claimedNaira.toLocaleString()}</td>
-                            <td style={{ textAlign: 'right', fontWeight: 600, color: '#b45309' }}>
+                            <td style={{ textAlign: 'right', fontWeight: 700, color: '#b45309' }}>
                               ₦{outstanding.toLocaleString()}
                             </td>
                             <td style={{ textAlign: 'right' }}>
-                              <input
-                                type="number"
-                                min={0}
-                                max={outstanding}
-                                className="form-control form-control-sm"
-                                style={{ textAlign: 'right' }}
-                                placeholder="0.00"
-                                value={currentVal}
-                                onChange={(e) => handleAllocationAmountChange(clm.id, parseFloat(e.target.value) || 0)}
-                              />
+                              <div className="ins-currency-input-wrap">
+                                <span className="ins-currency-prefix" style={{ fontSize: '13px', left: '10px' }}>₦</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={outstanding}
+                                  className="ins-form-input ins-form-input--currency"
+                                  style={{ textAlign: 'right', padding: '6px 10px 6px 24px', height: '34px', fontSize: '13px' }}
+                                  placeholder="0.00"
+                                  value={currentVal}
+                                  onChange={(e) => handleAllocationAmountChange(clm.id, parseFloat(e.target.value) || 0)}
+                                />
+                              </div>
                             </td>
                           </tr>
                         );
@@ -545,15 +625,20 @@ export const InsuranceRemittances: React.FC = () => {
             </div>
 
             <div className="ins-modal-footer">
-              <button className="btn-leh-secondary" onClick={() => setAllocationModal({ ...allocationModal, open: false })}>
+              <button 
+                type="button" 
+                className="btn-leh-secondary" 
+                onClick={() => setAllocationModal({ ...allocationModal, open: false })}
+              >
                 Cancel
               </button>
               <button
+                type="button"
                 className="btn-leh-forest"
                 disabled={totalAllocatedInModal <= 0 || remainingUnallocatedInModal < 0}
                 onClick={executeAllocation}
               >
-                Confirm Allocations
+                <CheckCircle2 size={15} /> Confirm Settlements ({Object.values(allocationModal.allocations).filter(v => v > 0).length} Claims)
               </button>
             </div>
           </div>
