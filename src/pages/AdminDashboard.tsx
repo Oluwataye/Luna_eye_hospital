@@ -176,7 +176,7 @@ export const AdminDashboard: React.FC = () => {
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '16px',
-                boxShadow: '0 20px 40px rgba(37, 99, 235, 0.2)'
+                boxShadow: '0 20px 40px rgba(46, 90, 38, 0.25)'
               }}>
                  <Zap size={24} />
                  <div>

@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Truck, ShoppingBag, Plus, FileText, 
-  Users, Loader2, Printer, Search, RefreshCw, ChevronRight, Package, ShieldCheck, X, Filter, ChevronLeft, CreditCard, Box, MessageSquare, Briefcase, Save
+  Users, Loader2, Printer, Search, RefreshCw, ChevronRight, Package, ShieldCheck, X, Filter, ChevronLeft, CreditCard, Box, MessageSquare, Briefcase, Save, Edit2, Trash2, Calendar
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { NairaIcon } from '../components/NairaIcon';
 import { api } from '../api';
 import { useNotification } from '../context/NotificationContext';
 import { formatDateStandard } from '../utils/date';
+import { InnerNavTabs } from '../components/InnerNavTabs';
 
 export const Procurement: React.FC = () => {
   const { notify } = useNotification();
@@ -25,6 +26,7 @@ export const Procurement: React.FC = () => {
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
   const [currentPage, setCurrentPage] = useState(1);
   const [supplierCurrentPage, setSupplierCurrentPage] = useState(1);
   const rowsPerPage = 20;
@@ -52,6 +54,34 @@ export const Procurement: React.FC = () => {
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [showProcurementModal, setShowProcurementModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Edit Procurement State
+  const [editModal, setEditModal] = useState<{ open: boolean; record: any | null }>({ open: false, record: null });
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editForm, setEditForm] = useState({
+    id: 0,
+    supplier_id: '',
+    item_name: '',
+    quantity_received: 1,
+    unit_cost: 0,
+    total_cost: 0,
+    invoice_number: '',
+    amount_paid: 0,
+    balance: 0,
+    status: 'Unpaid',
+    purchase_date: new Date().toISOString().split('T')[0],
+    received_by: localStorage.getItem('user_name') || 'Admin',
+    notes: ''
+  });
+
+  // Payment Update Modal State
+  const [payModal, setPayModal] = useState<{ open: boolean; record: any | null }>({ open: false, record: null });
+  const [paySubmitting, setPaySubmitting] = useState(false);
+  const [payForm, setPayForm] = useState({
+    amount_paid: 0,
+    payment_ref: '',
+    notes: ''
+  });
 
   const [supplierForm, setSupplierForm] = useState({
     name: '', contact_person: '', phone: '', email: '', address: ''
@@ -144,6 +174,104 @@ export const Procurement: React.FC = () => {
     }
   };
 
+  const handleOpenEdit = (p: any) => {
+    setEditForm({
+      id: p.id,
+      supplier_id: String(p.supplier_id || ''),
+      item_name: p.item_name || '',
+      quantity_received: Number(p.quantity_received) || 1,
+      unit_cost: Number(p.unit_cost) || 0,
+      total_cost: Number(p.total_cost) || 0,
+      invoice_number: p.invoice_number || '',
+      amount_paid: Number(p.amount_paid) || 0,
+      balance: Number(p.balance) || 0,
+      status: p.status || 'Unpaid',
+      purchase_date: p.purchase_date?.split('T')[0] || new Date().toISOString().split('T')[0],
+      received_by: p.received_by || localStorage.getItem('user_name') || 'Admin',
+      notes: p.notes || ''
+    });
+    setEditModal({ open: true, record: p });
+  };
+
+  const handleUpdateProcurement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editForm.supplier_id) return notify('error', 'Supplier partner is required');
+    if (!editForm.item_name) return notify('error', 'Item name is required');
+    
+    setEditSubmitting(true);
+    try {
+      const total = Number(editForm.quantity_received) * Number(editForm.unit_cost);
+      const bal = total - Number(editForm.amount_paid);
+      const computedStatus = bal <= 0 ? 'Paid' : (editForm.amount_paid > 0 ? 'Partial' : 'Unpaid');
+      
+      await api.updateProcurement(editForm.id, {
+        supplier_id: Number(editForm.supplier_id),
+        item_name: editForm.item_name,
+        quantity_received: Number(editForm.quantity_received),
+        unit_cost: Number(editForm.unit_cost),
+        total_cost: total,
+        invoice_number: editForm.invoice_number,
+        amount_paid: Number(editForm.amount_paid),
+        balance: Math.max(0, bal),
+        status: computedStatus,
+        purchase_date: editForm.purchase_date,
+        received_by: editForm.received_by,
+        notes: editForm.notes
+      });
+      notify('success', 'Procurement record updated successfully');
+      setEditModal({ open: false, record: null });
+      fetchData();
+    } catch (err: any) {
+      notify('error', err.message || 'Failed to update procurement');
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
+  const handleDeleteProcurement = async (id: number, itemName: string) => {
+    if (!window.confirm(`Are you sure you want to permanently delete procurement record for "${itemName}"? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      await api.deleteProcurement(id);
+      notify('success', 'Procurement record deleted successfully');
+      fetchData();
+    } catch (err: any) {
+      notify('error', err.message || 'Failed to delete procurement');
+    }
+  };
+
+  const handleOpenPay = (p: any) => {
+    setPayForm({
+      amount_paid: p.balance || 0,
+      payment_ref: '',
+      notes: ''
+    });
+    setPayModal({ open: true, record: p });
+  };
+
+  const handleRecordPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!payModal.record) return;
+    if (payForm.amount_paid <= 0) return notify('error', 'Payment amount must be greater than zero');
+    
+    setPaySubmitting(true);
+    try {
+      await api.updateProcurementPayment(payModal.record.id, {
+        amount_paid: Number(payForm.amount_paid),
+        payment_ref: payForm.payment_ref,
+        notes: payForm.notes
+      });
+      notify('success', 'Supplier payment recorded successfully');
+      setPayModal({ open: false, record: null });
+      fetchData();
+    } catch (err: any) {
+      notify('error', err.message || 'Failed to record supplier payment');
+    } finally {
+      setPaySubmitting(false);
+    }
+  };
+
   // Filtering Logic
   const filteredData = procurements.filter(p => {
     const matchesSearch = 
@@ -153,7 +281,16 @@ export const Procurement: React.FC = () => {
     
     const matchesStatus = statusFilter === 'All' || p.status === statusFilter;
     
-    return matchesSearch && matchesStatus;
+    let matchesDate = true;
+    const pDate = p.purchase_date?.split('T')[0] || '';
+    if (dateFilter.start) {
+      matchesDate = matchesDate && (pDate >= dateFilter.start);
+    }
+    if (dateFilter.end) {
+      matchesDate = matchesDate && (pDate <= dateFilter.end);
+    }
+    
+    return matchesSearch && matchesStatus && matchesDate;
   });
 
   // Supplier Filtering Logic
@@ -278,43 +415,16 @@ export const Procurement: React.FC = () => {
       </div>
 
       {/* Tabs Switcher */}
-      <div ref={tableRef} className="leh-table-card" style={{ padding: '8px', marginBottom: '24px', maxWidth: '420px' }}>
-        <div style={{ display: 'flex', gap: '4px' }}>
-          <button 
-            type="button"
-            onClick={() => handleTabChange('procurements')}
-            style={{ 
-              flex: 1, 
-              padding: '12px', 
-              borderRadius: '10px', 
-              border: 'none', 
-              background: activeTab === 'procurements' ? 'var(--leh-primary-light)' : 'transparent', 
-              color: activeTab === 'procurements' ? 'var(--leh-primary)' : 'var(--leh-text-grey)', 
-              fontWeight: '800', 
-              fontSize: '13px', 
-              cursor: 'pointer' 
-            }}
-          >
-            PROCUREMENT REGISTRY
-          </button>
-          <button 
-            type="button"
-            onClick={() => handleTabChange('suppliers')}
-            style={{ 
-              flex: 1, 
-              padding: '12px', 
-              borderRadius: '10px', 
-              border: 'none', 
-              background: activeTab === 'suppliers' ? 'var(--leh-primary-light)' : 'transparent', 
-              color: activeTab === 'suppliers' ? 'var(--leh-primary)' : 'var(--leh-text-grey)', 
-              fontWeight: '800', 
-              fontSize: '13px', 
-              cursor: 'pointer' 
-            }}
-          >
-            SUPPLIER REGISTRY
-          </button>
-        </div>
+      <div ref={tableRef} style={{ marginBottom: '24px' }}>
+        <InnerNavTabs<'procurements' | 'suppliers'>
+          tabs={[
+            { id: 'procurements', label: 'PROCUREMENT REGISTRY', icon: ShoppingBag },
+            { id: 'suppliers', label: 'SUPPLIER REGISTRY', icon: Truck }
+          ]}
+          activeTab={activeTab}
+          onChange={handleTabChange}
+          style={{ maxWidth: '440px' }}
+        />
       </div>
 
       {/* Filter & Search Bar */}
@@ -336,19 +446,52 @@ export const Procurement: React.FC = () => {
             )}
           </div>
           {activeTab === 'procurements' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '200px' }}>
-              <Filter size={16} style={{ color: 'var(--leh-text-grey)' }} />
-              <select 
-                className="leh-search-input" 
-                style={{ padding: '8px 12px' }}
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="All">All Statuses</option>
-                <option value="Paid">Paid</option>
-                <option value="Partial">Partial</option>
-                <option value="Unpaid">Unpaid</option>
-              </select>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '160px' }}>
+                <Filter size={16} style={{ color: 'var(--leh-text-grey)' }} />
+                <select 
+                  className="leh-search-input" 
+                  style={{ padding: '8px 12px' }}
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="Paid">Paid</option>
+                  <option value="Partial">Partial</option>
+                  <option value="Unpaid">Unpaid</option>
+                </select>
+              </div>
+
+              {/* Date-Range Filter */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Calendar size={16} style={{ color: 'var(--leh-text-grey)' }} />
+                <input 
+                  type="date"
+                  className="leh-search-input"
+                  style={{ padding: '6px 10px', fontSize: '12px' }}
+                  value={dateFilter.start}
+                  onChange={(e) => setDateFilter(prev => ({ ...prev, start: e.target.value }))}
+                  title="Filter from Date"
+                />
+                <span style={{ color: 'var(--leh-text-grey)', fontSize: '12px' }}>to</span>
+                <input 
+                  type="date"
+                  className="leh-search-input"
+                  style={{ padding: '6px 10px', fontSize: '12px' }}
+                  value={dateFilter.end}
+                  onChange={(e) => setDateFilter(prev => ({ ...prev, end: e.target.value }))}
+                  title="Filter to Date"
+                />
+                {(dateFilter.start || dateFilter.end) && (
+                  <button 
+                    className="leh-btn-outline" 
+                    style={{ height: '32px', fontSize: '10px', padding: '0 8px' }}
+                    onClick={() => setDateFilter({ start: '', end: '' })}
+                  >
+                    CLEAR
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -419,10 +562,37 @@ export const Procurement: React.FC = () => {
                           {p.status?.toUpperCase()}
                         </span>
                       </td>
-                      <td style={{ paddingRight: '32px', textAlign: 'right' }}>
-                        <button className="leh-refresh-btn" style={{ marginLeft: 'auto' }}>
-                          <ChevronRight size={14} />
-                        </button>
+                      <td style={{ paddingRight: '24px', textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                          {p.balance > 0 && (
+                            <button 
+                              className="leh-btn-outline" 
+                              style={{ height: '30px', padding: '0 8px', fontSize: '11px', color: 'var(--leh-success)', borderColor: 'var(--leh-success)' }}
+                              onClick={() => handleOpenPay(p)}
+                              data-tooltip="Record Payment towards balance"
+                            >
+                              <CreditCard size={12} style={{ marginRight: '4px' }} /> PAY
+                            </button>
+                          )}
+                          <button 
+                            className="leh-refresh-btn" 
+                            style={{ height: '30px', width: '30px', padding: 0 }}
+                            onClick={() => handleOpenEdit(p)}
+                            data-tooltip="Edit procurement record"
+                            aria-label="Edit procurement"
+                          >
+                            <Edit2 size={13} style={{ color: 'var(--leh-primary)' }} />
+                          </button>
+                          <button 
+                            className="leh-refresh-btn" 
+                            style={{ height: '30px', width: '30px', padding: 0 }}
+                            onClick={() => handleDeleteProcurement(p.id, p.item_name)}
+                            data-tooltip="Delete procurement record"
+                            aria-label="Delete procurement"
+                          >
+                            <Trash2 size={13} style={{ color: 'var(--leh-red)' }} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -836,12 +1006,12 @@ export const Procurement: React.FC = () => {
                 </div>
 
                 {/* Valuation Summary */}
-                <div style={{ background: 'var(--leh-primary-light)', padding: '24px', borderRadius: '20px', border: '1px solid rgba(37, 99, 235, 0.1)', marginBottom: '32px' }}>
+                <div style={{ background: 'var(--leh-forest-tint)', padding: '24px', borderRadius: '20px', border: '1px solid rgba(46, 90, 38, 0.12)', marginBottom: '32px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                     <span style={{ fontSize: '11px', fontWeight: '900', color: 'var(--leh-primary)', letterSpacing: '0.05em' }}>TOTAL ACQUISITION VALUE</span>
                     <span style={{ fontSize: '20px', fontWeight: '900', color: 'var(--leh-primary)' }}>₦{currentTotal.toLocaleString()}</span>
                   </div>
-                  <div style={{ height: '1px', background: 'rgba(37, 99, 235, 0.1)', margin: '12px 0' }}></div>
+                  <div style={{ height: '1px', background: 'rgba(46, 90, 38, 0.12)', margin: '12px 0' }}></div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '11px', fontWeight: '900', color: currentBalance > 0 ? 'var(--leh-red)' : 'var(--leh-green)', letterSpacing: '0.05em' }}>
                       {currentBalance > 0 ? 'OUTSTANDING LIABILITY' : 'FINANCIAL CLEARANCE'}
@@ -859,6 +1029,272 @@ export const Procurement: React.FC = () => {
                   <button type="submit" className="leh-btn-primary" style={{ flex: 2, height: '56px' }} disabled={isSubmitting}>
                     {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
                     <span>{isSubmitting ? 'PROCESSING...' : 'COMMIT PROCUREMENT RECORD'}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Procurement Modal */}
+      {editModal.open && (
+        <div className="leh-modal-overlay">
+          <div className="leh-modal-content" style={{ maxWidth: '800px' }}>
+            <div className="leh-modal-header">
+              <div className="leh-modal-title">
+                <Edit2 style={{ color: 'var(--leh-primary)' }} />
+                <span>Modify Procurement Record #{editForm.id}</span>
+              </div>
+              <button className="leh-modal-close" onClick={() => setEditModal({ open: false, record: null })}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="leh-modal-body">
+              <form onSubmit={handleUpdateProcurement}>
+                {/* Section 1: Logistics & Sourcing */}
+                <div className="leh-form-section">
+                  <h4 className="leh-form-section-title">
+                    <Truck size={14} /> Sourcing & Logistics
+                  </h4>
+                  <div className="leh-form-grid">
+                    <div className="leh-form-group full-width">
+                      <label className="leh-label">SUPPLIER PARTNER</label>
+                      <select 
+                        className="leh-select" 
+                        required
+                        value={editForm.supplier_id}
+                        onChange={(e) => setEditForm({...editForm, supplier_id: e.target.value})}
+                      >
+                        <option value="">Select an authorized supplier...</option>
+                        {suppliers.map(s => <option key={s.id} value={s.id}>{s.name.toUpperCase()}</option>)}
+                      </select>
+                    </div>
+                    <div className="leh-form-group">
+                      <label className="leh-label">INVOICE / RECEIPT NUMBER</label>
+                      <input 
+                        type="text" 
+                        className="leh-input" 
+                        required
+                        placeholder="e.g. INV/2026/045"
+                        value={editForm.invoice_number}
+                        onChange={(e) => setEditForm({...editForm, invoice_number: e.target.value})}
+                      />
+                    </div>
+                    <div className="leh-form-group">
+                      <label className="leh-label">DATE OF ACQUISITION</label>
+                      <input 
+                        type="date" 
+                        className="leh-input" 
+                        required
+                        value={editForm.purchase_date}
+                        onChange={(e) => setEditForm({...editForm, purchase_date: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 2: Asset Specification */}
+                <div className="leh-form-section">
+                  <h4 className="leh-form-section-title">
+                    <Package size={14} /> Clinical Asset Specification
+                  </h4>
+                  <div className="leh-form-grid">
+                    <div className="leh-form-group full-width">
+                      <label className="leh-label">ITEM NAME</label>
+                      <input 
+                        type="text" 
+                        className="leh-input" 
+                        required
+                        value={editForm.item_name}
+                        onChange={(e) => setEditForm({...editForm, item_name: e.target.value})}
+                      />
+                    </div>
+                    <div className="leh-form-group">
+                      <label className="leh-label">QUANTITY RECEIVED</label>
+                      <input 
+                        type="number" 
+                        className="leh-input" 
+                        required 
+                        min="1"
+                        value={editForm.quantity_received}
+                        onChange={(e) => setEditForm({...editForm, quantity_received: Number(e.target.value)})}
+                      />
+                    </div>
+                    <div className="leh-form-group">
+                      <label className="leh-label">UNIT COST (₦)</label>
+                      <input 
+                        type="number" 
+                        className="leh-input" 
+                        required 
+                        min="0"
+                        value={editForm.unit_cost}
+                        onChange={(e) => setEditForm({...editForm, unit_cost: Number(e.target.value)})}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 3: Financial Settlement */}
+                <div className="leh-form-section">
+                  <h4 className="leh-form-section-title">
+                    <CreditCard size={14} /> Financial Settlement Protocol
+                  </h4>
+                  <div className="leh-form-grid">
+                    <div className="leh-form-group">
+                      <label className="leh-label">AMOUNT PAID (₦)</label>
+                      <input 
+                        type="number" 
+                        className="leh-input" 
+                        min="0"
+                        style={{ borderLeft: '4px solid var(--leh-green)' }}
+                        value={editForm.amount_paid}
+                        onChange={(e) => setEditForm({...editForm, amount_paid: Number(e.target.value)})}
+                      />
+                    </div>
+                    <div className="leh-form-group">
+                      <label className="leh-label">SETTLEMENT STATUS</label>
+                      {(() => {
+                        const total = (Number(editForm.quantity_received) || 0) * (Number(editForm.unit_cost) || 0);
+                        const bal = total - (Number(editForm.amount_paid) || 0);
+                        return (
+                          <div className={`leh-badge ${bal <= 0 ? 'leh-badge-green' : (editForm.amount_paid > 0 ? 'leh-badge-amber' : 'leh-badge-red')}`} style={{ height: '48px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '900' }}>
+                            {bal <= 0 ? 'FULLY SETTLED' : (editForm.amount_paid > 0 ? 'PARTIAL PAYMENT' : 'ACCRUED LIABILITY')}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                    <div className="leh-form-group full-width">
+                      <label className="leh-label">PROCUREMENT NOTES / DISCREPANCIES</label>
+                      <textarea 
+                        className="leh-textarea" 
+                        rows={2}
+                        value={editForm.notes}
+                        onChange={(e) => setEditForm({...editForm, notes: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Valuation Summary */}
+                {(() => {
+                  const total = (Number(editForm.quantity_received) || 0) * (Number(editForm.unit_cost) || 0);
+                  const bal = total - (Number(editForm.amount_paid) || 0);
+                  return (
+                    <div style={{ background: 'var(--leh-forest-tint)', padding: '24px', borderRadius: '20px', border: '1px solid rgba(46, 90, 38, 0.12)', marginBottom: '32px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: '900', color: 'var(--leh-primary)', letterSpacing: '0.05em' }}>REVISED ACQUISITION VALUE</span>
+                        <span style={{ fontSize: '20px', fontWeight: '900', color: 'var(--leh-primary)' }}>₦{total.toLocaleString()}</span>
+                      </div>
+                      <div style={{ height: '1px', background: 'rgba(46, 90, 38, 0.12)', margin: '12px 0' }}></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '11px', fontWeight: '900', color: bal > 0 ? 'var(--leh-red)' : 'var(--leh-green)', letterSpacing: '0.05em' }}>
+                          {bal > 0 ? 'REVISED OUTSTANDING LIABILITY' : 'FINANCIAL CLEARANCE'}
+                        </span>
+                        <span style={{ fontSize: '20px', fontWeight: '900', color: bal > 0 ? 'var(--leh-red)' : 'var(--leh-green)' }}>
+                          ₦{Math.max(0, bal).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="leh-modal-footer" style={{ padding: '0' }}>
+                  <button type="button" onClick={() => setEditModal({ open: false, record: null })} className="leh-btn-outline" style={{ flex: 1, height: '56px' }}>
+                    CANCEL
+                  </button>
+                  <button type="submit" className="leh-btn-primary" style={{ flex: 2, height: '56px' }} disabled={editSubmitting}>
+                    {editSubmitting ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                    <span>{editSubmitting ? 'SAVING...' : 'SAVE MODIFICATIONS'}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Supplier Payment Update Modal */}
+      {payModal.open && payModal.record && (
+        <div className="leh-modal-overlay">
+          <div className="leh-modal-content" style={{ maxWidth: '560px' }}>
+            <div className="leh-modal-header">
+              <div className="leh-modal-title">
+                <CreditCard style={{ color: 'var(--leh-success)' }} />
+                <span>Disburse Supplier Payment</span>
+              </div>
+              <button className="leh-modal-close" onClick={() => setPayModal({ open: false, record: null })}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="leh-modal-body">
+              <form onSubmit={handleRecordPayment}>
+                {/* PO Context Info */}
+                <div style={{ background: '#f8fafc', padding: '16px 20px', borderRadius: '16px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '700' }}>SUPPLIER:</span>
+                    <span style={{ fontSize: '12px', fontWeight: '900', color: '#0f172a' }}>{payModal.record.supplier_name}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '700' }}>ITEM:</span>
+                    <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--leh-primary)' }}>{payModal.record.item_name}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '700' }}>INVOICE #:</span>
+                    <span style={{ fontSize: '12px', fontWeight: '800' }}>{payModal.record.invoice_number || 'N/A'}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #cbd5e1', paddingTop: '8px' }}>
+                    <span style={{ fontSize: '11px', color: '#b91c1c', fontWeight: '900' }}>OUTSTANDING BALANCE:</span>
+                    <span style={{ fontSize: '14px', fontWeight: '900', color: '#dc2626' }}>₦{payModal.record.balance?.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div className="leh-form-section">
+                  <div className="leh-form-grid">
+                    <div className="leh-form-group full-width">
+                      <label className="leh-label">PAYMENT DISBURSEMENT AMOUNT (₦)</label>
+                      <input 
+                        type="number" 
+                        className="leh-input" 
+                        required 
+                        min="1"
+                        max={payModal.record.balance || undefined}
+                        value={payForm.amount_paid}
+                        onChange={(e) => setPayForm({...payForm, amount_paid: Number(e.target.value)})}
+                      />
+                    </div>
+                    <div className="leh-form-group full-width">
+                      <label className="leh-label">TRANSACTION REFERENCE / CHEQUE #</label>
+                      <input 
+                        type="text" 
+                        className="leh-input" 
+                        placeholder="e.g. TRF/GTB/948201 or CHQ-0021"
+                        value={payForm.payment_ref}
+                        onChange={(e) => setPayForm({...payForm, payment_ref: e.target.value})}
+                      />
+                    </div>
+                    <div className="leh-form-group full-width">
+                      <label className="leh-label">DISBURSEMENT MEMO / NOTES</label>
+                      <textarea 
+                        className="leh-textarea" 
+                        rows={2}
+                        placeholder="Additional notes for bank reconciliation..."
+                        value={payForm.notes}
+                        onChange={(e) => setPayForm({...payForm, notes: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="leh-modal-footer" style={{ padding: '0', marginTop: '20px' }}>
+                  <button type="button" onClick={() => setPayModal({ open: false, record: null })} className="leh-btn-outline" style={{ flex: 1, height: '52px' }}>
+                    CANCEL
+                  </button>
+                  <button type="submit" className="leh-btn-primary" style={{ flex: 2, height: '52px' }} disabled={paySubmitting}>
+                    {paySubmitting ? <Loader2 className="animate-spin" size={18} /> : <CreditCard size={18} />}
+                    <span>{paySubmitting ? 'DISBURSING...' : 'CONFIRM PAYMENT'}</span>
                   </button>
                 </div>
               </form>

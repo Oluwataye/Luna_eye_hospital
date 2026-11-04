@@ -2,6 +2,8 @@
 ### Luna Eye Hospital • Complete Offline Hospital System
 > **Written for Everyone!** Whether you are 15 years old, a nurse, a clinic manager, or a tech beginner, this guide will walk you through setting up VisionCare EMR step-by-step. Zero coding experience needed!
 
+> 📖 **Comprehensive System Documentation**: For complete clinical module specifications, database schemas, CDS safety guards, bilingual drop schedules, hardware protocols, and API architecture, see [SYSTEM_DOCUMENTATION.md](file:///c:/Users/HP/Documents/Luna%20Eyes%20Hospital/SYSTEM_DOCUMENTATION.md).
+
 ---
 
 ## 🎮 How This Works (Imagine a Multiplayer Game!)
@@ -94,12 +96,19 @@ cd ..
 ```
 
 ### Step 3: Run the Development Server
+**Option A — Single Command (Recommended):**
 ```powershell
-# In one terminal window, start the Node backend:
+npm run dev:all
+```
+*This starts both the Vite frontend watcher and the Node backend server concurrently in one terminal with color-coded tags.*
+
+**Option B — Two Terminals:**
+```powershell
+# Terminal 1 — Node backend:
 cd server
 npm run dev
 
-# In a second terminal window, start the React frontend:
+# Terminal 2 — React frontend:
 npm run dev
 ```
 

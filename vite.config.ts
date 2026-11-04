@@ -23,7 +23,7 @@ export default defineConfig({
     proxy: {
       // Forward all /api calls to the backend dev server (PORT=3200 in server/.env)
       '/api': {
-        target: 'http://127.0.0.1:3200',
+        target: 'http://127.0.0.1:3203',
         changeOrigin: true,
         ws: true,
       }

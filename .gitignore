@@ -13,6 +13,7 @@ dist-ssr
 *.local
 
 # Editor directories and files
+.gemini/
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -46,6 +47,7 @@ err.txt
 node_err.txt
 node_out.txt
 out.txt
+server_out.txt
 scratch/
 test_query.cjs
 test_query.js

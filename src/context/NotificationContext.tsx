@@ -105,13 +105,13 @@ const ToastItem: React.FC<{ toast: Toast; onClose: (id: string) => void }> = ({ 
       Icon: AlertTriangle,
     },
     info: {
-      border: '#3b82f6',
+      border: 'var(--leh-info)',
       bg: '#eff6ff',
       iconBg: '#dbeafe',
-      iconColor: '#2563eb',
+      iconColor: 'var(--leh-info)',
       title: 'Info',
       titleColor: '#1d4ed8',
-      bar: '#3b82f6',
+      bar: 'var(--leh-info)',
       Icon: Info,
     },
   }[toast.type];

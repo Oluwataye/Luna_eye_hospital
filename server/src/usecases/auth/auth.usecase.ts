@@ -22,15 +22,16 @@ export class AuthUseCase {
       throw new Error('Authentication failed: Invalid credentials');
     }
 
+    const userEmail = user.email || `${user.username.toLowerCase()}@lunaeye.com`;
     const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role, full_name: user.full_name },
+      { id: user.id, username: user.username, email: userEmail, role: user.role, full_name: user.full_name },
       JWT_SECRET,
       { expiresIn: '30m' }
     );
 
     // Remove password before returning
     const { password: _, ...safeUser } = user;
-    return { token, user: safeUser };
+    return { token, user: { ...safeUser, email: userEmail } };
   }
 
   async logout(token: string): Promise<void> {

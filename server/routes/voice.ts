@@ -19,6 +19,7 @@ if (!fs.existsSync(AUDIO_DIR)) {
 const CONFIG_FILE = path.resolve(writableRootDir, 'voice_config.json');
 
 export interface VoiceConfig {
+  ai_enabled: boolean;
   active_whisper_model: string;
   device: string;
   compute_type: string;
@@ -30,6 +31,7 @@ export interface VoiceConfig {
 }
 
 const DEFAULT_CONFIG: VoiceConfig = {
+  ai_enabled: true,
   active_whisper_model: 'base.en',
   device: 'auto',
   compute_type: 'auto',
@@ -45,7 +47,11 @@ function getVoiceConfig(): VoiceConfig {
   try {
     if (fs.existsSync(CONFIG_FILE)) {
       const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
-      return { ...DEFAULT_CONFIG, ...data };
+      return {
+        ...DEFAULT_CONFIG,
+        ...data,
+        ai_enabled: data.ai_enabled !== false
+      };
     }
   } catch (err) {
     console.warn('[VOICE] Could not read voice_config.json, using defaults:', err);
@@ -55,9 +61,31 @@ function getVoiceConfig(): VoiceConfig {
 
 function saveVoiceConfig(config: Partial<VoiceConfig>): VoiceConfig {
   const current = getVoiceConfig();
-  const merged = { ...current, ...config };
+  const resolvedAi = config.ai_enabled !== undefined
+    ? Boolean(config.ai_enabled)
+    : (current.ai_enabled !== false);
+
+  const merged: VoiceConfig = {
+    ...current,
+    ...config,
+    ai_enabled: resolvedAi
+  };
   try {
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(merged, null, 2), 'utf-8');
+    // Also sync to packaged-release/voice_config.json or server/voice_config.json if running in different directories
+    const syncCandidates = [
+      path.resolve(serverRootDir, 'voice_config.json'),
+      path.resolve(serverRootDir, '..', 'packaged-release', 'voice_config.json'),
+      path.resolve(serverRootDir, 'packaged-release', 'voice_config.json'),
+      path.resolve(__dirname, '..', 'voice_config.json')
+    ];
+    for (const p of syncCandidates) {
+      if (p !== CONFIG_FILE && fs.existsSync(path.dirname(p))) {
+        try {
+          fs.writeFileSync(p, JSON.stringify(merged, null, 2), 'utf-8');
+        } catch {}
+      }
+    }
   } catch (err) {
     console.error('[VOICE] Failed to write voice_config.json:', err);
   }
@@ -234,6 +262,7 @@ router.get('/settings', async (_req: Request, res: Response) => {
 router.post('/settings', async (req: Request, res: Response) => {
   try {
     const {
+      ai_enabled,
       active_whisper_model,
       device,
       compute_type,
@@ -278,7 +307,22 @@ router.post('/settings', async (req: Request, res: Response) => {
       }
     }
 
+    // Explicitly coerce ai_enabled — body may have it as boolean, string, or absent
+    let resolvedAiEnabled: boolean;
+    if (typeof ai_enabled === 'boolean') {
+      resolvedAiEnabled = ai_enabled;
+    } else if (ai_enabled === 'false' || ai_enabled === '0') {
+      resolvedAiEnabled = false;
+    } else if (ai_enabled === 'true' || ai_enabled === '1') {
+      resolvedAiEnabled = true;
+    } else if (ai_enabled === undefined || ai_enabled === null) {
+      resolvedAiEnabled = currentConfig.ai_enabled !== undefined ? currentConfig.ai_enabled : true;
+    } else {
+      resolvedAiEnabled = Boolean(ai_enabled);
+    }
+
     const updatedConfig = saveVoiceConfig({
+      ai_enabled: resolvedAiEnabled,
       active_whisper_model: targetModel,
       device: targetDevice,
       compute_type: targetCompute,
@@ -288,6 +332,12 @@ router.post('/settings', async (req: Request, res: Response) => {
       llm_temperature: typeof llm_temperature === 'number' ? llm_temperature : currentConfig.llm_temperature,
       llm_prompt_template: llm_prompt_template ?? currentConfig.llm_prompt_template
     });
+
+    // Instant real-time broadcast to all connected workstations via SSE & WebSocket
+    const broadcastFn = req.app.get('broadcastVoiceAiStatus');
+    if (typeof broadcastFn === 'function') {
+      broadcastFn(resolvedAiEnabled);
+    }
 
     return res.json({
       success: true,
@@ -362,6 +412,12 @@ router.post('/process', upload.single('audio'), async (req: Request, res: Respon
   let aiFilterApplied = 0;
 
   const config = getVoiceConfig();
+  if (config.ai_enabled === false) {
+    return res.status(403).json({
+      error: 'AI Voice Dictation is currently disabled by system administration.',
+      disabled: true
+    });
+  }
 
   try {
     // 1. Resolve Audio File Path (from multer upload or base64)

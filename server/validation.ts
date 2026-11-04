@@ -45,6 +45,7 @@ export const LoginSchema = z.object({
 // Create User Schema
 export const CreateUserSchema = z.object({
   username: sanitizedString('Username is required'),
+  email: z.string().email('Valid email address required').optional().nullable().or(z.literal('')),
   password: AdminPasswordSchema,
   full_name: sanitizedString('Full name is required'),
   role: z.enum(['Admin', 'Receptionist', 'Nurse', 'Optometrist', 'Consultant', 'Doctor', 'Pharmacist']),
@@ -55,6 +56,7 @@ export const CreateUserSchema = z.object({
 // Update User Schema
 export const UpdateUserSchema = z.object({
   username: sanitizedString().optional(),
+  email: z.string().email('Valid email address required').optional().nullable().or(z.literal('')),
   password: AdminPasswordSchema.optional().nullable().or(z.literal('')),
   full_name: sanitizedString().optional(),
   role: z.enum(['Admin', 'Receptionist', 'Nurse', 'Optometrist', 'Consultant', 'Doctor', 'Pharmacist']).optional(),
@@ -72,6 +74,7 @@ export const ChangePasswordSchema = z.object({
 
 // Create Patient Schema
 export const CreatePatientSchema = z.object({
+  hospital_number: sanitizedString().optional().nullable(),
   full_name: sanitizedString('Full name is required'),
   gender: z.enum(['Male', 'Female', 'Other']),
   dob: sanitizedString('Date of birth is required'),
@@ -87,10 +90,38 @@ export const CreatePatientSchema = z.object({
   allergies: sanitizedString().optional().nullable(),
   medical_alerts: sanitizedString().optional().nullable(),
   payment_category: sanitizedString().optional().nullable().default('Private'),
-  department: sanitizedString().optional().nullable().default('General')
+  department: sanitizedString().optional().nullable().default('General'),
+  // Extended demographic & family fields
+  tribe: sanitizedString().optional().nullable(),
+  religion: sanitizedString().optional().nullable(),
+  state_of_origin: sanitizedString().optional().nullable(),
+  next_of_kin_address: sanitizedString().optional().nullable(),
+  family_id: z.coerce.number().optional().nullable(),
+  relationship_to_family: sanitizedString().optional().nullable(),
+  registration_type: z.enum(['INDIVIDUAL', 'FAMILY_MEMBER']).optional().nullable().default('INDIVIDUAL')
 });
 
 export const UpdatePatientSchema = CreatePatientSchema.partial();
+
+// Family Household Validation Schemas
+export const CreateFamilySchema = z.object({
+  family_name: sanitizedString('Family name (surname) is required'),
+  contact_person_name: sanitizedString('Contact person name is required'),
+  contact_person_phone: sanitizedString('Contact person phone number is required'),
+  residential_address: sanitizedString().optional().nullable(),
+  tribe: sanitizedString().optional().nullable(),
+  state_of_origin: sanitizedString().optional().nullable(),
+  // Used when capturing an existing manual cardholder into the EMR — preserves their physical card number
+  existing_card_number: sanitizedString().optional().nullable(),
+  confirm_duplicate: z.boolean().optional().default(false)
+});
+
+export const UpdateFamilySchema = CreateFamilySchema.partial();
+
+export const LinkPatientFamilySchema = z.object({
+  patient_id: sanitizedString('Patient ID is required'),
+  relationship_to_family: sanitizedString('Relationship to family is required')
+});
 
 // ── Date and Pagination Query Schemas ──
 export const dateString = z.preprocess((val) => {
@@ -168,6 +199,44 @@ export const RequiredReportQuerySchema = z.object({
   start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'start_date must be in YYYY-MM-DD format'),
   end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'end_date must be in YYYY-MM-DD format'),
   cashier: sanitizedString().optional()
+});
+
+// ── Transaction Creation Schema ──
+export const CreateTransactionSchema = z.object({
+  patient_id: z.string().optional().nullable(),
+  billing_type: z.enum(['patient', 'family', 'walk_in']).optional().default('patient'),
+  family_id: z.union([z.number().int(), z.string()]).transform(val => (val !== undefined && val !== null && val !== '') ? Number(val) : null).optional().nullable(),
+  visit_id: z.union([z.number().int(), z.string()]).transform(val => (val !== undefined && val !== null && val !== '') ? Number(val) : null).optional().nullable(),
+  amount_paid: z.union([z.number().nonnegative(), z.string()]).transform(val => parseFloat(String(val)) || 0).default(0),
+  discount: z.union([z.number().nonnegative(), z.string()]).transform(val => parseFloat(String(val)) || 0).default(0),
+  payment_method: sanitizedString('Payment method is required'),
+  payment_details: z.any().optional(),
+  cashier: sanitizedString().optional(),
+  supervisor_username: sanitizedString().optional(),
+  supervisor_password: z.string().optional(),
+  discount_reason: sanitizedString().optional(),
+  discount_note: sanitizedString().optional(),
+  is_insurance_bill: z.union([z.boolean(), z.number(), z.string()]).transform(val => val === true || val === 1 || val === '1' || val === 'true').optional().default(false),
+  payer_id: z.union([z.number().int(), z.string()]).transform(val => (val !== undefined && val !== null && val !== '') ? Number(val) : null).optional().nullable(),
+  claim_id: z.union([z.number().int(), z.string()]).transform(val => (val !== undefined && val !== null && val !== '') ? Number(val) : null).optional().nullable(),
+  patient_portion: z.union([z.number().nonnegative(), z.string()]).transform(val => (val !== undefined && val !== null && val !== '') ? parseFloat(String(val)) : null).optional().nullable(),
+  payer_portion: z.union([z.number().nonnegative(), z.string()]).transform(val => (val !== undefined && val !== null && val !== '') ? parseFloat(String(val)) : null).optional().nullable(),
+  items: z.array(z.object({
+    inventory_id: z.string().optional().nullable(),
+    item_id: z.union([z.string(), z.number()]).optional().nullable(),
+    description: z.string().optional().nullable(),
+    name: z.string().optional().nullable(),
+    qty: z.union([z.number(), z.string()]).transform(val => Number(val) || 1),
+    unit_price: z.union([z.number(), z.string()]).transform(val => parseFloat(String(val)) || 0)
+  })).min(1, 'At least one item must be billed')
+}).superRefine((data, ctx) => {
+  if (data.billing_type === 'patient' && (!data.patient_id || !data.patient_id.trim())) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['patient_id'],
+      message: 'patient_id is required when billing_type is patient'
+    });
+  }
 });
 
 // ── Generic Schema Validation Middleware ──

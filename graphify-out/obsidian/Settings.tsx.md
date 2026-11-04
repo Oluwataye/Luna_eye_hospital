@@ -1,0 +1,37 @@
+---
+source_file: "src/pages/Settings.tsx"
+type: "code"
+community: "Community 0"
+location: "L1"
+tags:
+  - graphify/code
+  - graphify/EXTRACTED
+  - community/Community_0
+---
+
+# Settings.tsx
+
+## Connections
+- [[API_BASE_URL]] - `imports` [EXTRACTED]
+- [[App.tsx]] - `imports_from` [EXTRACTED]
+- [[AuthContext.tsx]] - `imports_from` [EXTRACTED]
+- [[InnerNavTabs()]] - `imports` [EXTRACTED]
+- [[InnerNavTabs.tsx]] - `imports_from` [EXTRACTED]
+- [[LoadingSpinner()]] - `imports` [EXTRACTED]
+- [[LoadingSpinner.tsx]] - `imports_from` [EXTRACTED]
+- [[NotificationContext.tsx]] - `imports_from` [EXTRACTED]
+- [[Settings()]] - `contains` [EXTRACTED]
+- [[ThermalPrinterModal()]] - `imports` [EXTRACTED]
+- [[ThermalPrinterModal.tsx]] - `imports_from` [EXTRACTED]
+- [[actionTypes]] - `contains` [EXTRACTED]
+- [[api]] - `imports` [EXTRACTED]
+- [[api.ts]] - `imports_from` [EXTRACTED]
+- [[date.ts]] - `imports_from` [EXTRACTED]
+- [[formatDateStandard()]] - `imports` [EXTRACTED]
+- [[lucide-react]] - `imports_from` [EXTRACTED]
+- [[react]] - `imports_from` [EXTRACTED]
+- [[react-router-dom]] - `imports_from` [EXTRACTED]
+- [[useAuth()]] - `imports` [EXTRACTED]
+- [[useNotification()]] - `imports` [EXTRACTED]
+
+#graphify/code #graphify/EXTRACTED #community/Community_0

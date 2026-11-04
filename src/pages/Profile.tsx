@@ -13,7 +13,8 @@ export const Profile: React.FC = () => {
   // Profile Edit State
   const [profileData, setProfileData] = useState({
     full_name: '',
-    phone_number: ''
+    phone_number: '',
+    email: ''
   });
 
   // Password Change State
@@ -27,7 +28,8 @@ export const Profile: React.FC = () => {
     if (user) {
       setProfileData({
         full_name: user.full_name,
-        phone_number: user.phone_number || ''
+        phone_number: user.phone_number || '',
+        email: user.email || ''
       });
     }
   }, [user]);
@@ -103,7 +105,7 @@ export const Profile: React.FC = () => {
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'center',
-            boxShadow: '0 8px 16px -4px rgba(37, 99, 235, 0.3)'
+            boxShadow: '0 8px 16px -4px rgba(46, 90, 38, 0.35)'
           }}>
             <User size={28} style={{ color: '#fff' }} />
           </div>
@@ -163,8 +165,8 @@ export const Profile: React.FC = () => {
                   <Mail size={18} />
                 </div>
                 <div>
-                  <p className="leh-label" style={{ fontSize: '10px', fontWeight: '800', margin: 0 }}>ACCESS NODE</p>
-                  <p className="leh-table-bold" style={{ fontSize: '13px', margin: 0 }}>{user?.username}</p>
+                  <p className="leh-label" style={{ fontSize: '10px', fontWeight: '800', margin: 0 }}>OFFICIAL EMAIL</p>
+                  <p className="leh-table-bold" style={{ fontSize: '13px', margin: 0 }}>{user?.email || `${user?.username?.toLowerCase()}@lunaeye.com`}</p>
                 </div>
               </div>
 
@@ -211,7 +213,7 @@ export const Profile: React.FC = () => {
             </div>
             
             <form onSubmit={handleProfileUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="leh-form-group" style={{ marginBottom: 0 }}>
                   <label className="leh-label">Full Operator Name</label>
                   <input
@@ -222,6 +224,18 @@ export const Profile: React.FC = () => {
                     value={profileData.full_name}
                     onChange={(e) => setProfileData({ ...profileData, full_name: e.target.value })}
                     placeholder="Enter legal full name"
+                  />
+                </div>
+                <div className="leh-form-group" style={{ marginBottom: 0 }}>
+                  <label className="leh-label">Official Email Address</label>
+                  <input
+                    className="leh-input"
+                    style={{ height: '48px' }}
+                    type="email"
+                    required
+                    value={profileData.email}
+                    onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+                    placeholder="e.g. staff@lunaeye.com"
                   />
                 </div>
                 <div className="leh-form-group" style={{ marginBottom: 0 }}>

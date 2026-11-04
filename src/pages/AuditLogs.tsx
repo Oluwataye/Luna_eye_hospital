@@ -121,7 +121,7 @@ export const AuditLogs: React.FC = () => {
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'center',
-            boxShadow: '0 8px 16px -4px rgba(37, 99, 235, 0.3)'
+            boxShadow: '0 8px 16px -4px rgba(46, 90, 38, 0.30)'
           }}>
             <Shield size={28} style={{ color: '#fff' }} />
           </div>
@@ -161,7 +161,7 @@ export const AuditLogs: React.FC = () => {
           <p className="leh-label">Total Events</p>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
             <h3 className="leh-stat-value">{logs.length}</h3>
-            <span className="leh-status-dot" style={{ background: '#eff6ff', color: '#2563eb' }}>Logs</span>
+            <span className="leh-status-dot" style={{ background: 'var(--leh-info-bg)', color: 'var(--leh-info)' }}>Logs</span>
           </div>
         </div>
         <div className="leh-stat-card">

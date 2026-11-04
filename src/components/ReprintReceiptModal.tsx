@@ -11,15 +11,6 @@ interface ReprintReceiptModalProps {
   onClose: () => void;
 }
 
-const fmt = (val: number) =>
-  new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency: 'NGN',
-    minimumFractionDigits: 0,
-  })
-    .format(val)
-    .replace('NGN', '₦ ');
-
 const ReprintReceiptModal: React.FC<ReprintReceiptModalProps> = ({ receipt_number, onClose }) => {
   const { user } = useAuth();
   const { notify } = useNotification();
@@ -81,9 +72,40 @@ const ReprintReceiptModal: React.FC<ReprintReceiptModalProps> = ({ receipt_numbe
   if (loading) return null;
   if (isRestricted || !data) return null;
 
-  const grandTotal = Math.max(0, data.total_amount - data.discount);
-
   const now = new Date();
+  const grandTotal = Math.max(0, (data.total_amount || 0) - (data.discount || 0));
+
+  const getRevFund = (item: any) => {
+    if (item.category && String(item.category).trim()) return String(item.category).trim();
+    if (item.rev_fund && String(item.rev_fund).trim()) return String(item.rev_fund).trim();
+    if (item.department && String(item.department).trim()) return String(item.department).trim();
+    const desc = (item.description || item.name || '').toLowerCase();
+    if (desc.includes('wound') || desc.includes('dress') || desc.includes('inject') || desc.includes('nurs') || desc.includes('stitch')) return 'Nursing Services';
+    if (desc.includes('consult') || desc.includes('registration') || desc.includes('card') || desc.includes('review') || desc.includes('triage')) return 'Consultation';
+    if (desc.includes('lens') || desc.includes('frame') || desc.includes('glass') || desc.includes('opt') || desc.includes('spectacle')) return 'Optical';
+    if (desc.includes('drop') || desc.includes('tab') || desc.includes('cap') || desc.includes('syrup') || desc.includes('cream') || desc.includes('ointment')) return 'Pharmacy';
+    if (desc.includes('scan') || desc.includes('test') || desc.includes('lab') || desc.includes('fundus') || desc.includes('visual') || desc.includes('pachymetry') || desc.includes('biometry')) return 'Laboratory';
+    return 'Services';
+  };
+
+  const formatAuditDate = (date: any) => {
+    try {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return String(date || '');
+      const month = d.getMonth() + 1;
+      const day = d.getDate();
+      const year = d.getFullYear();
+      let hours = d.getHours();
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const seconds = String(d.getSeconds()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      return `${month}/${day}/${year} ${hours}:${minutes}:${seconds} ${ampm}`;
+    } catch {
+      return String(date || '');
+    }
+  };
 
   return (
     <div className="leh-modal-overlay">
@@ -98,9 +120,9 @@ const ReprintReceiptModal: React.FC<ReprintReceiptModalProps> = ({ receipt_numbe
            </button>
         </div>
         
-        <div className="leh-modal-body" style={{ background: 'var(--leh-bg-light)', overflowY: 'auto', padding: '40px' }}>
-           <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: '#fffbeb', color: '#92400e', borderRadius: '99px', border: '1px solid #fde68a', fontWeight: '900', fontSize: '11px', letterSpacing: '0.05em' }}>
+        <div className="leh-modal-body" style={{ background: '#f1f5f9', overflowY: 'auto', padding: '24px' }}>
+           <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: '#fffbeb', color: '#92400e', borderRadius: '99px', border: '1px solid #fde68a', fontWeight: '900', fontSize: '11px', letterSpacing: '0.05em' }}>
                  <RefreshCcw size={14} className="animate-spin-slow" />
                  OFFICIAL AUDIT REPRINT
               </div>
@@ -108,73 +130,99 @@ const ReprintReceiptModal: React.FC<ReprintReceiptModalProps> = ({ receipt_numbe
 
            <div className="pos-receipt-printable" style={{ 
              background: 'white', 
-             padding: '40px', 
-             boxShadow: '0 20px 50px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.05)', 
-             borderRadius: '16px',
-             position: 'relative',
-             maxWidth: '440px',
+             padding: '0', 
+             boxShadow: '0 10px 30px rgba(0,0,0,0.1)', 
+             maxWidth: '380px',
              margin: '0 auto',
-             border: '1px solid #fff'
+             border: '2px solid #000',
+             color: '#000',
+             fontFamily: 'Arial, Helvetica, sans-serif'
            }}>
-              {/* Watermark Overlay */}
-             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.05, pointerEvents: 'none', transform: 'rotate(-35deg)', fontSize: '48px', fontWeight: '900', textAlign: 'center', color: '#be123c', zIndex: 0 }}>
-               DUPLICATE COPY
+             <div style={{
+               fontSize: '13px',
+               fontWeight: '900',
+               textAlign: 'center',
+               padding: '8px 4px',
+               borderBottom: '2px solid #000',
+               textTransform: 'uppercase',
+               letterSpacing: '0.5px'
+             }}>
+               {data.clinic?.name || 'LUNA EYE HOSPITAL'}
              </div>
 
-             <div style={{ position: 'relative', zIndex: 1 }}>
-                <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-                  <h1 style={{ fontSize: '22px', fontWeight: '900', color: '#0f172a', margin: '0 0 6px', fontFamily: 'Outfit, sans-serif' }}>{data.clinic?.name || 'LUNA EYE HOSPITAL'}</h1>
-                  <p style={{ fontSize: '11px', color: '#64748b', margin: 0, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{data.clinic?.address}</p>
-                </div>
+             <div style={{
+               fontSize: '12px',
+               fontWeight: '900',
+               textAlign: 'center',
+               padding: '5px 4px',
+               borderBottom: '2px solid #000',
+               letterSpacing: '0.5px'
+             }}>
+               BAT. NO.: {data.receipt_no}
+             </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', padding: '20px 0', borderTop: '2px dashed #e2e8f0', borderBottom: '2px dashed #e2e8f0', marginBottom: '32px' }}>
-                   <div>
-                      <p style={{ fontSize: '9px', fontWeight: '800', color: '#94a3b8', margin: '0 0 4px 0' }}>RECEIPT NO</p>
-                      <p style={{ fontSize: '13px', fontWeight: '900', margin: 0 }}>{data.receipt_no}</p>
-                   </div>
-                   <div style={{ textAlign: 'right' }}>
-                      <p style={{ fontSize: '9px', fontWeight: '800', color: '#94a3b8', margin: '0 0 4px 0' }}>DATE</p>
-                      <p style={{ fontSize: '13px', fontWeight: '900', margin: 0 }}>{new Date(data.created_at).toLocaleDateString()}</p>
-                   </div>
-                </div>
+             <div style={{
+               fontSize: '11px',
+               fontWeight: '900',
+               textAlign: 'left',
+               padding: '6px 8px',
+               borderBottom: '2px solid #000',
+               textTransform: 'uppercase'
+             }}>
+               {(data.patient_name || 'WALK-IN PATIENT').toUpperCase()}({data.patient_id || data.file_number || '11025'})
+             </div>
 
-                <div style={{ marginBottom: '32px' }}>
-                   <p style={{ fontSize: '10px', fontWeight: '800', color: '#94a3b8', marginBottom: '6px' }}>BILLING RECIPIENT</p>
-                   <p style={{ fontSize: '16px', fontWeight: '900', color: '#0f172a', textTransform: 'uppercase', margin: 0 }}>{data.patient_name}</p>
-                   <p style={{ fontSize: '11px', color: '#64748b', fontWeight: '700', marginTop: '4px' }}>Patient Registry ID: {data.patient_id}</p>
-                </div>
-
-                <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse', marginBottom: '32px' }}>
-                   <thead>
-                     <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                       <th style={{ textAlign: 'left', padding: '12px 0', color: '#94a3b8', fontWeight: '800', fontSize: '10px' }}>DESCRIPTION</th>
-                       <th style={{ textAlign: 'right', padding: '12px 0', color: '#94a3b8', fontWeight: '800', fontSize: '10px' }}>AMOUNT</th>
+             <div style={{ padding: '8px' }}>
+               <table style={{ width: '100%', fontSize: '10px', borderCollapse: 'collapse', border: '1px solid #000' }}>
+                 <thead>
+                   <tr>
+                     <th style={{ border: '1px solid #000', padding: '4px 2px', textAlign: 'left', width: '27%' }}>RevFund</th>
+                     <th style={{ border: '1px solid #000', padding: '4px 2px', textAlign: 'left', width: '33%' }}>Name</th>
+                     <th style={{ border: '1px solid #000', padding: '4px 2px', textAlign: 'center', width: '10%' }}>Qty</th>
+                     <th style={{ border: '1px solid #000', padding: '4px 2px', textAlign: 'center', width: '10%' }}>Freq</th>
+                     <th style={{ border: '1px solid #000', padding: '4px 2px', textAlign: 'right', width: '20%' }}>price</th>
+                   </tr>
+                 </thead>
+                 <tbody>
+                   {data.items?.map((item: any, i: number) => (
+                     <tr key={i}>
+                       <td style={{ border: '1px solid #000', padding: '4px 2px', fontWeight: '600' }}>{getRevFund(item)}</td>
+                       <td style={{ border: '1px solid #000', padding: '4px 2px', fontWeight: '600' }}>{item.description || item.name}</td>
+                       <td style={{ border: '1px solid #000', padding: '4px 2px', textAlign: 'center', fontWeight: '600' }}>{item.qty || 1}</td>
+                       <td style={{ border: '1px solid #000', padding: '4px 2px', textAlign: 'center' }}>{item.freq || ''}</td>
+                       <td style={{ border: '1px solid #000', padding: '4px 2px', textAlign: 'right', fontWeight: '600' }}>{Number(item.unit_price * (item.qty || 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                      </tr>
-                   </thead>
-                   <tbody>
-                     {data.items?.map((item: any, i: number) => (
-                       <tr key={i} style={{ borderBottom: '1px solid #f8fafc' }}>
-                         <td style={{ padding: '12px 0', fontWeight: '700' }}>{item.description} <span style={{ color: '#94a3b8', fontWeight: '600' }}>x{item.qty}</span></td>
-                         <td style={{ textAlign: 'right', padding: '12px 0', fontWeight: '800', color: '#0f172a' }}>{fmt(item.unit_price * item.qty)}</td>
-                       </tr>
-                     ))}
-                   </tbody>
-                </table>
+                   ))}
+                   <tr>
+                     <td colSpan={4} style={{ border: '1px solid #000', padding: '5px 4px', fontWeight: '900' }}>Sub Total:</td>
+                     <td style={{ border: '1px solid #000', padding: '5px 4px', textAlign: 'right', fontWeight: '900' }}>{Number(data.total_amount || grandTotal).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                   </tr>
+                   {data.discount > 0 && (
+                     <tr>
+                       <td colSpan={4} style={{ border: '1px solid #000', padding: '4px', fontWeight: '900' }}>Discount:</td>
+                       <td style={{ border: '1px solid #000', padding: '4px', textAlign: 'right', fontWeight: '900' }}>-{Number(data.discount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                     </tr>
+                   )}
+                 </tbody>
+               </table>
+             </div>
 
-                <div style={{ background: '#f8fafc', padding: '24px', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
-                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: '900', color: 'var(--leh-primary)' }}>
-                     <span>NET TOTAL PAID</span>
-                     <span>{fmt(grandTotal)}</span>
-                   </div>
-                </div>
+             <div style={{ padding: '4px 8px 10px 8px', fontSize: '10px', lineHeight: '1.4', fontWeight: '600' }}>
+               <div>BilledBy: {data.cashier || user?.full_name || 'cashier cashier'} ({data.cashier_email || user?.email || 'cashier@healthrevolve.com'})</div>
+               <div>Processed/Printed By: {user?.full_name || 'cashier cashier'}({user?.email || 'cashier@healthrevolve.com'})</div>
+               <div>on the {formatAuditDate(now)}</div>
+             </div>
 
-                <div style={{ marginTop: '40px', padding: '20px', border: '1px solid #e2e8f0', borderRadius: '12px', textAlign: 'center' }}>
-                   <p style={{ fontSize: '10px', color: '#64748b', fontWeight: '700', lineHeight: '1.6', margin: 0 }}>
-                      SECURITY AUDIT TRAIL<br/>
-                      Reprinted: {now.toLocaleString()}<br/>
-                      Authorized By: {user?.full_name.toUpperCase()}
-                   </p>
-                </div>
+             <div style={{
+               fontSize: '15px',
+               fontWeight: '900',
+               textAlign: 'center',
+               padding: '12px 4px 16px',
+               letterSpacing: '0.5px',
+               lineHeight: '1.25'
+             }}>
+               --POWERED<br/>
+               BY T-TECH SOLUTION--
              </div>
            </div>
         </div>

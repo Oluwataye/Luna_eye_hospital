@@ -78,10 +78,10 @@ export const ConsultantDashboard: React.FC = () => {
             disabled={queueStats.waiting_for_consultation.length === 0}
             style={{ 
               background: queueStats.waiting_for_consultation.length > 0 
-                ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' 
+                ? 'linear-gradient(135deg, var(--leh-forest) 0%, var(--leh-forest-hover) 100%)' 
                 : undefined,
               boxShadow: queueStats.waiting_for_consultation.length > 0 
-                ? '0 10px 25px -5px rgba(37, 99, 235, 0.4)' 
+                ? '0 10px 25px -5px rgba(46, 90, 38, 0.45)' 
                 : 'none'
             }}
           >

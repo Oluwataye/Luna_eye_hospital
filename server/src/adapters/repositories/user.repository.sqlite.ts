@@ -62,7 +62,7 @@ export class UserRepositorySqlite implements IUserRepository {
 
   findAll(): Promise<User[]> {
     return new Promise((resolve, reject) => {
-      db.all('SELECT id, username, full_name, role, department, phone_number, status, created_at FROM users', [], (err, rows: User[]) => {
+      db.all('SELECT id, username, email, full_name, role, department, phone_number, status, created_at FROM users', [], (err, rows: User[]) => {
         if (err) return reject(err);
         resolve(rows || []);
       });

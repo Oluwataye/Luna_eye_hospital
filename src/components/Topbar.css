@@ -1,22 +1,27 @@
+/* ============================================================
+   TOPBAR — Luna Eye Hospital Brand Redesign v3.0
+   White surface, Forest Green accents, soft green border.
+   ============================================================ */
+
 .leh-topbar {
-  height: 80px;
-  background: rgba(255, 255, 255, 0.95);
+  height: 72px;
+  background: var(--leh-surface);
   backdrop-filter: blur(20px);
-  border-bottom: 1px solid var(--leh-border-light);
+  border-bottom: 1.5px solid var(--leh-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 40px;
+  padding: 0 32px;
   position: sticky;
   top: 0;
-  z-index: 1000;
-  box-shadow: 0 4px 20px -10px rgba(0,0,0,0.05);
+  z-index: 900;
+  box-shadow: 0 2px 12px rgba(46, 90, 38, 0.05);
 }
 
 .leh-topbar-left {
   display: flex;
   align-items: center;
-  gap: 48px;
+  gap: 40px;
   flex: 1;
 }
 
@@ -26,104 +31,124 @@
 }
 
 .leh-brand-label {
-  font-size: 10px;
-  font-weight: 900;
-  color: var(--leh-primary);
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--leh-forest);
   text-transform: uppercase;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.16em;
   margin-bottom: 2px;
+  font-family: var(--leh-font);
 }
 
 .leh-topbar-title {
-  font-size: 18px;
-  font-weight: 900;
-  color: var(--leh-text-dark);
-  letter-spacing: -0.02em;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--leh-ink);
+  letter-spacing: -0.01em;
   margin: 0;
+  font-family: var(--leh-font);
 }
 
+/* Search */
 .leh-topbar-search-container {
-  max-width: 520px;
+  max-width: 480px;
   width: 100%;
   position: relative;
 }
 
 .leh-search-icon-wrapper {
   position: absolute;
-  left: 18px;
+  left: 16px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--leh-text-light);
+  color: var(--leh-placeholder);
   z-index: 10;
   pointer-events: none;
+  transition: color 0.2s;
+}
+
+.leh-topbar-search-container:focus-within .leh-search-icon-wrapper {
+  color: var(--leh-forest);
 }
 
 .leh-topbar-search-input input {
   width: 100%;
-  height: 48px;
-  background: var(--leh-bg-light);
-  border: 1px solid transparent;
-  border-radius: 14px;
-  padding: 0 20px 0 52px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--leh-text-dark);
+  height: 42px;
+  background: var(--leh-bg);
+  border: 1.5px solid var(--leh-border);
+  border-radius: 99px;
+  padding: 0 20px 0 48px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--leh-ink);
+  font-family: var(--leh-font);
   transition: all 0.2s ease;
 }
 
+.leh-topbar-search-input input::placeholder {
+  color: var(--leh-placeholder);
+}
+
 .leh-topbar-search-input input:focus {
-  background: white;
-  border-color: var(--leh-primary);
-  box-shadow: 0 0 0 4px var(--leh-primary-light);
+  background: var(--leh-surface);
+  border-color: var(--leh-forest);
+  box-shadow: var(--leh-shadow-focus);
   outline: none;
 }
 
+/* Right cluster */
 .leh-topbar-right {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 16px;
 }
 
+/* Notification bell */
 .leh-notification-trigger {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--leh-bg-light);
-  color: var(--leh-text-muted);
-  border: none;
+  background: var(--leh-bg);
+  color: var(--leh-muted);
+  border: 1px solid var(--leh-border);
   cursor: pointer;
   position: relative;
   transition: all 0.2s ease;
 }
 
 .leh-notification-trigger:hover {
-  background: white;
-  color: var(--leh-primary);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  background: var(--leh-forest-tint);
+  color: var(--leh-forest);
+  border-color: var(--leh-forest);
   transform: translateY(-1px);
+}
+
+.leh-notification-trigger:focus-visible {
+  outline: 3px solid var(--leh-forest);
+  outline-offset: 2px;
 }
 
 .leh-notification-dot {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 9px;
+  right: 9px;
   width: 8px;
   height: 8px;
-  background: var(--leh-red);
-  border: 2px solid white;
+  background: var(--leh-danger);
+  border: 2px solid var(--leh-surface);
   border-radius: 50%;
 }
 
 .leh-topbar-divider {
   width: 1px;
-  height: 32px;
-  background: var(--leh-border-light);
+  height: 28px;
+  background: var(--leh-border);
 }
 
-/* User Profile Styles */
+/* User Profile */
 .leh-user-profile-wrapper {
   position: relative;
 }
@@ -131,17 +156,23 @@
 .leh-profile-trigger {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   background: none;
   border: none;
-  padding: 4px;
+  padding: 4px 8px 4px 4px;
   cursor: pointer;
-  border-radius: 16px;
+  border-radius: 12px;
   transition: all 0.2s ease;
 }
 
 .leh-profile-trigger:hover {
-  background: var(--leh-bg-light);
+  background: var(--leh-bg);
+}
+
+.leh-profile-trigger:focus-visible {
+  outline: 3px solid var(--leh-forest);
+  outline-offset: 2px;
+  border-radius: 12px;
 }
 
 .leh-profile-info {
@@ -151,109 +182,117 @@
 }
 
 .leh-profile-name {
-  font-size: 14px;
-  font-weight: 800;
-  color: var(--leh-text-dark);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--leh-ink);
+  font-family: var(--leh-font);
 }
 
 .leh-profile-role {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 800;
-  color: var(--leh-text-light);
+  color: var(--leh-muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
+  font-family: var(--leh-font);
 }
 
 .leh-profile-avatar {
-  width: 44px;
-  height: 44px;
-  background: white;
-  border: 1px solid var(--leh-border-light);
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  background: var(--leh-forest);
+  border: none;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--leh-primary);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  color: var(--leh-lime);
+  font-weight: 800;
+  font-size: 15px;
+  font-family: var(--leh-font);
 }
 
-/* Dropdown Menu */
+/* Dropdown */
 .leh-profile-dropdown {
   position: absolute;
-  top: calc(100% + 12px);
+  top: calc(100% + 10px);
   right: 0;
-  width: 240px;
-  background: white;
-  border-radius: 16px;
-  border: 1px solid var(--leh-border-light);
-  box-shadow: 0 12px 30px rgba(0,0,0,0.1);
+  width: 220px;
+  background: var(--leh-surface);
+  border-radius: 14px;
+  border: 1px solid var(--leh-border);
+  box-shadow: var(--leh-shadow-md), 0 8px 24px rgba(46,90,38,0.10);
   padding: 8px;
   animation: leh-dropdown-slide 0.2s ease-out;
+  z-index: 1100;
 }
 
 @keyframes leh-dropdown-slide {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .leh-dropdown-header {
-  padding: 12px 16px;
-  font-size: 10px;
-  font-weight: 900;
-  color: var(--leh-text-light);
-  letter-spacing: 0.05em;
+  padding: 10px 14px;
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--leh-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   display: flex;
   align-items: center;
   gap: 8px;
+  font-family: var(--leh-font);
 }
 
 .leh-dropdown-item {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: 10px;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
   border: none;
   background: none;
   cursor: pointer;
   font-size: 13px;
-  font-weight: 700;
-  color: var(--leh-text-dark);
-  transition: all 0.2s ease;
+  font-weight: 600;
+  color: var(--leh-ink);
+  transition: all 0.15s ease;
+  font-family: var(--leh-font);
 }
 
 .leh-dropdown-item:hover {
-  background: var(--leh-bg-light);
-  color: var(--leh-primary);
+  background: var(--leh-forest-tint);
+  color: var(--leh-forest);
 }
 
 .leh-dropdown-item.logout {
-  color: var(--leh-red);
+  color: var(--leh-danger);
 }
 
 .leh-dropdown-item.logout:hover {
-  background: #fef2f2;
-  color: var(--leh-red);
+  background: var(--leh-danger-bg);
+  color: var(--leh-danger);
 }
 
 .leh-dropdown-divider {
   height: 1px;
-  background: var(--leh-border-light);
-  margin: 8px;
+  background: var(--leh-border);
+  margin: 6px 8px;
 }
 
-/* Notification Pulse Animation */
+/* Notification Pulse */
 .pulse-bell {
-  animation: leh-bell-pulse 2s infinite ease-in-out;
+  animation: leh-bell-pulse 2.5s infinite ease-in-out;
 }
 
 @keyframes leh-bell-pulse {
-  0% { transform: scale(1); }
-  10% { transform: scale(1.1) rotate(15deg); }
-  20% { transform: scale(1.1) rotate(-15deg); }
-  30% { transform: scale(1.1) rotate(10deg); }
-  40% { transform: scale(1.1) rotate(-10deg); }
-  50% { transform: scale(1.1) rotate(0); }
+  0%   { transform: scale(1); }
+  10%  { transform: scale(1.1) rotate(12deg); }
+  20%  { transform: scale(1.1) rotate(-12deg); }
+  30%  { transform: scale(1.1) rotate(8deg); }
+  40%  { transform: scale(1.1) rotate(-8deg); }
+  50%  { transform: scale(1); rotate(0deg); }
   100% { transform: scale(1); }
 }

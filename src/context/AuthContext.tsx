@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '../api';
 
-interface User {
+export interface User {
   id: number;
   username: string;
+  email?: string;
   role: string;
   full_name: string;
   phone_number?: string;
@@ -34,6 +35,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const parsedUser = JSON.parse(storedUser);
       api.getProfile(parsedUser.id)
         .then((profile) => {
+          if (!profile.email && profile.username) {
+            profile.email = `${profile.username.toLowerCase()}@lunaeye.com`;
+          }
           setUser(profile);
         })
         .catch((err) => {
@@ -51,8 +55,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (credentials: any) => {
     const data = await api.login(credentials);
-    setUser(data.user);
-    localStorage.setItem('user', JSON.stringify(data.user));
+    const loggedUser = data.user;
+    if (loggedUser && !loggedUser.email && loggedUser.username) {
+      loggedUser.email = `${loggedUser.username.toLowerCase()}@lunaeye.com`;
+    }
+    setUser(loggedUser);
+    localStorage.setItem('user', JSON.stringify(loggedUser));
   };
 
   const logout = async () => {

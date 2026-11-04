@@ -6,6 +6,7 @@
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
+    "dev:all": "concurrently -n \"front,server\" -c \"cyan,magenta\" \"npm run dev\" \"npm --prefix server run dev\"",
     "build": "cross-env NODE_OPTIONS=--max-old-space-size=4096 tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -30,6 +31,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^10.0.6",
     "cross-env": "^10.1.0",
     "electron": "^42.3.3",
     "electron-builder": "^26.8.1",

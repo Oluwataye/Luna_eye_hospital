@@ -19,6 +19,7 @@ import { useNotification } from '../context/NotificationContext';
 import { formatDateStandard } from '../utils/date';
 import { useNavigate } from 'react-router-dom';
 import ReprintReceiptModal from '../components/ReprintReceiptModal';
+import { InnerNavTabs } from '../components/InnerNavTabs';
 const ReprintManagement: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -256,27 +257,20 @@ const ReprintManagement: React.FC = () => {
         </div>
       </div>
 
-      <div className="leh-table-card" style={{ padding: '8px', marginBottom: '24px' }}>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button 
-            onClick={() => { setActiveTab('all'); setPage(1); }}
-            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '14px', border: 'none', background: activeTab === 'all' ? 'var(--leh-primary-light)' : 'transparent', color: activeTab === 'all' ? 'var(--leh-primary)' : 'var(--leh-text-grey)', borderRadius: '12px', cursor: 'pointer', fontWeight: activeTab === 'all' ? '800' : '600', fontSize: '14px', transition: 'all 0.2s' }}
-          >
-            <History size={18} /> FULL AUDIT TRAIL
-          </button>
-          <button 
-            onClick={() => { setActiveTab('control'); setPage(1); }}
-            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '14px', border: 'none', background: activeTab === 'control' ? 'var(--leh-primary-light)' : 'transparent', color: activeTab === 'control' ? 'var(--leh-primary)' : 'var(--leh-text-grey)', borderRadius: '12px', cursor: 'pointer', fontWeight: activeTab === 'control' ? '800' : '600', fontSize: '14px', transition: 'all 0.2s' }}
-          >
-            <Printer size={18} /> REPRINT CONTROL UNIT
-          </button>
-          <button 
-            onClick={() => { setActiveTab('restricted'); setPage(1); }}
-            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '14px', border: 'none', background: activeTab === 'restricted' ? 'var(--leh-primary-light)' : 'transparent', color: activeTab === 'restricted' ? 'var(--leh-primary)' : 'var(--leh-text-grey)', borderRadius: '12px', cursor: 'pointer', fontWeight: activeTab === 'restricted' ? '800' : '600', fontSize: '14px', transition: 'all 0.2s' }}
-          >
-            <ShieldCheck size={18} /> SECURITY LOCKS
-          </button>
-        </div>
+      <div style={{ marginBottom: '24px' }}>
+        <InnerNavTabs<'all' | 'control' | 'restricted'>
+          tabs={[
+            { id: 'all', label: 'FULL AUDIT TRAIL', icon: History },
+            { id: 'control', label: 'REPRINT CONTROL UNIT', icon: Printer },
+            { id: 'restricted', label: 'SECURITY LOCKS', icon: ShieldCheck }
+          ]}
+          activeTab={activeTab}
+          onChange={(newTab) => {
+            setActiveTab(newTab);
+            setPage(1);
+          }}
+          fullWidth
+        />
       </div>
 
       {activeTab === 'all' && (
@@ -579,7 +573,7 @@ const ReprintManagement: React.FC = () => {
             
             <div className="leh-modal-body" style={{ padding: '32px' }}>
               <div style={{ background: 'var(--leh-primary-light)', padding: '24px', borderRadius: '24px', textAlign: 'center', marginBottom: '32px', border: '1px solid var(--leh-primary)' }}>
-                 <div style={{ width: '64px', height: '64px', background: '#fff', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--leh-primary)', margin: '0 auto 16px', boxShadow: '0 8px 20px rgba(37,99,235,0.15)' }}>
+                 <div style={{ width: '64px', height: '64px', background: '#fff', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--leh-primary)', margin: '0 auto 16px', boxShadow: '0 8px 20px rgba(46,90,38,0.18)' }}>
                     <Printer size={32} />
                  </div>
                  <h4 className="leh-table-bold" style={{ fontSize: '18px', marginBottom: '8px', color: 'var(--leh-primary)' }}>Reprint Tolerance Ceiling</h4>

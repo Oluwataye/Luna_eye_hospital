@@ -42,7 +42,7 @@
 
 .log-type-badge.login { background: #ecfdf5; color: #059669; }
 .log-type-badge.login_failed { background: #fef2f2; color: #dc2626; }
-.log-type-badge.patient_edit { background: #eff6ff; color: #2563eb; }
+.log-type-badge.patient_edit { background: var(--leh-info-bg); color: var(--leh-info); }
 .log-type-badge.clinical_edit { background: #fffbeb; color: #d97706; }
 .log-type-badge.billing_create { background: #f5f3ff; color: #7c3aed; }
 .log-type-badge.stock_adjust { background: #fff7ed; color: #ea580c; }

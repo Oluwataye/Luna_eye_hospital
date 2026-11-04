@@ -39,6 +39,11 @@ export const Patients: React.FC<PatientsProps> = ({ view: initialView = 'list' }
   const [patients, setPatients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Option A: Tabbed View (Individual Patients vs Families)
+  const [activeTab, setActiveTab] = useState<'patients' | 'families'>('patients');
+  const [families, setFamilies] = useState<any[]>([]);
+  const [familiesLoading, setFamiliesLoading] = useState(false);
   
   // Current patient context for profile/checkin sub-views
   const [currentPatient, setCurrentPatient] = useState<any>(null);
@@ -61,6 +66,18 @@ export const Patients: React.FC<PatientsProps> = ({ view: initialView = 'list' }
       notify('error', 'Registry synchronization failed');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchFamilies = async () => {
+    setFamiliesLoading(true);
+    try {
+      const data = await api.getFamilies();
+      setFamilies(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Failed to load families:', err);
+    } finally {
+      setFamiliesLoading(false);
     }
   };
 
@@ -88,6 +105,7 @@ export const Patients: React.FC<PatientsProps> = ({ view: initialView = 'list' }
 
   useEffect(() => {
     fetchPatients();
+    fetchFamilies();
   }, []);
 
   useEffect(() => {
@@ -97,12 +115,28 @@ export const Patients: React.FC<PatientsProps> = ({ view: initialView = 'list' }
   }, [urlId, initialView]);
 
   const filteredPatients = useMemo(() => {
+    const q = searchTerm.toLowerCase().trim();
+    if (!q) return patients;
     return patients.filter(p => 
-      p.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      String(p.id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.phone?.includes(searchTerm)
+      p.full_name?.toLowerCase().includes(q) ||
+      String(p.id).toLowerCase().includes(q) ||
+      p.phone?.includes(q) ||
+      p.family_name?.toLowerCase().includes(q) ||
+      p.family_card_number?.toLowerCase().includes(q)
     );
   }, [patients, searchTerm]);
+
+  const filteredFamilies = useMemo(() => {
+    const q = searchTerm.toLowerCase().trim();
+    if (!q) return families;
+    return families.filter(f =>
+      f.family_name?.toLowerCase().includes(q) ||
+      String(f.family_card_number).toLowerCase().includes(q) ||
+      f.contact_person_name?.toLowerCase().includes(q) ||
+      f.contact_person_phone?.includes(q) ||
+      f.residential_address?.toLowerCase().includes(q)
+    );
+  }, [families, searchTerm]);
 
   const calculateAge = (dob: string) => {
     if (!dob) return 'N/A';
@@ -665,149 +699,313 @@ export const Patients: React.FC<PatientsProps> = ({ view: initialView = 'list' }
           </div>
           <Link to="/patients/register" className="leh-btn-primary">
             <UserPlus size={20} />
-            <span>REGISTER PATIENT</span>
+            <span>NEW REGISTRATION</span>
           </Link>
         </div>
       </header>
 
-      <div className="leh-table-wrapper">
-        <table className="leh-table">
-          <thead>
-            <tr>
-              <th style={{ paddingLeft: '24px' }}>FILE NO.</th>
-              <th>FULL NAME</th>
-              <th>GENDER / AGE</th>
-              <th>PHONE</th>
-              <th>VISIT STATUS</th>
-              <th style={{ textAlign: 'right', paddingRight: '24px' }}>ACTIONS</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+      {/* Option A: Top Category Tabs */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+        <button
+          type="button"
+          onClick={() => setActiveTab('patients')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 22px',
+            borderRadius: '12px',
+            border: activeTab === 'patients' ? 'none' : '1.5px solid var(--leh-border)',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontWeight: '800',
+            transition: 'all 0.2s ease',
+            background: activeTab === 'patients' ? 'var(--leh-forest)' : 'var(--leh-surface)',
+            color: activeTab === 'patients' ? 'var(--leh-lime)' : 'var(--leh-muted)',
+            boxShadow: activeTab === 'patients' ? '0 4px 14px rgba(46, 90, 38, 0.25)' : 'none'
+          }}
+        >
+          <UserIcon size={16} />
+          <span>Individual Patients ({patients.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('families')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 22px',
+            borderRadius: '12px',
+            border: activeTab === 'families' ? 'none' : '1.5px solid var(--leh-border)',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontWeight: '800',
+            transition: 'all 0.2s ease',
+            background: activeTab === 'families' ? 'var(--leh-forest)' : 'var(--leh-surface)',
+            color: activeTab === 'families' ? 'var(--leh-lime)' : 'var(--leh-muted)',
+            boxShadow: activeTab === 'families' ? '0 4px 14px rgba(46, 90, 38, 0.25)' : 'none'
+          }}
+        >
+          <Users size={16} />
+          <span>Families ({families.length})</span>
+        </button>
+      </div>
+
+      {/* TAB 1: INDIVIDUAL PATIENTS TABLE */}
+      {activeTab === 'patients' && (
+        <div className="leh-table-wrapper">
+          <table className="leh-table">
+            <thead>
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', padding: '100px' }}>
-                  <LoadingSpinner size="large" label="Loading clinical patient registry..." />
-                </td>
+                <th style={{ paddingLeft: '24px' }}>FILE NO.</th>
+                <th>FULL NAME</th>
+                <th>GENDER / AGE</th>
+                <th>PHONE</th>
+                <th>VISIT STATUS</th>
+                <th style={{ textAlign: 'right', paddingRight: '24px' }}>ACTIONS</th>
               </tr>
-            ) : filteredPatients.length === 0 ? (
-              <tr>
-                <td colSpan={6} style={{ textAlign: 'center', padding: '100px' }}>
-                  <div style={{ opacity: 0.3 }}>
-                    <Users size={64} style={{ margin: '0 auto 16px', display: 'block' }} />
-                    <p style={{ fontWeight: '800', textTransform: 'uppercase' }}>No records found</p>
-                  </div>
-                </td>
-              </tr>
-            ) : filteredPatients.map(patient => (
-                <tr key={patient.id} className="leh-table-row">
-                  <td style={{ paddingLeft: '24px' }}>
-                    <span style={{ fontFamily: 'monospace', fontWeight: '900', color: 'var(--leh-primary)', background: 'var(--leh-primary-light)', padding: '5px 12px', borderRadius: '8px', fontSize: '11px' }}>
-                      {patient.id}
-                    </span>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '100px' }}>
+                    <LoadingSpinner size="large" label="Loading clinical patient registry..." />
                   </td>
-                  <td style={{ fontWeight: '800', color: 'var(--leh-text-dark)' }}>{patient.full_name}</td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span className={`leh-status-badge ${patient.gender === 'Male' ? 'blue' : 'red'}`} style={{ fontSize: '10px' }}>{patient.gender}</span>
-                      <span className="leh-label">{calculateAge(patient.dob)} yrs</span>
+                </tr>
+              ) : filteredPatients.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '100px' }}>
+                    <div style={{ opacity: 0.3 }}>
+                      <Users size={64} style={{ margin: '0 auto 16px', display: 'block' }} />
+                      <p style={{ fontWeight: '800', textTransform: 'uppercase' }}>No records found</p>
                     </div>
                   </td>
-                  <td className="leh-label">{patient.phone || '—'}</td>
-                  <td>
-                    <span className={`leh-status-badge ${(() => {
-                      const s = patient.current_status as PatientStatus;
-                      if (!s) return 'gray';
-                      if (s === PatientStatus.WAITING_FOR_TRIAGE) return 'blue';
-                      if (s === PatientStatus.IN_TRIAGE) return 'blue';
-                      if (s === PatientStatus.WAITING_FOR_CONSULTATION) return 'amber';
-                      if (s === PatientStatus.IN_CONSULTATION) return 'green';
-                      if (s === PatientStatus.CONSULTATION_COMPLETE) return 'green';
-                      if (s === PatientStatus.AWAITING_BILLING) return 'red';
-                      if (s === PatientStatus.PAID) return 'green';
-                      if (s === PatientStatus.ADMITTED) return 'purple';
-                      return 'green';
-                    })()}`} style={{ fontSize: '10px', textTransform: 'uppercase' }}>
-                      {patient.current_status ? (StatusLabels[patient.current_status as PatientStatus] || patient.current_status) : 'No Active Visit'}
-                    </span>
-                  </td>
-                  <td style={{ paddingRight: '24px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                      <Link
-                        to={`/patients/profile/${encodeURIComponent(patient.id)}`}
-                        className="leh-btn-outline"
-                        style={{ height: '36px', padding: '0 14px', borderRadius: '10px' }}
-                        data-tooltip={`View Profile for ${patient.full_name}`}
-                        aria-label="View Patient Profile"
-                      >
-                        <Eye size={15} /><span style={{ fontSize: '12px' }}>VIEW</span>
-                      </Link>
-                      
-                      {(() => {
+                </tr>
+              ) : filteredPatients.map(patient => (
+                  <tr key={patient.id} className="leh-table-row">
+                    <td style={{ paddingLeft: '24px' }}>
+                      <span style={{ fontFamily: 'monospace', fontWeight: '900', color: 'var(--leh-primary)', background: 'var(--leh-primary-light)', padding: '5px 12px', borderRadius: '8px', fontSize: '11px' }}>
+                        {patient.id}
+                      </span>
+                    </td>
+                    <td style={{ fontWeight: '800', color: 'var(--leh-text-dark)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                        <span>{patient.full_name}</span>
+                        {patient.family_id && (
+                          <Link 
+                            to={`/patients/family/${patient.family_id}`}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              color: 'var(--leh-forest)',
+                              background: 'var(--leh-forest-tint)',
+                              border: '1px solid var(--leh-border)',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              textDecoration: 'none'
+                            }}
+                            title={`Belongs to ${patient.family_name || 'Family'} (${patient.family_card_number || ''})`}
+                          >
+                            <Users size={11} />
+                            <span>{patient.family_name} Family{patient.relationship_to_family ? ` • ${patient.relationship_to_family}` : ''}</span>
+                          </Link>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span className={`leh-status-badge ${patient.gender === 'Male' ? 'blue' : 'red'}`} style={{ fontSize: '10px' }}>{patient.gender}</span>
+                        <span className="leh-label">{calculateAge(patient.dob)} yrs</span>
+                      </div>
+                    </td>
+                    <td className="leh-label">{patient.phone || '—'}</td>
+                    <td>
+                      <span className={`leh-status-badge ${(() => {
                         const s = patient.current_status as PatientStatus;
+                        if (!s) return 'gray';
+                        if (s === PatientStatus.WAITING_FOR_TRIAGE) return 'blue';
+                        if (s === PatientStatus.IN_TRIAGE) return 'blue';
+                        if (s === PatientStatus.WAITING_FOR_CONSULTATION) return 'amber';
+                        if (s === PatientStatus.IN_CONSULTATION) return 'green';
+                        if (s === PatientStatus.CONSULTATION_COMPLETE) return 'green';
+                        if (s === PatientStatus.AWAITING_BILLING) return 'red';
+                        if (s === PatientStatus.PAID) return 'green';
+                        if (s === PatientStatus.ADMITTED) return 'purple';
+                        return 'green';
+                      })()}`} style={{ fontSize: '10px', textTransform: 'uppercase' }}>
+                        {patient.current_status ? (StatusLabels[patient.current_status as PatientStatus] || patient.current_status) : 'No Active Visit'}
+                      </span>
+                    </td>
+                    <td style={{ paddingRight: '24px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                        <Link
+                          to={`/patients/profile/${encodeURIComponent(patient.id)}`}
+                          className="leh-btn-outline"
+                          style={{ height: '36px', padding: '0 14px', borderRadius: '10px' }}
+                          data-tooltip={`View Profile for ${patient.full_name}`}
+                          aria-label="View Patient Profile"
+                        >
+                          <Eye size={15} /><span style={{ fontSize: '12px' }}>VIEW</span>
+                        </Link>
                         
-                        // 1. DISCHARGED -> Only View
-                        if (s === PatientStatus.DISCHARGED) return null;
+                        {(() => {
+                          const s = patient.current_status as PatientStatus;
+                          
+                          // 1. DISCHARGED -> Only View
+                          if (s === PatientStatus.DISCHARGED) return null;
 
-                        // 2. Already in clinical workflow -> Disabled Grey
-                        const isInQueue = [
-                          PatientStatus.WAITING_FOR_TRIAGE,
-                          PatientStatus.WAITING_FOR_CONSULTATION,
-                          PatientStatus.IN_CONSULTATION,
-                          PatientStatus.CONSULTATION_COMPLETE
-                        ].includes(s as any);
+                          // 2. Already in clinical workflow -> Disabled Grey
+                          const isInQueue = [
+                            PatientStatus.WAITING_FOR_TRIAGE,
+                            PatientStatus.WAITING_FOR_CONSULTATION,
+                            PatientStatus.IN_CONSULTATION,
+                            PatientStatus.CONSULTATION_COMPLETE
+                          ].includes(s as any);
 
-                        if (isInQueue) {
-                          return (
-                            <button
-                              disabled
-                              className="leh-btn-outline"
-                              title="Patient already in queue"
-                              style={{ 
-                                height: '36px', padding: '0 14px', borderRadius: '10px', 
-                                opacity: 0.6, cursor: 'not-allowed', 
-                                color: '#94a3b8', borderColor: '#e2e8f0', background: '#f8fafc' 
-                              }}
-                            >
-                              <CheckCircle size={15} /><span style={{ fontSize: '12px' }}>CHECK-IN</span>
-                            </button>
-                          );
-                        }
+                          if (isInQueue) {
+                            return (
+                              <button
+                                disabled
+                                className="leh-btn-outline"
+                                title="Patient already in queue"
+                                style={{ 
+                                  height: '36px', padding: '0 14px', borderRadius: '10px', 
+                                  opacity: 0.6, cursor: 'not-allowed', 
+                                  color: '#94a3b8', borderColor: '#e2e8f0', background: '#f8fafc' 
+                                }}
+                              >
+                                <CheckCircle size={15} /><span style={{ fontSize: '12px' }}>CHECK-IN</span>
+                              </button>
+                            );
+                          }
 
-                        // 3. Post-Billing -> Send to Triage (Amber)
-                        const isPostBilling = s === PatientStatus.AWAITING_BILLING || s === PatientStatus.PAID;
-                        if (isPostBilling) {
+                          // 3. Post-Billing -> Send to Triage (Amber)
+                          const isPostBilling = s === PatientStatus.AWAITING_BILLING || s === PatientStatus.PAID;
+                          if (isPostBilling) {
+                            return (
+                              <Link
+                                to={`/patients/check-in/${encodeURIComponent(patient.id)}`}
+                                className="leh-btn-primary"
+                                style={{ height: '36px', padding: '0 14px', borderRadius: '10px', background: '#f59e0b', border: 'none' }}
+                                data-tooltip="Send patient to Triage Queue"
+                              >
+                                <CheckCircle size={15} /><span style={{ fontSize: '12px' }}>SEND TO TRIAGE</span>
+                              </Link>
+                            );
+                          }
+
+                          // 4. REGISTERED or No active visit -> Normal Check-In
                           return (
                             <Link
                               to={`/patients/check-in/${encodeURIComponent(patient.id)}`}
                               className="leh-btn-primary"
-                              style={{ height: '36px', padding: '0 14px', borderRadius: '10px', background: '#f59e0b', border: 'none' }}
-                              data-tooltip="Send patient to Triage Queue"
+                              style={{ height: '36px', padding: '0 14px', borderRadius: '10px' }}
+                              data-tooltip="Start Check-in Process"
                             >
-                              <CheckCircle size={15} /><span style={{ fontSize: '12px' }}>SEND TO TRIAGE</span>
+                              <CheckCircle size={15} /><span style={{ fontSize: '12px' }}>CHECK-IN</span>
                             </Link>
                           );
-                        }
+                        })()}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
+        </div>
+      )}
 
-                        // 4. REGISTERED or No active visit -> Normal Check-In
-                        return (
-                          <Link
-                            to={`/patients/check-in/${encodeURIComponent(patient.id)}`}
-                            className="leh-btn-primary"
-                            style={{ height: '36px', padding: '0 14px', borderRadius: '10px' }}
-                            data-tooltip="Start Check-in Process"
-                          >
-                            <CheckCircle size={15} /><span style={{ fontSize: '12px' }}>CHECK-IN</span>
-                          </Link>
-                        );
-                      })()}
+      {/* TAB 2: FAMILIES TABLE */}
+      {activeTab === 'families' && (
+        <div className="leh-table-wrapper">
+          <table className="leh-table">
+            <thead>
+              <tr>
+                <th style={{ paddingLeft: '24px', width: '140px' }}>FAMILY CARD NO.</th>
+                <th>HOUSEHOLD NAME</th>
+                <th>CONTACT PERSON</th>
+                <th>CONTACT PHONE</th>
+                <th>RESIDENCE / LOCATION</th>
+                <th>MEMBERS</th>
+                <th style={{ textAlign: 'right', paddingRight: '24px' }}>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {familiesLoading ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '100px' }}>
+                    <LoadingSpinner size="large" label="Loading family households..." />
+                  </td>
+                </tr>
+              ) : filteredFamilies.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '100px' }}>
+                    <div style={{ opacity: 0.3 }}>
+                      <Users size={64} style={{ margin: '0 auto 16px', display: 'block' }} />
+                      <p style={{ fontWeight: '800', textTransform: 'uppercase' }}>No family records found</p>
                     </div>
                   </td>
                 </tr>
-              ))
-            }
-          </tbody>
-        </table>
-      </div>
+              ) : filteredFamilies.map(f => (
+                <tr key={f.id} className="leh-table-row">
+                  <td style={{ paddingLeft: '24px' }}>
+                    <span style={{ fontFamily: 'monospace', fontWeight: '900', color: 'var(--leh-primary)', background: 'var(--leh-primary-light)', padding: '5px 12px', borderRadius: '8px', fontSize: '11px' }}>
+                      {f.family_card_number}
+                    </span>
+                  </td>
+                  <td>
+                    <Link 
+                      to={`/patients/family/${f.id}`}
+                      style={{ fontWeight: '800', color: 'var(--leh-text-dark)', textDecoration: 'none' }}
+                    >
+                      {f.family_name} Family
+                    </Link>
+                  </td>
+                  <td style={{ fontWeight: '700', color: '#334155' }}>
+                    {f.contact_person_name}
+                  </td>
+                  <td className="leh-label">
+                    {f.contact_person_phone || '—'}
+                  </td>
+                  <td className="leh-label" style={{ maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {f.residential_address || '—'}
+                  </td>
+                  <td>
+                    <span style={{
+                      background: '#e0f2fe',
+                      color: '#0369a1',
+                      padding: '4px 10px',
+                      borderRadius: '12px',
+                      fontSize: '11px',
+                      fontWeight: '800'
+                    }}>
+                      {f.members_count || 0} Member{f.members_count === 1 ? '' : 's'}
+                    </span>
+                  </td>
+                  <td style={{ paddingRight: '24px', textAlign: 'right' }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                      <Link
+                        to={`/patients/family/${f.id}`}
+                        className="leh-btn-primary"
+                        style={{ height: '34px', padding: '0 14px', borderRadius: '8px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        <Eye size={13} />
+                        <span>VIEW HOUSEHOLD</span>
+                      </Link>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 };

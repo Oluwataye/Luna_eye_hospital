@@ -14,7 +14,7 @@
 /* --- Left Panel: Clinical Branding --- */
 .branding-panel {
   flex: 0 0 60%;
-  background-color: #050a18;
+  background-color: var(--leh-forest-active);
   display: flex;
   flex-direction: column;
   padding: 80px 100px;
@@ -40,16 +40,17 @@
 .brand-logo {
   width: 64px;
   height: 64px;
-  background: #2563eb;
-  color: white;
+  background: var(--leh-lime);
+  color: var(--leh-forest);
   border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 8px 20px rgba(192, 255, 114, 0.35);
 }
 
 .brand-title {
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--leh-font);
   font-size: 32px;
   font-weight: 900;
   color: white;
@@ -61,17 +62,17 @@
 .brand-subtitle {
   font-size: 11px;
   font-weight: 800;
-  color: #3b82f6;
+  color: var(--leh-lime);
   letter-spacing: 0.1em;
 }
 
 .pill-badge {
   display: inline-block;
   padding: 4px 12px;
-  background: rgba(37, 99, 235, 0.1);
-  border: 1px solid rgba(37, 99, 235, 0.2);
+  background: rgba(192, 255, 114, 0.15);
+  border: 1px solid rgba(192, 255, 114, 0.3);
   border-radius: 6px;
-  color: #60a5fa;
+  color: var(--leh-lime);
   font-size: 11px;
   font-weight: 800;
   margin-bottom: 32px;
@@ -280,22 +281,22 @@
 }
 
 .remember-me input:checked + .checkbox-custom {
-  background: #2563eb;
-  border-color: #2563eb;
+  background: var(--leh-forest);
+  border-color: var(--leh-forest);
 }
 
 .forgot-password {
   font-size: 13px;
   font-weight: 800;
-  color: #2563eb;
+  color: var(--leh-forest);
   text-decoration: none;
 }
 
 .login-submit-btn {
   width: 100%;
   height: 64px;
-  background: #2563eb;
-  color: white;
+  background: var(--leh-forest);
+  color: var(--leh-lime);
   border: none;
   border-radius: 20px;
   font-size: 16px;
@@ -305,12 +306,13 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  box-shadow: 0 12px 24px -8px rgba(37, 99, 235, 0.4);
+  box-shadow: 0 12px 24px -8px rgba(46, 90, 38, 0.45);
   transition: all 0.2s;
+  font-family: var(--leh-font);
 }
 
 .login-submit-btn:hover {
-  background: #1d4ed8;
+  background: var(--leh-forest-hover);
   transform: translateY(-2px);
 }
 

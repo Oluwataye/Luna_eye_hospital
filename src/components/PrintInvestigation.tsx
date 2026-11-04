@@ -21,8 +21,8 @@ interface PrintInvestigationProps {
 export const PrintInvestigation: React.FC<PrintInvestigationProps> = ({ investigation }) => {
   return (
     <div className="clinical-report pos-receipt" style={{ width: '100%', maxWidth: '800px', padding: '40px', fontFamily: 'serif' }}>
-      <div className="receipt-header" style={{ borderBottom: '2px solid #2563eb', paddingBottom: '20px' }}>
-        <h1 style={{ color: '#2563eb', margin: 0, fontSize: '28px' }}>LUNA EYE HOSPITAL</h1>
+      <div className="receipt-header" style={{ borderBottom: '2px solid var(--leh-forest)', paddingBottom: '20px' }}>
+        <h1 style={{ color: 'var(--leh-forest)', margin: 0, fontSize: '28px' }}>LUNA EYE HOSPITAL</h1>
         <p style={{ margin: '5px 0' }}>13A, Behind Bomas Supermarket, Old Airport Road, Minna</p>
         <p style={{ margin: '5px 0' }}>Tel: 09044687558 | WhatsApp: 09114111418</p>
         <p style={{ margin: '5px 0' }}>Email: lunaeyehospital@gmail.com</p>

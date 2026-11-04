@@ -1,0 +1,221 @@
+/* ============================================================
+   INNER NAV TABS — VisionCare EMR
+   Standardized internal navigation component matching the 
+   prominent, high-contrast visual identity of the external sidebar
+   ============================================================ */
+
+/* ── Base horizontal container ── */
+.inner-nav-container {
+  display: inline-flex;
+  align-items: center;
+  background: var(--leh-bg);
+  border: 1px solid var(--leh-border);
+  border-radius: 14px;
+  padding: 6px;
+  box-shadow: var(--leh-shadow);
+  gap: 6px;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* ── Vertical container ── */
+.inner-nav-container--vertical {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  background: var(--leh-surface);
+  border: 1px solid var(--leh-border);
+  border-radius: 16px;
+  padding: 8px;
+  gap: 4px;
+  box-shadow: var(--leh-shadow);
+}
+
+.inner-nav-container--full-width {
+  display: flex;
+  width: 100%;
+}
+
+.inner-nav-container--scrollable {
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: thin;
+}
+
+.inner-nav-container--scrollable::-webkit-scrollbar {
+  height: 4px;
+}
+
+.inner-nav-container--scrollable::-webkit-scrollbar-thumb {
+  background: var(--leh-border);
+  border-radius: 4px;
+}
+
+/* ── Base Tab item ── */
+.inner-nav-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border-radius: 10px;
+  border: 1px solid var(--leh-border);
+  background: var(--leh-surface);
+  color: var(--leh-muted);
+  font-weight: 600;
+  font-size: 13px;
+  font-family: var(--leh-font);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  user-select: none;
+  text-decoration: none;
+  box-sizing: border-box;
+  position: relative;
+  box-shadow: var(--leh-shadow);
+}
+
+.inner-nav-tab:hover:not(.inner-nav-tab--active):not(:disabled) {
+  background: var(--leh-forest-tint);
+  color: var(--leh-forest);
+  border-color: var(--leh-border);
+}
+
+/* Active State — Forest Green background, Lime text (WCAG AA: >7:1) */
+.inner-nav-tab--active {
+  background: var(--leh-forest) !important;
+  color: var(--leh-lime) !important;     /* Lime on Forest — high contrast */
+  border-color: var(--leh-forest) !important;
+  font-weight: 800;
+  box-shadow: 0 4px 14px rgba(46, 90, 38, 0.30) !important;
+}
+
+.inner-nav-tab--active svg {
+  color: var(--leh-lime) !important;
+}
+
+/* ── Vertical Variant Specifics ── */
+.inner-nav-container--vertical .inner-nav-tab {
+  width: 100%;
+  justify-content: flex-start;
+  padding: 11px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--leh-font);
+  margin-bottom: 2px;
+  background: var(--leh-surface);
+  border: 1px solid var(--leh-border);
+  color: var(--leh-muted);
+  box-shadow: none;
+}
+
+.inner-nav-container--vertical .inner-nav-tab:hover:not(.inner-nav-tab--active):not(:disabled) {
+  background: var(--leh-forest-tint);
+  color: var(--leh-forest);
+  border-color: var(--leh-border);
+  transform: translateX(3px);
+}
+
+.inner-nav-container--vertical .inner-nav-tab--active {
+  background: var(--leh-forest) !important;
+  color: var(--leh-lime) !important;
+  border-color: var(--leh-forest) !important;
+  box-shadow: 0 4px 14px rgba(46, 90, 38, 0.30) !important;
+  transform: none;
+}
+
+.inner-nav-container--vertical .inner-nav-tab .inner-nav-tab-icon {
+  color: var(--leh-muted);
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.inner-nav-container--vertical .inner-nav-tab:hover:not(.inner-nav-tab--active) .inner-nav-tab-icon {
+  transform: scale(1.1);
+  color: var(--leh-forest);
+}
+
+.inner-nav-container--vertical .inner-nav-tab--active .inner-nav-tab-icon {
+  color: var(--leh-lime) !important;
+}
+
+.inner-nav-container--vertical .inner-nav-tab .inner-nav-tab-label {
+  flex: 1;
+  text-align: left;
+}
+
+.inner-nav-container--full-width:not(.inner-nav-container--vertical) .inner-nav-tab {
+  flex: 1;
+}
+
+/* Sizes */
+.inner-nav-container--small .inner-nav-tab {
+  padding: 7px 12px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+.inner-nav-container--large .inner-nav-tab {
+  padding: 12px 24px;
+  font-size: 14px;
+}
+
+/* Status icon (e.g. checkmark) */
+.inner-nav-tab-status-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Chevron */
+.inner-nav-tab-chevron {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* Disabled */
+.inner-nav-tab:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Icon */
+.inner-nav-tab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 0.2s ease;
+}
+
+/* Label */
+.inner-nav-tab-label {
+  letter-spacing: 0.01em;
+}
+
+/* Badge count */
+.inner-nav-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 7px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 800;
+  font-family: var(--leh-font);
+  margin-left: 6px;
+  background: var(--leh-border);
+  color: var(--leh-muted);
+  line-height: 1;
+}
+
+.inner-nav-tab--active .inner-nav-tab-badge {
+  background: var(--leh-lime);
+  color: var(--leh-forest);
+}
+
+.inner-nav-tab:not(.inner-nav-tab--active) .inner-nav-tab-badge {
+  background: var(--leh-border);
+  color: var(--leh-muted);
+}

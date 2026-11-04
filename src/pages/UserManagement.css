@@ -15,7 +15,7 @@
 
 .role-badge.admin { background-color: #fef2f2; color: #991b1b; border: 1px solid #fee2e2; }
 .role-badge.receptionist { background-color: #ecfdf5; color: #065f46; border: 1px solid #d1fae5; }
-.role-badge.nurse { background-color: #eff6ff; color: #1e40af; border: 1px solid #dbeafe; }
+.role-badge.nurse { background-color: var(--leh-info-bg); color: var(--leh-info); border: 1px solid var(--leh-info-border); }
 .role-badge.consultant { background-color: #f5f3ff; color: #5b21b6; border: 1px solid #ede9fe; }
 
 .user-status-dot {

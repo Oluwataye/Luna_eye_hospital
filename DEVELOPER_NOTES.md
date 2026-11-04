@@ -16,10 +16,17 @@ Check the bottom of the **Billing Page** for the **Build Timestamp**.
 
 ## Improved Development Workflow
 To avoid manual builds during active development:
-1.  Run `npm run dev` in the root.
-2.  This starts a Vite development server with **Hot Module Replacement (HMR)**.
-3.  Any changes saved to `src/` will reflect in the browser instantly.
-4.  Only run `npm run build` when you are ready to deploy the stable version for clinical use.
+1.  Run `npm run dev:all` in the root (starts both Vite frontend and Express server concurrently).
+2.  Any changes saved to `src/` reflect in the browser instantly via HMR.
+3.  When deploying to the hospital workstations, execute:
+    ```bash
+    npm run release:standalone
+    ```
+    This automatically builds the production assets, compiles backend TypeScript, packages `packaged-release/VisionCare-EMR.exe`, and synchronizes runtime binaries.
+
+## Full System Architecture & Module Reference
+For in-depth architectural specifications, database schemas, 12-section clinical chart details, CDS drug contraindication rules, bilingual drop leaflets, and hardware protocols, refer to:
+👉 [SYSTEM_DOCUMENTATION.md](file:///c:/Users/HP/Documents/Luna%20Eyes%20Hospital/SYSTEM_DOCUMENTATION.md)
 
 ---
-*Last Updated: 07/05/2026*
+*Last Updated: 18/10/2026*

@@ -6,6 +6,7 @@ import { useNotification } from '../context/NotificationContext';
 import { formatDateStandard } from '../utils/date';
 import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { InnerNavTabs } from '../components/InnerNavTabs';
 
 export const Results: React.FC = () => {
   const { user } = useAuth();
@@ -115,7 +116,7 @@ export const Results: React.FC = () => {
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'center',
-            boxShadow: '0 8px 16px -4px rgba(37, 99, 235, 0.3)'
+            boxShadow: '0 8px 16px -4px rgba(46, 90, 38, 0.35)'
           }}>
             <FlaskConical size={28} style={{ color: '#fff' }} />
           </div>
@@ -125,34 +126,30 @@ export const Results: React.FC = () => {
           </div>
         </div>
         
-        <div style={{ display: 'flex', background: '#fff', padding: '6px', borderRadius: '14px', border: '1px solid #e5e7eb', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
-          <button 
-            className={`leh-tab ${activeTab === 'pending' ? 'active' : ''}`} 
-            style={{ height: '36px', padding: '0 16px', fontSize: '11px', fontWeight: '800', border: 'none' }}
-            onClick={() => setActiveTab('pending')}
-          >
-            TEST QUEUE
-          </button>
-          <button 
-            className={`leh-tab ${activeTab === 'completed' ? 'active' : ''}`} 
-            style={{ height: '36px', padding: '0 16px', fontSize: '11px', fontWeight: '800', border: 'none' }}
-            onClick={() => setActiveTab('completed')}
-          >
-            COMPLETED
-          </button>
-          <button 
-            className={`leh-tab ${activeTab === 'reviewed' ? 'active' : ''}`} 
-            style={{ height: '36px', padding: '0 16px', fontSize: '11px', fontWeight: '800', border: 'none' }}
-            onClick={() => setActiveTab('reviewed')}
-            data-tooltip="View clinical archives"
-          >
-            ARCHIVE
-          </button>
-          <div style={{ width: '1px', background: '#e5e7eb', margin: '8px 4px' }}></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <InnerNavTabs<'pending' | 'completed' | 'reviewed'>
+            tabs={[
+              { id: 'pending', label: 'TEST QUEUE' },
+              { id: 'completed', label: 'COMPLETED' },
+              { id: 'reviewed', label: 'ARCHIVE', tooltip: 'View clinical archives' }
+            ]}
+            activeTab={activeTab}
+            onChange={setActiveTab}
+          />
           <button 
             onClick={loadInvestigations} 
             className="leh-btn-outline" 
-            style={{ border: 'none', height: '36px', width: '36px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            style={{ 
+              height: '46px', 
+              width: '46px', 
+              padding: 0, 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              background: '#ffffff'
+            }}
             data-tooltip="Refresh test queue"
             aria-label="Refresh investigations"
           >

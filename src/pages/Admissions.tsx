@@ -8,6 +8,7 @@ import { formatDateStandard } from '../utils/date';
 import { LiveSearch } from '../components/LiveSearch';
 import { useNotification } from '../context/NotificationContext';
 import { printElementId } from '../utils/printHelpers';
+import { InnerNavTabs } from '../components/InnerNavTabs';
 
 export const Admissions: React.FC = () => {
   const { user } = useAuth();
@@ -162,22 +163,15 @@ export const Admissions: React.FC = () => {
       <div style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: '32px', alignItems: 'start' }}>
         {/* Left Grid: Admission Registry */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <div className="leh-table-card" style={{ padding: '8px' }}>
-             <div style={{ display: 'flex', gap: '4px' }}>
-               <button 
-                 onClick={() => setActiveTab('admitted')}
-                 style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: activeTab === 'admitted' ? 'var(--leh-primary-light)' : 'transparent', color: activeTab === 'admitted' ? 'var(--leh-primary)' : 'var(--leh-text-muted)', fontWeight: '800', fontSize: '13px', cursor: 'pointer' }}
-               >
-                 CURRENTLY ADMITTED
-               </button>
-               <button 
-                 onClick={() => setActiveTab('discharged')}
-                 style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: activeTab === 'discharged' ? 'var(--leh-primary-light)' : 'transparent', color: activeTab === 'discharged' ? 'var(--leh-primary)' : 'var(--leh-text-muted)', fontWeight: '800', fontSize: '13px', cursor: 'pointer' }}
-               >
-                 DISCHARGE LOGS
-               </button>
-             </div>
-          </div>
+          <InnerNavTabs<'admitted' | 'discharged'>
+            tabs={[
+              { id: 'admitted', label: 'CURRENTLY ADMITTED', icon: BedDouble },
+              { id: 'discharged', label: 'DISCHARGE LOGS', icon: UserMinus }
+            ]}
+            activeTab={activeTab}
+            onChange={setActiveTab}
+            fullWidth
+          />
 
           <div className="leh-table-card">
             <div style={{ padding: '24px', borderBottom: '1px solid var(--leh-border-light)' }}>
@@ -261,7 +255,7 @@ export const Admissions: React.FC = () => {
                     )}
                   />
                   {newAdmission.patient_id && (
-                    <div style={{ marginTop: '12px', padding: '12px 16px', background: 'var(--leh-primary-light)', borderRadius: '12px', border: '1px solid var(--leh-primary)', color: 'var(--leh-primary)', fontWeight: '800', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ marginTop: '12px', padding: '12px 16px', background: 'var(--leh-forest-light)', borderRadius: '12px', border: '1px solid var(--leh-primary)', color: 'var(--leh-primary)', fontWeight: '800', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
                       <CheckCircle size={14} /> TARGET SELECTED: {newAdmission.patient_id}
                     </div>
                   )}
@@ -371,7 +365,7 @@ export const Admissions: React.FC = () => {
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                    <div style={{ padding: '24px', background: 'var(--leh-primary-light)', borderRadius: '24px', border: '1px solid rgba(37, 99, 235, 0.1)' }}>
+                    <div style={{ padding: '24px', background: 'var(--leh-forest-light)', borderRadius: '24px', border: '1px solid rgba(46, 90, 38, 0.18)' }}>
                       <h3 className="leh-label" style={{ fontSize: '11px', fontWeight: '900', color: 'var(--leh-primary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Shield size={14} /> PRIMARY CLINICAL INDICATION
                       </h3>

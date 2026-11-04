@@ -17,39 +17,35 @@
 
 .leh-strategic-btn:hover {
   transform: translateY(-4px);
-  background: white !important;
-  border-color: var(--leh-primary) !important;
-  box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.1);
+  background: var(--leh-forest-tint) !important;
+  border-color: var(--leh-forest) !important;
+  box-shadow: 0 10px 25px -5px rgba(46, 90, 38, 0.12);
 }
 
 .leh-strategic-btn:hover svg {
   transform: scale(1.1);
 }
 
-/* Audit Trail Table Polish */
-.leh-table-card .leh-table th {
-  background: #f8fafc;
-  border-top: 1px solid var(--leh-border-light);
-}
-
+/* Audit Trail Table — global .leh-table th handles lime header;
+   td border uses soft brand green */
 .leh-table-card .leh-table td {
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--leh-border-light);
 }
 
-/* System Integrity Pulse */
+/* System Integrity Pulse — using brand semantic tokens */
 .integrity-healthy {
-  background: #f0fdf4;
-  border: 1px solid #dcfce7;
+  background: var(--leh-success-bg);
+  border: 1px solid var(--leh-success-border);
 }
 
 .integrity-warning {
-  background: #fffbeb;
-  border: 1px solid #fef3c7;
+  background: var(--leh-warning-bg);
+  border: 1px solid var(--leh-warning-border);
 }
 
 .integrity-danger {
-  background: #fef2f2;
-  border: 1px solid #fee2e2;
+  background: var(--leh-danger-bg);
+  border: 1px solid var(--leh-danger-border);
 }
 
 /* Responsive Overrides */

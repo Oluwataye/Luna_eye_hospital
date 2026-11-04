@@ -139,7 +139,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
                    display: 'flex', 
                    gap: '16px', 
                    cursor: 'pointer',
-                   background: n.is_read ? 'white' : 'rgba(37, 99, 235, 0.02)',
+                   background: n.is_read ? 'white' : 'rgba(46, 90, 38, 0.03)',
                    transition: 'background 0.2s ease'
                 }}
               >

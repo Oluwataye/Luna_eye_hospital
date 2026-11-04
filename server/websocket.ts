@@ -16,6 +16,45 @@ interface LiveSession {
   tempFilePath: string;
 }
 
+const activeVoiceSockets = new Set<WebSocket>();
+
+export function broadcastWsVoiceStatus(ai_enabled: boolean) {
+  const payload = JSON.stringify({ type: 'AI_STATUS', ai_enabled });
+  for (const ws of activeVoiceSockets) {
+    try {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(payload);
+        if (!ai_enabled) {
+          ws.send(JSON.stringify({ error: 'AI Voice Dictation has been paused by system administration.', disabled: true }));
+          ws.close(1008, 'AI Voice disabled by admin');
+        }
+      }
+    } catch {}
+  }
+}
+
+/**
+ * Broadcast EDI clearinghouse queue state transitions to connected clients
+ */
+export function broadcastEdiQueueUpdate(data: {
+  event: 'JOB_ENQUEUED' | 'JOB_STARTED' | 'JOB_COMPLETED' | 'JOB_FAILED' | 'JOB_RETRIED';
+  job: any;
+  batch_id?: number;
+}) {
+  const payload = JSON.stringify({
+    type: 'EDI_QUEUE_UPDATE',
+    ...data,
+    timestamp: new Date().toISOString()
+  });
+  for (const ws of activeVoiceSockets) {
+    try {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(payload);
+      }
+    } catch {}
+  }
+}
+
 export function setupVoiceWebSocket(server: Server) {
   const wss = new WebSocketServer({ server, path: '/api/voice/live-ws' });
 
@@ -27,8 +66,25 @@ export function setupVoiceWebSocket(server: Server) {
   }
 
   wss.on('connection', (ws: WebSocket) => {
+    activeVoiceSockets.add(ws);
     const sessionId = crypto.randomUUID();
     const tempFilePath = path.join(tempDir, `live_${sessionId}.webm`);
+
+    const isPackaged = typeof (process as any).pkg !== 'undefined';
+    const serverRootDir = __dirname.includes('dist') ? path.join(__dirname, '..') : path.resolve(__dirname, '..');
+    const writableRootDir = isPackaged ? path.dirname(process.execPath) : serverRootDir;
+    const configPath = path.resolve(writableRootDir, 'voice_config.json');
+
+    try {
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        if (config.ai_enabled === false) {
+          ws.send(JSON.stringify({ error: 'AI Voice Dictation is currently disabled by system administration.', disabled: true }));
+          ws.close(1008, 'AI Voice disabled by admin');
+          return;
+        }
+      }
+    } catch {}
 
     const session: LiveSession = {
       id: sessionId,
@@ -116,6 +172,8 @@ export function setupVoiceWebSocket(server: Server) {
               text: session.lastTranscript,
               sessionId: session.id
             }));
+          } else if (msg.type === 'subscribe_edi' || msg.type === 'ping') {
+            ws.send(JSON.stringify({ type: 'ack', event: msg.type }));
           }
         }
       } catch (err: any) {
@@ -124,6 +182,7 @@ export function setupVoiceWebSocket(server: Server) {
     });
 
     const cleanup = () => {
+      activeVoiceSockets.delete(ws);
       if (fs.existsSync(session.tempFilePath)) {
         try {
           fs.unlinkSync(session.tempFilePath);

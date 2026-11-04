@@ -18,7 +18,13 @@ import {
   ChevronRight,
   ShieldCheck,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  TrendingUp,
+  DollarSign,
+  Shield,
+  FileText,
+  CreditCard,
+  Building2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSidebar } from '../context/SidebarContext';
@@ -47,12 +53,33 @@ export const Sidebar: React.FC = () => {
       ]
     },
     {
-      label: 'Operations & Finance',
+      label: 'Operations & Supply',
       items: [
         { path: '/billing', label: 'Billing', icon: Receipt, roles: ['Admin', 'Receptionist'] },
         { path: '/inventory', label: 'Inventory', icon: Package, roles: ['Admin'] },
         { path: '/procurement', label: 'Procurement', icon: Truck, roles: ['Admin'] },
-        { path: '/reports', label: 'Reports', icon: BarChart3, roles: ['Admin'] },
+      ]
+    },
+    {
+      label: 'Business & Finance',
+      items: [
+        { path: '/profit-loss', label: 'Profit & Loss', icon: TrendingUp, roles: ['Admin'] },
+        { path: '/expenses', label: 'Expenses Log', icon: DollarSign, roles: ['Admin'] },
+        { path: '/payroll', label: 'Payroll & Salaries', icon: Users, roles: ['Admin'] },
+        { path: '/tax', label: 'Tax & Statutory', icon: Shield, roles: ['Admin'] },
+        { path: '/reports', label: 'All Reports', icon: BarChart3, roles: ['Admin'] },
+      ]
+    },
+    {
+      label: 'Insurance & Claims',
+      items: [
+        { path: '/insurance/claims', label: 'Claims', icon: FileText, roles: ['Admin'] },
+        { path: '/insurance/authorizations', label: 'Authorizations', icon: ShieldCheck, roles: ['Admin'] },
+        { path: '/insurance/enrollees', label: 'Enrollees', icon: Users, roles: ['Admin'] },
+        { path: '/insurance/payers', label: 'Payers & Plans', icon: Building2, roles: ['Admin'] },
+        { path: '/insurance/tariffs', label: 'Tariffs', icon: DollarSign, roles: ['Admin'] },
+        { path: '/insurance/remittances', label: 'Remittances', icon: CreditCard, roles: ['Admin'] },
+        { path: '/insurance/reports', label: 'Insurance Reports', icon: BarChart3, roles: ['Admin'] },
       ]
     },
     {
@@ -98,6 +125,9 @@ export const Sidebar: React.FC = () => {
           {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
         </button>
       </div>
+
+      {/* Gold Divider */}
+      <div className="sidebar-gold-divider" />
 
       {/* Nav */}
       <div className="sidebar-scrollable">

@@ -1,12 +1,17 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
-  Save, CheckCircle, User, Activity, Eye, 
+  Save, User, Activity, Eye, 
   Pill, Glasses, Stethoscope, Scissors, CheckCircle2, Printer, 
   Search, Plus, Trash2, Clock, X, RefreshCcw, Loader2,
   History as HistoryIcon, Droplets, Target, 
-  ClipboardList, AlertTriangle, Download, Info, AlertCircle
+  ClipboardList, AlertTriangle, Download, Info, AlertCircle, MicOff,
+  Layers, ScrollText, Circle, ListChecks, ArrowRight,
+  ShieldAlert, ShieldCheck, Sparkles,
+  Calendar, CalendarCheck, CalendarDays,
+  Sun, Moon, Sunrise, Sunset, FileText,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
-import { VoiceInputWrapper, VoiceRecordingBadge } from '../components/voice';
+import { VoiceInputWrapper, VoiceRecordingBadge, useVoiceSession } from '../components/voice';
 
 const SNELLEN_OPTIONS = ['6/6', '6/9', '6/12', '6/18', '6/24', '6/36', '6/60', '3/60', '1/60', 'CF', 'HM', 'PL', 'NPL'];
 
@@ -56,6 +61,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { formatDateStandard, formatDateTimeStandard } from '../utils/date';
 import { PatientStatus } from '../constants/workflow';
+import { InnerNavTabs } from '../components/InnerNavTabs';
 import './Consultations.css';
 
 // --- TYPES ---
@@ -69,18 +75,387 @@ interface Medication {
   instructions: string;
 }
 
+interface PrescriptionRegimen {
+  id: string;
+  name: string;
+  shortName: string;
+  badgeColor: { bg: string; text: string; border: string };
+  description: string;
+  medications: Array<{
+    drug_name: string;
+    strength: string;
+    route: string;
+    dose: string;
+    frequency: string;
+    duration: string;
+    instructions: string;
+  }>;
+  counselingInstructions: string;
+}
+
+const OPHTHALMIC_REGIMENS: PrescriptionRegimen[] = [
+  {
+    id: 'cataract-postop',
+    name: 'Post-Op Cataract Protocol',
+    shortName: 'Post-Op Cataract',
+    badgeColor: { bg: '#e0e7ff', text: '#3730a3', border: '#c7d2fe' },
+    description: 'Triple therapy: Moxifloxacin + Prednisolone + Nepafenac',
+    medications: [
+      { drug_name: 'G. Moxifloxacin 0.5%', strength: '0.5%', route: 'Topical', dose: '1 drop QDS', frequency: 'QDS', duration: '2 weeks', instructions: 'Instill into operated eye' },
+      { drug_name: 'G. Prednisolone Acetate 1%', strength: '1%', route: 'Topical', dose: '1 drop QDS (tapering)', frequency: 'QDS', duration: '4 weeks', instructions: 'Shake well before instillation' },
+      { drug_name: 'G. Nepafenac 0.1%', strength: '0.1%', route: 'Topical', dose: '1 drop TDS', frequency: 'TDS', duration: '3 weeks', instructions: 'NSAID drop for pain & macular protection' }
+    ],
+    counselingInstructions: 'Post-op cataract protocol: Avoid eye rubbing. Wear protective eye shield when sleeping for 1 week. Space multiple eye drops by 5 minutes. Review in 1 week.'
+  },
+  {
+    id: 'dry-eye',
+    name: 'Dry Eye Syndrome Protocol',
+    shortName: 'Dry Eye (Day + Night)',
+    badgeColor: { bg: '#e0f2fe', text: '#0369a1', border: '#bae6fd' },
+    description: 'Carboxymethylcellulose drops + Lubricating night gel',
+    medications: [
+      { drug_name: 'G. Carboxymethylcellulose 0.5%', strength: '0.5%', route: 'Topical', dose: '1 drop QDS', frequency: 'QDS', duration: '1 month', instructions: 'Daytime tear replacement' },
+      { drug_name: 'Night Lubricating Eye Gel (Carbomer 0.2%)', strength: '0.2%', route: 'Topical', dose: '1 application at bedtime', frequency: 'Nocte', duration: '1 month', instructions: 'Instill inside lower lid before sleep' }
+    ],
+    counselingInstructions: 'Dry Eye care: Daily warm eyelid compresses and eyelid hygiene. Avoid direct air currents, fan/AC exposure, and take regular screen breaks. Review in 1 month.'
+  },
+  {
+    id: 'glaucoma-firstline',
+    name: 'Glaucoma Monotherapy Protocol',
+    shortName: 'Glaucoma (Timolol 0.5%)',
+    badgeColor: { bg: '#ecfdf5', text: '#065f46', border: '#a7f3d0' },
+    description: 'First-line beta-blocker IOP control',
+    medications: [
+      { drug_name: 'G. Timolol Maleate 0.5%', strength: '0.5%', route: 'Topical', dose: '1 drop BD (12-hourly)', frequency: 'BD', duration: '1 month', instructions: 'Morning and evening; punctal occlusion 2 mins' }
+    ],
+    counselingInstructions: 'Glaucoma therapy: Strict adherence required. Demonstrate nasolacrimal punctal occlusion (press tear duct for 2 minutes post-drop) to minimize systemic absorption. Review in 4 weeks for IOP re-measurement.'
+  },
+  {
+    id: 'allergic-conjunctivitis',
+    name: 'Allergic Conjunctivitis Protocol',
+    shortName: 'Allergic Conjunctivitis',
+    badgeColor: { bg: '#fef3c7', text: '#92400e', border: '#fde68a' },
+    description: 'Mast-cell stabilizer / Antihistamine + Short-course FML',
+    medications: [
+      { drug_name: 'G. Olopatadine 0.1%', strength: '0.1%', route: 'Topical', dose: '1 drop BD', frequency: 'BD', duration: '3 weeks', instructions: 'Dual-action antihistamine' },
+      { drug_name: 'G. Fluorometholone 0.1% (FML)', strength: '0.1%', route: 'Topical', dose: '1 drop TDS', frequency: 'TDS', duration: '7 days', instructions: 'Soft steroid; do not use beyond 1 week without review' }
+    ],
+    counselingInstructions: 'Allergic conjunctivitis: Apply cold compresses over eyelids for itching relief. Avoid vigorous eye rubbing. Avoid dust/pollen exposure. Review in 2 weeks.'
+  },
+  {
+    id: 'bacterial-conjunctivitis',
+    name: 'Bacterial Conjunctivitis Protocol',
+    shortName: 'Bacterial Conjunctivitis',
+    badgeColor: { bg: '#ffe4e6', text: '#9f1239', border: '#fecdd3' },
+    description: 'Broad-spectrum fluoroquinolone / antibiotic drops',
+    medications: [
+      { drug_name: 'G. Ciprofloxacin 0.3%', strength: '0.3%', route: 'Topical', dose: '1 drop QDS', frequency: 'QDS', duration: '7 days', instructions: 'Broad-spectrum antibacterial' },
+      { drug_name: 'G. Chloramphenicol 0.5% (Eye Ointment)', strength: '0.5%', route: 'Topical', dose: '1 application at bedtime', frequency: 'Nocte', duration: '7 days', instructions: 'Night ointment application' }
+    ],
+    counselingInstructions: 'Bacterial conjunctivitis hygiene: Wash hands before and after drop instillation. Use personal clean face towels. Do not wear contact lenses until discharge has cleared. Review in 5-7 days.'
+  }
+];
+
+interface FollowUpPill {
+  id: string;
+  label: string;
+  days: number;
+  months: number;
+  isSOS?: boolean;
+  hint: string;
+  color: { bg: string; text: string; border: string };
+}
+
+const FOLLOW_UP_PILLS: FollowUpPill[] = [
+  { id: '3d', label: '+3 Days', days: 3, months: 0, hint: 'Acute / Corneal Abrasion', color: { bg: '#fef2f2', text: '#991b1b', border: '#fecaca' } },
+  { id: '1w', label: '+1 Week', days: 7, months: 0, hint: 'Post-Op Cataract / Acute Review', color: { bg: '#eff6ff', text: '#1e40af', border: '#bfdbfe' } },
+  { id: '2w', label: '+2 Weeks', days: 14, months: 0, hint: 'Steroid Taper / Allergy Review', color: { bg: '#f0fdf4', text: '#166534', border: '#bbf7d0' } },
+  { id: '1m', label: '+1 Month', days: 0, months: 1, hint: 'Routine IOP / Post-Op Final Refraction', color: { bg: '#faf5ff', text: '#6b21a8', border: '#e9d5ff' } },
+  { id: '3m', label: '+3 Months', days: 0, months: 3, hint: 'Stable Glaucoma / Diabetic Retinopathy', color: { bg: '#fff7ed', text: '#9a3412', border: '#fed7aa' } },
+  { id: '6m', label: '+6 Months', days: 0, months: 6, hint: 'Chronic Surveillance / Annual Check', color: { bg: '#f8fafc', text: '#334155', border: '#cbd5e1' } },
+  { id: 'sos', label: '🚨 SOS', days: 0, months: 0, isSOS: true, hint: 'Emergency / As-Needed Return', color: { bg: '#fff1f2', text: '#be123c', border: '#fda4af' } }
+];
+
+const calculateFollowUpDate = (days: number, months: number = 0) => {
+  const target = new Date();
+  if (months > 0) {
+    target.setMonth(target.getMonth() + months);
+  }
+  if (days > 0) {
+    target.setDate(target.getDate() + days);
+  }
+
+  // Clinic working days check: Sunday (0) rolls forward to Monday (+1 day)
+  let rolledSunday = false;
+  if (target.getDay() === 0) {
+    rolledSunday = true;
+    target.setDate(target.getDate() + 1);
+  }
+
+  const yyyy = target.getFullYear();
+  const mm = String(target.getMonth() + 1).padStart(2, '0');
+  const dd = String(target.getDate()).padStart(2, '0');
+  const dateStr = `${yyyy}-${mm}-${dd}`;
+
+  return { dateStr, target, rolledSunday };
+};
+
+const getFollowUpStatus = (dateStr: string) => {
+  if (!dateStr) return null;
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return null;
+  const target = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+  if (isNaN(target.getTime())) return null;
+
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  target.setHours(0, 0, 0, 0);
+  const diffTime = target.getTime() - now.getTime();
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+  const weekdayName = target.toLocaleDateString('en-GB', { weekday: 'long' });
+  const formattedDate = target.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+  return { diffDays, weekdayName, formattedDate, target };
+};
+
+// --- DRUG SAFETY & CONTRAINDICATION GUARD ---
+
+interface SafetyAlert {
+  id: string;
+  drugIndex: number;
+  drugName: string;
+  severity: 'HIGH_RISK' | 'WARNING';
+  triggerCondition: string;
+  rationale: string;
+  suggestedAlternative: {
+    drug_name: string;
+    strength: string;
+    route: string;
+    dose: string;
+    frequency: string;
+    duration: string;
+    instructions: string;
+    reason: string;
+  };
+}
+
+const checkDrugSafety = (meds: Medication[], history: string, allergies: string, pulse?: string): SafetyAlert[] => {
+  const alerts: SafetyAlert[] = [];
+  if (!Array.isArray(meds) || meds.length === 0) return alerts;
+
+  const histLower = (history || '').toLowerCase();
+  const allergyLower = (allergies || '').toLowerCase();
+  const pulseVal = parseInt(pulse || '72', 10);
+
+  meds.forEach((med, idx) => {
+    if (!med.drug_name) return;
+    const drugLower = med.drug_name.toLowerCase();
+
+    // 1. Beta-Blocker Contraindications (Asthma, COPD, Severe Bradycardia)
+    const isBetaBlocker = drugLower.includes('timolol') || drugLower.includes('levobunolol') || drugLower.includes('carteolol');
+    if (isBetaBlocker) {
+      const hasAsthmaOrCopd = histLower.includes('asthma') || histLower.includes('copd') || histLower.includes('bronch') || histLower.includes('wheez');
+      const hasBradycardia = histLower.includes('bradycardia') || histLower.includes('heart block') || (pulseVal > 0 && pulseVal < 55);
+
+      if (hasAsthmaOrCopd) {
+        alerts.push({
+          id: `bb-resp-${idx}`,
+          drugIndex: idx,
+          drugName: med.drug_name,
+          severity: 'HIGH_RISK',
+          triggerCondition: 'Asthma / Reactive Airway Disease',
+          rationale: 'Non-selective beta-blockers (e.g., Timolol) can trigger acute, life-threatening bronchospasm via nasolacrimal systemic absorption.',
+          suggestedAlternative: {
+            drug_name: 'G. Latanoprost 0.005%',
+            strength: '0.005%',
+            route: 'Topical',
+            dose: '1 drop Nocte',
+            frequency: 'Nocte',
+            duration: '1 month',
+            instructions: 'First-line prostaglandin analog; no bronchospastic risk',
+            reason: 'Switch to Latanoprost (Prostaglandin analog) for safe IOP reduction without bronchospasm.'
+          }
+        });
+      } else if (hasBradycardia) {
+        alerts.push({
+          id: `bb-cardio-${idx}`,
+          drugIndex: idx,
+          drugName: med.drug_name,
+          severity: 'HIGH_RISK',
+          triggerCondition: `Bradycardia / Heart Block (${pulse ? `Pulse: ${pulse} bpm` : '<55 bpm'})`,
+          rationale: 'Timolol exhibits significant negative chronotropic systemic cardiac effects, precipitating severe bradycardia or complete heart block.',
+          suggestedAlternative: {
+            drug_name: 'G. Betaxolol 0.25% (Suspension)',
+            strength: '0.25%',
+            route: 'Topical',
+            dose: '1 drop BD',
+            frequency: 'BD',
+            duration: '1 month',
+            instructions: 'Cardioselective beta-1 antagonist with significantly lower cardiac side effects',
+            reason: 'Switch to Betaxolol (Cardioselective beta-1) or Latanoprost.'
+          }
+        });
+      }
+    }
+
+    // 2. Documented Allergy Matches
+    // 2a. Sulfa Allergy vs Carbonic Anhydrase Inhibitors
+    const isCAI = drugLower.includes('dorzolamide') || drugLower.includes('brinzolamide') || drugLower.includes('acetazolamide') || drugLower.includes('diamox') || drugLower.includes('cosopt');
+    const hasSulfaAllergy = allergyLower.includes('sulfa') || allergyLower.includes('bactrim') || allergyLower.includes('septra') || allergyLower.includes('sulfonamide');
+    if (isCAI && hasSulfaAllergy) {
+      alerts.push({
+        id: `sulfa-cai-${idx}`,
+        drugIndex: idx,
+        drugName: med.drug_name,
+        severity: 'HIGH_RISK',
+        triggerCondition: 'Documented Sulfonamide Allergy',
+        rationale: 'Topical and oral CAIs share sulfonamide pharmacophores and can provoke severe allergic reactions, angioedema, or SJS.',
+        suggestedAlternative: {
+          drug_name: 'G. Brimonidine 0.2%',
+          strength: '0.2%',
+          route: 'Topical',
+          dose: '1 drop BD',
+          frequency: 'BD',
+          duration: '1 month',
+          instructions: 'Alpha-2 adrenergic agonist; safe in sulfa allergy',
+          reason: 'Switch to Brimonidine 0.2% (Alpha-2 agonist) to avoid sulfonamide cross-reactivity.'
+        }
+      });
+    }
+
+    // 2b. Fluoroquinolone Allergy vs Moxifloxacin / Ciprofloxacin / Ofloxacin
+    const isFQ = drugLower.includes('moxifloxacin') || drugLower.includes('ciprofloxacin') || drugLower.includes('ofloxacin') || drugLower.includes('levofloxacin');
+    const hasFQAllergy = allergyLower.includes('cipro') || allergyLower.includes('moxi') || allergyLower.includes('quinolone') || allergyLower.includes('fluoroquinolone');
+    if (isFQ && hasFQAllergy) {
+      alerts.push({
+        id: `fq-allergy-${idx}`,
+        drugIndex: idx,
+        drugName: med.drug_name,
+        severity: 'HIGH_RISK',
+        triggerCondition: 'Documented Fluoroquinolone Allergy',
+        rationale: 'Patient has a recorded allergy to fluoroquinolones. Topical administration may provoke severe lid chemosis or systemic hypersensitivity.',
+        suggestedAlternative: {
+          drug_name: 'G. Tobramycin 0.3%',
+          strength: '0.3%',
+          route: 'Topical',
+          dose: '1 drop QDS',
+          frequency: 'QDS',
+          duration: '10 days',
+          instructions: 'Aminoglycoside antibiotic for broad-spectrum ocular coverage',
+          reason: 'Switch to Tobramycin 0.3% (Aminoglycoside) to eliminate fluoroquinolone exposure.'
+        }
+      });
+    }
+
+    // 2c. Chloramphenicol Allergy
+    const isChlor = drugLower.includes('chloramphenicol');
+    const hasChlorAllergy = allergyLower.includes('chloramphenicol');
+    if (isChlor && hasChlorAllergy) {
+      alerts.push({
+        id: `chlor-allergy-${idx}`,
+        drugIndex: idx,
+        drugName: med.drug_name,
+        severity: 'HIGH_RISK',
+        triggerCondition: 'Documented Chloramphenicol Allergy',
+        rationale: 'Patient has a documented allergy to chloramphenicol.',
+        suggestedAlternative: {
+          drug_name: 'G. Gentamicin 0.3% Ointment',
+          strength: '0.3%',
+          route: 'Topical',
+          dose: '1 application Nocte',
+          frequency: 'Nocte',
+          duration: '7 days',
+          instructions: 'Apply inside lower conjunctival fornix at night',
+          reason: 'Switch to Gentamicin ointment for safe nighttime antibacterial coverage.'
+        }
+      });
+    }
+  });
+
+  return alerts;
+};
+
+// --- BILINGUAL PRESCRIPTION LEAFLET HELPERS ---
+
+interface DosingSlotMap {
+  morning: string | null;
+  afternoon: string | null;
+  evening: string | null;
+  night: string | null;
+}
+
+const getDropDosingSlots = (frequency: string = '', dose: string = '', route: string = ''): DosingSlotMap => {
+  const combined = `${frequency} ${dose} ${route}`.toUpperCase();
+  const isOintment = combined.includes('OINTMENT') || combined.includes('GEL');
+  const unit = isOintment ? '1 Line / Layi 1' : '1 Drop / Ɗigo 1';
+
+  if (combined.includes('QDS') || combined.includes('4') || combined.includes('4 TIMES')) {
+    return { morning: unit, afternoon: unit, evening: unit, night: unit };
+  }
+  if (combined.includes('TDS') || combined.includes('3') || combined.includes('3 TIMES')) {
+    return { morning: unit, afternoon: unit, evening: null, night: unit };
+  }
+  if (combined.includes('BD') || combined.includes('2') || combined.includes('12-HOURLY') || combined.includes('TWICE')) {
+    return { morning: unit, afternoon: null, evening: null, night: unit };
+  }
+  if (combined.includes('NOCTE') || combined.includes('BEDTIME') || combined.includes('NIGHT')) {
+    return { morning: null, afternoon: null, evening: null, night: unit };
+  }
+  if (combined.includes('MANE') || combined.includes('MORNING')) {
+    return { morning: unit, afternoon: null, evening: null, night: null };
+  }
+  return { morning: unit, afternoon: null, evening: null, night: unit };
+};
+
 // --- HELPER COMPONENTS ---
 
-const SectionHeader = ({ title, icon: Icon, onMarkNormal, onSave, isSaving }: { title: string; icon?: any; onMarkNormal?: () => void; onSave?: () => void; isSaving?: boolean }) => (
+const SectionHeader = ({ 
+  title, 
+  icon: Icon, 
+  onMarkNormal, 
+  normalButtonLabel = "NORMAL EXAM PRESET", 
+  extraAction,
+  onSave, 
+  isSaving 
+}: { 
+  title: string; 
+  icon?: any; 
+  onMarkNormal?: () => void; 
+  normalButtonLabel?: string; 
+  extraAction?: React.ReactNode;
+  onSave?: () => void; 
+  isSaving?: boolean 
+}) => (
     <div className="section-header-sticky">
       <h2>
         {Icon && <Icon size={20} />}
         {title}
       </h2>
-      <div style={{ display: 'flex', gap: '12px' }}>
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+        {extraAction}
         {onMarkNormal && (
-          <button className="leh-btn-outline" onClick={onMarkNormal} style={{ height: '36px', padding: '0 16px', fontSize: '11px' }}>
-            MARK ALL NORMAL
+          <button 
+            type="button"
+            className="leh-btn-outline" 
+            onClick={onMarkNormal} 
+            style={{ 
+              height: '36px', 
+              padding: '0 16px', 
+              fontSize: '11px',
+              fontWeight: '800',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: '#f0fdf4',
+              color: '#15803d',
+              borderColor: '#bbf7d0',
+              boxShadow: '0 2px 6px rgba(22, 163, 74, 0.12)'
+            }}
+            title="1-Click Quick-Stamp: Populates physiological normal slit-lamp & normotensive IOP 14 mmHg"
+          >
+            <Sparkles size={14} style={{ color: '#16a34a' }} />
+            <span>{normalButtonLabel}</span>
           </button>
         )}
         {onSave && (
@@ -297,6 +672,7 @@ const VisualAcuitySelector = ({ options, value, onChange, disabled }: { options:
 export const Consultations: React.FC = () => {
   const { user } = useAuth();
   const { notify } = useNotification();
+  const { isAiAvailable } = useVoiceSession();
   
   const [patients, setPatients] = useState<any[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
@@ -306,21 +682,130 @@ export const Consultations: React.FC = () => {
   const [isDirty, setIsDirty] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const autoSaveTimerRef = React.useRef<any>(null);
+  const workspaceScrollRef = useRef<HTMLDivElement>(null);
+  const isProgrammaticScrollRef = useRef<boolean>(false);
+
+  const [viewMode, setViewMode] = useState<'tabbed' | 'continuous'>(() => {
+    return (localStorage.getItem('leh_consultation_view_mode') as 'tabbed' | 'continuous') || 'tabbed';
+  });
 
   const menuItems = [
-    { id: 'History', label: 'History & Complaint', icon: User },
-    { id: 'Vitals', label: 'Vitals Review', icon: Activity },
-    { id: 'Vision', label: '1. Visual Acuity', icon: Eye },
-    { id: 'OcularExam', label: '2. Ocular Examination', icon: Eye },
-    { id: 'Refraction', label: '3. Refraction', icon: Glasses },
-    { id: 'DilatedFunduscopy', label: '4. Dilated Funduscopy', icon: Droplets },
-    { id: 'CVF', label: '5. Confrontation Fields (CVF)', icon: Eye },
-    { id: 'Pachymetry', label: '6. Pachymetry', icon: Target },
-    { id: 'Investigations', label: '7. Investigations', icon: ClipboardList },
-    { id: 'Diagnosis', label: '8. Clinical Diagnosis', icon: Target },
-    { id: 'Plan', label: '9. Treatment Plan', icon: Pill },
-    { id: 'Surgery', label: '10. Surgery & Admission', icon: Scissors }
+    { id: 'History', label: 'History & Complaint', icon: User, shortcut: 'Alt+1' },
+    { id: 'Vitals', label: 'Vitals Review', icon: Activity, shortcut: 'Alt+2' },
+    { id: 'Vision', label: '1. Visual Acuity', icon: Eye, shortcut: 'Alt+3' },
+    { id: 'OcularExam', label: '2. Ocular Examination', icon: Eye, shortcut: 'Alt+4' },
+    { id: 'Refraction', label: '3. Refraction', icon: Glasses, shortcut: 'Alt+5' },
+    { id: 'DilatedFunduscopy', label: '4. Dilated Funduscopy', icon: Droplets, shortcut: 'Alt+6' },
+    { id: 'CVF', label: '5. Confrontation Fields (CVF)', icon: Eye, shortcut: 'Alt+7' },
+    { id: 'Pachymetry', label: '6. Pachymetry', icon: Target, shortcut: 'Alt+8' },
+    { id: 'Investigations', label: '7. Investigations', icon: ClipboardList, shortcut: 'Alt+9' },
+    { id: 'Diagnosis', label: '8. Clinical Diagnosis', icon: Target, shortcut: 'Alt+0' },
+    { id: 'Plan', label: '9. Treatment Plan', icon: Pill, shortcut: 'Alt+-' },
+    { id: 'Surgery', label: '10. Surgery & Admission', icon: Scissors, shortcut: 'Alt+=' }
   ];
+
+  const handleSectionNavigation = useCallback((sectionId: string) => {
+    setActiveTab(sectionId);
+    if (viewMode === 'continuous') {
+      const el = document.getElementById(`clinical-section-${sectionId}`);
+      if (el) {
+        isProgrammaticScrollRef.current = true;
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(() => {
+          isProgrammaticScrollRef.current = false;
+        }, 600);
+      }
+    }
+  }, [viewMode]);
+
+  const handleViewModeToggle = (mode: 'tabbed' | 'continuous') => {
+    setViewMode(mode);
+    localStorage.setItem('leh_consultation_view_mode', mode);
+    notify('info', `Switched to ${mode === 'continuous' ? 'Continuous Scroll' : 'Tabbed'} view`);
+    if (mode === 'continuous') {
+      setTimeout(() => {
+        const el = document.getElementById(`clinical-section-${activeTab}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    }
+  };
+
+  // Keyboard Navigation: Alt+1..9, Alt+0, Alt+-, Alt+=, Alt+↑, Alt+↓
+  useEffect(() => {
+    if (!selectedPatient) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!e.altKey || e.ctrlKey || e.metaKey) return;
+
+      const key = e.key;
+      let targetIndex: number | null = null;
+
+      if (key >= '1' && key <= '9') {
+        targetIndex = parseInt(key, 10) - 1;
+      } else if (key === '0') {
+        targetIndex = 9;
+      } else if (key === '-' || key === '_') {
+        targetIndex = 10;
+      } else if (key === '=' || key === '+') {
+        targetIndex = 11;
+      } else if (key === 'ArrowDown') {
+        const curIdx = menuItems.findIndex(m => m.id === activeTab);
+        targetIndex = curIdx < menuItems.length - 1 ? curIdx + 1 : 0;
+      } else if (key === 'ArrowUp') {
+        const curIdx = menuItems.findIndex(m => m.id === activeTab);
+        targetIndex = curIdx > 0 ? curIdx - 1 : menuItems.length - 1;
+      }
+
+      if (targetIndex !== null && targetIndex >= 0 && targetIndex < menuItems.length) {
+        e.preventDefault();
+        const target = menuItems[targetIndex];
+        handleSectionNavigation(target.id);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedPatient, activeTab, viewMode, handleSectionNavigation]);
+
+  // Real-Time IntersectionObserver Scrollspy for Continuous Scroll Mode
+  useEffect(() => {
+    if (viewMode !== 'continuous' || !selectedPatient) return;
+
+    const scrollContainer = workspaceScrollRef.current;
+    if (!scrollContainer) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (isProgrammaticScrollRef.current) return;
+
+        const visibleEntries = entries.filter(entry => entry.isIntersecting);
+        if (visibleEntries.length > 0) {
+          visibleEntries.sort((a, b) => {
+            return Math.abs(a.boundingClientRect.top - 120) - Math.abs(b.boundingClientRect.top - 120);
+          });
+          const topVisible = visibleEntries[0];
+          const sectionId = topVisible.target.id.replace('clinical-section-', '');
+          if (sectionId && sectionId !== activeTab) {
+            setActiveTab(sectionId);
+          }
+        }
+      },
+      {
+        root: scrollContainer,
+        rootMargin: '-10% 0px -55% 0px',
+        threshold: [0, 0.15, 0.4]
+      }
+    );
+
+    menuItems.forEach(item => {
+      const el = document.getElementById(`clinical-section-${item.id}`);
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, [viewMode, selectedPatient, activeTab]);
   const [showTriageModal, setShowTriageModal] = useState(false);
   const [showSendBackModal, setShowSendBackModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -393,7 +878,150 @@ export const Consultations: React.FC = () => {
     investigations_fbs: '', investigations_rbs: '', investigations_hba1c: '', investigations_rvs: 'Not Done'
   });
 
+  interface AuditItem {
+    sectionId: string;
+    label: string;
+    severity: 'critical' | 'recommended';
+    issue: string;
+    fieldFocusHint?: string;
+  }
+
   const [sectionStatus, setSectionStatus] = useState<any>({});
+  const [showMiniMap, setShowMiniMap] = useState(false);
+  const [showAuditorModal, setShowAuditorModal] = useState(false);
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [showLeafletModal, setShowLeafletModal] = useState(false);
+  const [leafletLang, setLeafletLang] = useState<'bilingual' | 'english' | 'hausa'>('bilingual');
+  const [printMode, setPrintMode] = useState<'summary' | 'leaflet'>('summary');
+  const [auditResults, setAuditResults] = useState<{ critical: AuditItem[]; recommended: AuditItem[] }>({ critical: [], recommended: [] });
+  const miniMapRef = useRef<HTMLDivElement>(null);
+  const actionStripRef = useRef<HTMLDivElement>(null);
+  const [canScrollStripLeft, setCanScrollStripLeft] = useState(false);
+  const [canScrollStripRight, setCanScrollStripRight] = useState(false);
+
+  const checkStripScrollLimits = useCallback(() => {
+    const el = actionStripRef.current;
+    if (!el) return;
+    setCanScrollStripLeft(el.scrollLeft > 6);
+    setCanScrollStripRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 6);
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(checkStripScrollLimits, 150);
+    const handleResize = () => checkStripScrollLimits();
+    window.addEventListener('resize', handleResize);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [selectedPatient, checkStripScrollLimits]);
+
+  const completedCount = Object.values(sectionStatus).filter(Boolean).length;
+  const nextIncompleteSection = menuItems.find(item => !sectionStatus[item.id]);
+
+  // CLINICAL COMPLETENESS AUDIT ENGINE
+  const runCompletenessAudit = useCallback((): { critical: AuditItem[]; recommended: AuditItem[] } => {
+    const critical: AuditItem[] = [];
+    const recommended: AuditItem[] = [];
+
+    // 1. Mandatory Core: Chief Complaint & History (PRD 6.5.1)
+    if (!formData.complaint || formData.complaint.trim().length < 5) {
+      critical.push({
+        sectionId: 'History',
+        label: 'Chief Complaint & History',
+        severity: 'critical',
+        issue: !formData.complaint?.trim() 
+          ? 'Chief complaint statement is empty.' 
+          : 'Chief complaint is too brief (minimum 5 characters required).',
+        fieldFocusHint: 'complaint'
+      });
+    }
+
+    // 2. Mandatory Core: Primary Clinical Diagnosis (PRD 6.5.8)
+    if (!formData.diagnosis_primary?.trim()) {
+      critical.push({
+        sectionId: 'Diagnosis',
+        label: 'Primary Clinical Diagnosis',
+        severity: 'critical',
+        issue: 'No primary diagnosis recorded. An ICD or clinical ophthalmic diagnosis is required.',
+        fieldFocusHint: 'diagnosis_primary'
+      });
+    }
+
+    // 3. Mandatory Core: Treatment & Management Plan (PRD 6.5.9)
+    const hasMeds = Array.isArray(formData.plan_meds) && formData.plan_meds.some((m: any) => m.drug_name && m.drug_name.trim().length > 0);
+    const hasGlasses = Boolean(formData.plan_glasses_od?.sph || formData.plan_glasses_os?.sph);
+    const hasInstructions = Boolean(formData.plan_special_instructions?.trim() || formData.plan_instructions?.trim() || formData.plan_followup_date?.trim());
+    const hasProcedure = Boolean(formData.surgery_advised || formData.admission_advised);
+
+    if (!hasMeds && !hasGlasses && !hasInstructions && !hasProcedure) {
+      critical.push({
+        sectionId: 'Plan',
+        label: 'Treatment & Management Plan',
+        severity: 'critical',
+        issue: 'No medications prescribed, optical correction, surgical recommendation, or clinical instructions documented.',
+        fieldFocusHint: 'plan_special_instructions'
+      });
+    }
+
+    // 4. Drug Safety & Contraindication Guard Check
+    const activeDrugSafetyAlerts = checkDrugSafety(formData.plan_meds, formData.medical_history, formData.allergies, formData.vitals_pulse);
+    if (activeDrugSafetyAlerts.length > 0) {
+      recommended.push({
+        sectionId: 'Plan',
+        label: 'Drug Safety & Contraindication Guard',
+        severity: 'recommended',
+        issue: `${activeDrugSafetyAlerts.length} potential contraindication(s) detected: ${activeDrugSafetyAlerts.map(a => `${a.drugName} (${a.triggerCondition})`).join(', ')}.`,
+        fieldFocusHint: 'plan_meds'
+      });
+    }
+
+    // Recommended Best Practice: Visual Acuity (OD / OS)
+    if (!formData.va_od_unaided_dv && !formData.va_os_unaided_dv && !formData.va_od_corrected_dv && !formData.va_os_corrected_dv) {
+      recommended.push({
+        sectionId: 'Acuity',
+        label: 'Visual Acuity (OD / OS)',
+        severity: 'recommended',
+        issue: 'Distance or near visual acuity baseline not recorded for either eye.',
+        fieldFocusHint: 'va_od_unaided_dv'
+      });
+    }
+
+    // Recommended Best Practice: Intraocular Pressure (Tonometry)
+    if (!formData.iop_od && !formData.iop_os) {
+      recommended.push({
+        sectionId: 'OcularExam',
+        label: 'Intraocular Pressure (Tonometry)',
+        severity: 'recommended',
+        issue: 'IOP measurement not entered in Ocular Examination.',
+        fieldFocusHint: 'iop_od'
+      });
+    }
+
+    return { critical, recommended };
+  }, [formData]);
+
+  const handleJumpToNextIncomplete = useCallback(() => {
+    const next = menuItems.find(item => !sectionStatus[item.id]);
+    if (next) {
+      handleSectionNavigation(next.id);
+      notify('info', `Jumped to next incomplete section: ${next.label}`);
+    } else {
+      notify('success', 'All 12 clinical sections have been completed!');
+    }
+  }, [sectionStatus, menuItems, handleSectionNavigation, notify]);
+
+  // Click outside to close MiniMap popover
+  useEffect(() => {
+    if (!showMiniMap) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (miniMapRef.current && !miniMapRef.current.contains(e.target as Node)) {
+        setShowMiniMap(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMiniMap]);
 
   const loadQueue = useCallback(async () => {
     try {
@@ -577,27 +1205,136 @@ export const Consultations: React.FC = () => {
   };
 
   const markSectionNormal = (section: string) => {
-    const normalValues: any = {};
     if (section === 'OcularExam') {
-      normalValues.as_lids_od = 'Normal'; normalValues.as_lids_os = 'Normal';
-      normalValues.as_conj_od = 'Normal'; normalValues.as_conj_os = 'Normal';
-      normalValues.as_cornea_od = 'Clear'; normalValues.as_cornea_os = 'Clear';
-      normalValues.as_ac_depth_od = 'Normal'; normalValues.as_ac_depth_os = 'Normal';
-      normalValues.as_ac_cells_od = 'None'; normalValues.as_ac_cells_os = 'None';
-      normalValues.as_iris_od = 'Normal'; normalValues.as_iris_os = 'Normal';
-      normalValues.as_lens_od = 'Clear'; normalValues.as_lens_os = 'Clear';
-      normalValues.exam_gonioscopy_od = 'Open Angle (Grade 4)'; normalValues.exam_gonioscopy_os = 'Open Angle (Grade 4)';
-      normalValues.exam_fundus_od = 'Normal'; normalValues.exam_fundus_os = 'Normal';
-    } else if (section === 'DilatedFunduscopy') {
-      normalValues.dil_adequate = 'Adequate';
-      normalValues.dil_od = 'Yes'; normalValues.dil_os = 'Yes';
-      normalValues.fs_disc_margins_od = 'Distinct'; normalValues.fs_disc_margins_os = 'Distinct';
-      normalValues.fs_disc_color_od = 'Pink'; normalValues.fs_disc_color_os = 'Pink';
-      normalValues.fs_macula_od = 'Normal Reflex'; normalValues.fs_macula_os = 'Normal Reflex';
-      normalValues.fs_vessels_nipping_od = 'Absent'; normalValues.fs_vessels_nipping_os = 'Absent';
-      normalValues.fs_periph_od = 'Normal'; normalValues.fs_periph_os = 'Normal';
+      // Smart Overwrite Check: confirm if doctor has already entered non-empty findings or tonometry
+      const hasExistingData = Boolean(
+        formData.iop_od || 
+        formData.iop_os || 
+        formData.as_cornea_notes_od || 
+        formData.as_cornea_notes_os || 
+        formData.as_lids_notes_od || 
+        formData.as_lids_notes_os ||
+        formData.as_lens_notes_od ||
+        formData.as_lens_notes_os ||
+        (formData.as_cornea_od && formData.as_cornea_od !== 'Clear') ||
+        (formData.as_lens_od && formData.as_lens_od !== 'Clear') ||
+        (formData.as_ac_cells_od && formData.as_ac_cells_od !== 'None')
+      );
+
+      if (hasExistingData) {
+        const confirmed = window.confirm(
+          'Apply Normal Exam Preset?\n\nExisting inputs in Ocular Examination will be standardized to physiological normal (IOP 14 mmHg OD/OS, Cornea Clear, AC Quiet).'
+        );
+        if (!confirmed) return;
+      }
+
+      const nowTime = new Date().toTimeString().slice(0, 5); // HH:MM
+
+      const normalValues = {
+        as_lids_od: 'Normal', as_lids_os: 'Normal',
+        as_lids_notes_od: '', as_lids_notes_os: '',
+        as_conj_od: 'Normal', as_conj_os: 'Normal',
+        as_conj_notes_od: '', as_conj_notes_os: '',
+        as_cornea_od: 'Clear', as_cornea_os: 'Clear',
+        as_cornea_notes_od: '', as_cornea_notes_os: '',
+        as_ac_depth_od: 'Normal', as_ac_depth_os: 'Normal',
+        as_ac_cells_od: 'None', as_ac_cells_os: 'None',
+        as_iris_od: 'Normal', as_iris_os: 'Normal',
+        as_lens_od: 'Clear', as_lens_os: 'Clear',
+        as_lens_notes_od: '', as_lens_notes_os: '',
+        iop_method: 'Goldmann Applanation',
+        iop_od: '14',
+        iop_os: '14',
+        iop_time: nowTime,
+        iop_notes: '',
+        exam_gonioscopy_od: 'Open Angle (Grade 4)', exam_gonioscopy_os: 'Open Angle (Grade 4)',
+        exam_gonioscopy_notes: '',
+        exam_fundus_od: 'Normal', exam_fundus_os: 'Normal',
+        exam_fundus_notes: ''
+      };
+
+      setFormData((prev: any) => ({ ...prev, ...normalValues }));
+      setSectionStatus((prev: any) => ({ ...prev, OcularExam: true }));
+      setIsDirty(true);
+      notify('success', 'Normal Exam Preset applied: Slit-lamp unremarkable, IOP 14 mmHg OD/OS (Goldmann)');
+      return;
     }
-    setFormData((prev: any) => ({ ...prev, ...normalValues }));
+
+    if (section === 'Vision') {
+      // Smart Overwrite Check: confirm if doctor has already entered non-empty acuity values
+      const hasExistingData = Boolean(
+        formData.va_od_unaided_dv || 
+        formData.va_os_unaided_dv || 
+        formData.va_od_unaided_nv || 
+        formData.va_os_unaided_nv ||
+        formData.va_od_aided_dv ||
+        formData.va_os_aided_dv ||
+        formData.va_od_ph ||
+        formData.va_os_ph
+      );
+
+      if (hasExistingData) {
+        const confirmed = window.confirm(
+          'Apply Normal Vision Preset?\n\nExisting acuity entries will be standardized to physiological baseline (Distance: 6/6 OD/OS, Near: N6 OD/OS, Method: Snellen Chart).'
+        );
+        if (!confirmed) return;
+      }
+
+      const normalValues = {
+        va_method: 'Snellen Chart',
+        va_od_unaided_dv: '6/6',
+        va_os_unaided_dv: '6/6',
+        va_od_unaided_nv: 'N6',
+        va_os_unaided_nv: 'N6'
+      };
+
+      setFormData((prev: any) => ({ ...prev, ...normalValues }));
+      setSectionStatus((prev: any) => ({ ...prev, Vision: true }));
+      setIsDirty(true);
+      notify('success', 'Normal Vision Preset applied: 6/6 Distance & N6 Near (OD & OS)');
+      return;
+    }
+
+    if (section === 'DilatedFunduscopy') {
+      const normalValues = {
+        dil_adequate: 'Adequate',
+        dil_od: 'Yes', dil_os: 'Yes',
+        fs_disc_margins_od: 'Distinct', fs_disc_margins_os: 'Distinct',
+        fs_disc_color_od: 'Pink', fs_disc_color_os: 'Pink',
+        fs_disc_cdr_od: '0.3', fs_disc_cdr_os: '0.3',
+        fs_macula_od: 'Normal Reflex', fs_macula_os: 'Normal Reflex',
+        fs_vessels_nipping_od: 'Absent', fs_vessels_nipping_os: 'Absent',
+        fs_periph_od: 'Normal', fs_periph_os: 'Normal',
+        fs_vit_od: 'Normal', fs_vit_os: 'Normal'
+      };
+
+      setFormData((prev: any) => ({ ...prev, ...normalValues }));
+      setSectionStatus((prev: any) => ({ ...prev, DilatedFunduscopy: true }));
+      setIsDirty(true);
+      notify('success', 'Normal Fundus Preset applied: Distinct disc margins, 0.3 CDR, Normal macula reflex');
+      return;
+    }
+  };
+
+  const quickStampSingleEyeVision = (eye: 'OD' | 'OS') => {
+    if (eye === 'OD') {
+      setFormData((prev: any) => ({
+        ...prev,
+        va_method: prev.va_method || 'Snellen Chart',
+        va_od_unaided_dv: '6/6',
+        va_od_unaided_nv: 'N6'
+      }));
+      notify('info', 'Quick-Stamped Right Eye (OD): 6/6 & N6');
+    } else {
+      setFormData((prev: any) => ({
+        ...prev,
+        va_method: prev.va_method || 'Snellen Chart',
+        va_os_unaided_dv: '6/6',
+        va_os_unaided_nv: 'N6'
+      }));
+      notify('info', 'Quick-Stamped Left Eye (OS): 6/6 & N6');
+    }
+    setSectionStatus((prev: any) => ({ ...prev, Vision: true }));
     setIsDirty(true);
   };
 
@@ -621,23 +1358,28 @@ export const Consultations: React.FC = () => {
     return Math.floor(difference / (1000 * 60 * 60 * 24 * 365.25));
   };
 
-  const handleSave = async (finalize: boolean = false) => {
+  const handleInitiateFinalize = () => {
+    if (!selectedPatient) return;
+    const audit = runCompletenessAudit();
+    setAuditResults(audit);
+    if (audit.critical.length > 0 || audit.recommended.length > 0) {
+      setShowAuditorModal(true);
+    } else {
+      if (window.confirm('All mandatory and recommended clinical sections are complete! Finalize this visit and route to Pharmacy / Billing?')) {
+        handleSave(true, true);
+      }
+    }
+  };
+
+  const handleSave = async (finalize: boolean = false, overrideAudit: boolean = false) => {
      if (!selectedPatient) return;
      
-     // Mandatory clinical validation for finalization
-     if (finalize) {
-       const missing = [];
-       if (!formData.complaint || formData.complaint.trim().length < 5) {
-         missing.push('Section 1: Chief Complaint (min 5 chars)');
-       }
-        if (!formData.diagnosis_primary?.trim()) {
-          missing.push('Section 8: Primary Diagnosis');
-        }
-
-       if (missing.length > 0) {
-         notify('error', `Cannot finalize: ${missing.join(', ')} missing.`);
-         if (missing[0].includes('Chief Complaint')) setActiveTab('History');
-         else setActiveTab('Diagnosis');
+     // Mandatory clinical completeness audit validation
+     if (finalize && !overrideAudit) {
+       const audit = runCompletenessAudit();
+       if (audit.critical.length > 0) {
+         setAuditResults(audit);
+         setShowAuditorModal(true);
          return;
        }
      }
@@ -715,8 +1457,120 @@ export const Consultations: React.FC = () => {
     setIsDirty(true);
   };
 
-  const renderTabContent = () => {
-    switch (activeTab) {
+  const applyPrescriptionRegimen = (regimen: PrescriptionRegimen) => {
+    if (isLocked) return;
+
+    // Smart Append: Retain existing doctor entries while dropping purely empty rows
+    const currentMeds = (formData.plan_meds || []).filter(
+      (m: Medication) => m.drug_name && m.drug_name.trim().length > 0
+    );
+
+    const newItems = regimen.medications.map(m => ({ ...m }));
+    const combinedMeds = [...currentMeds, ...newItems];
+
+    // Auto-fill clinical instructions if blank or append protocol guidance
+    let updatedSpecialInstructions = formData.plan_special_instructions || '';
+    if (!updatedSpecialInstructions.trim()) {
+      updatedSpecialInstructions = regimen.counselingInstructions;
+    } else if (!updatedSpecialInstructions.includes(regimen.counselingInstructions)) {
+      updatedSpecialInstructions = `${updatedSpecialInstructions.trim()}\n\n[${regimen.name}]: ${regimen.counselingInstructions}`;
+    }
+
+    setFormData((prev: any) => ({
+      ...prev,
+      plan_meds: combinedMeds,
+      plan_special_instructions: updatedSpecialInstructions,
+      plan_instructions: prev.plan_instructions || regimen.counselingInstructions
+    }));
+
+    setSectionStatus((prev: any) => ({ ...prev, Plan: true }));
+    setIsDirty(true);
+    notify('success', `Regimen applied: ${regimen.name} (${regimen.medications.length} items added)`);
+  };
+
+  const applyFollowUpPreset = (pill: FollowUpPill) => {
+    if (isLocked) return;
+
+    if (pill.isSOS) {
+      const sosNote = 'SOS: Return immediately if severe eye pain, sudden vision drop, persistent flashes/floaters, or acute redness develops.';
+      let special = formData.plan_special_instructions || '';
+      if (!special.includes('SOS:')) {
+        special = special ? `${special.trim()}\n\n[EMERGENCY RETURN]: ${sosNote}` : `[EMERGENCY RETURN]: ${sosNote}`;
+      }
+      setFormData((prev: any) => ({
+        ...prev,
+        plan_followup_date: '',
+        plan_special_instructions: special
+      }));
+      setSectionStatus((prev: any) => ({ ...prev, Plan: true }));
+      setIsDirty(true);
+      notify('info', 'Follow-up set to SOS: Emergency counseling added to instructions.');
+      return;
+    }
+
+    const { dateStr, target, rolledSunday } = calculateFollowUpDate(pill.days, pill.months);
+    const weekday = target.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+
+    // Sync with Reception Notes so front-desk / cashier sees the follow-up appointment request
+    const bookingTag = `[OUTPATIENT APPOINTMENT]: Scheduled review for ${weekday} (Clinic Session 08:30-13:30)`;
+    let recNotes = formData.notes_reception || '';
+    if (!recNotes.includes('[OUTPATIENT APPOINTMENT]:')) {
+      recNotes = recNotes ? `${recNotes.trim()}\n${bookingTag}` : bookingTag;
+    } else {
+      recNotes = recNotes.replace(/\[OUTPATIENT APPOINTMENT\]:.*(\n|$)/, `${bookingTag}\n`).trim();
+    }
+
+    setFormData((prev: any) => ({
+      ...prev,
+      plan_followup_date: dateStr,
+      notes_reception: recNotes
+    }));
+
+    setSectionStatus((prev: any) => ({ ...prev, Plan: true }));
+    setIsDirty(true);
+
+    if (rolledSunday) {
+      notify('success', `Follow-up set to ${weekday} (Rolled from Sunday to Monday clinic reopen)`);
+    } else {
+      notify('success', `Follow-up date calculated: ${weekday}`);
+    }
+  };
+
+  const applyDrugSubstitution = (alert: SafetyAlert) => {
+    if (isLocked) return;
+    const updatedMeds = [...(formData.plan_meds || [])];
+    if (updatedMeds[alert.drugIndex]) {
+      const oldName = updatedMeds[alert.drugIndex].drug_name;
+      updatedMeds[alert.drugIndex] = {
+        ...updatedMeds[alert.drugIndex],
+        drug_name: alert.suggestedAlternative.drug_name,
+        strength: alert.suggestedAlternative.strength,
+        route: alert.suggestedAlternative.route,
+        dose: alert.suggestedAlternative.dose,
+        frequency: alert.suggestedAlternative.frequency,
+        duration: alert.suggestedAlternative.duration,
+        instructions: alert.suggestedAlternative.instructions
+      };
+
+      // Record clinical substitution reason in special instructions
+      const safetyNote = `[SAFETY SUBSTITUTION]: Replaced ${oldName} with ${alert.suggestedAlternative.drug_name} (${alert.suggestedAlternative.reason}).`;
+      let special = formData.plan_special_instructions || '';
+      if (!special.includes(safetyNote)) {
+        special = special ? `${special.trim()}\n\n${safetyNote}` : safetyNote;
+      }
+
+      setFormData((prev: any) => ({
+        ...prev,
+        plan_meds: updatedMeds,
+        plan_special_instructions: special
+      }));
+      setIsDirty(true);
+      notify('success', `Substituted with safe alternative: ${alert.suggestedAlternative.drug_name}`);
+    }
+  };
+
+  const renderTabContent = (targetTab: string = activeTab) => {
+    switch (targetTab) {
       case 'History':
         return (
           <div className="animate-slide-up">
@@ -859,10 +1713,79 @@ export const Consultations: React.FC = () => {
       case 'Vision':
         return (
           <div className="animate-slide-up">
-            <SectionHeader title="Section C: Visual Acuity" icon={Eye} onSave={() => handleSave(false)} isSaving={isSaving} />
+            <SectionHeader 
+              title="Section 1: Visual Acuity" 
+              icon={Eye} 
+              onMarkNormal={() => markSectionNormal('Vision')} 
+              normalButtonLabel="NORMAL VISION PRESET (6/6, N6)"
+              onSave={() => handleSave(false)} 
+              isSaving={isSaving} 
+            />
             <div className="clinical-section-card">
-              <div className="clinical-group-header" style={{ marginBottom: '32px' }}>
-                <div className="clinical-group-title">Acuity Measurements</div>
+              <div className="clinical-group-header" style={{ marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                  <div className="clinical-group-title">Acuity Measurements</div>
+                  {/* Inline Quick-Stamp Chips Toolbar */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => markSectionNormal('Vision')}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '5px 12px',
+                        background: '#f0fdf4',
+                        color: '#166534',
+                        border: '1px solid #bbf7d0',
+                        borderRadius: '20px',
+                        fontSize: '11px',
+                        fontWeight: '800',
+                        cursor: 'pointer',
+                        boxShadow: '0 1px 3px rgba(22, 163, 74, 0.1)',
+                        transition: 'all 0.15s'
+                      }}
+                      title="1-Click: Set Distance 6/6 & Near N6 for both eyes"
+                    >
+                      <Sparkles size={13} style={{ color: '#16a34a' }} />
+                      <span>Quick-Stamp 6/6 & N6 (Both Eyes)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => quickStampSingleEyeVision('OD')}
+                      style={{
+                        padding: '4px 10px',
+                        background: '#eff6ff',
+                        color: '#1d4ed8',
+                        border: '1px solid #bfdbfe',
+                        borderRadius: '16px',
+                        fontSize: '10px',
+                        fontWeight: '800',
+                        cursor: 'pointer'
+                      }}
+                      title="Stamp 6/6 & N6 on Right Eye (OD) only"
+                    >
+                      OD: 6/6 & N6
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => quickStampSingleEyeVision('OS')}
+                      style={{
+                        padding: '4px 10px',
+                        background: '#eff6ff',
+                        color: '#1d4ed8',
+                        border: '1px solid #bfdbfe',
+                        borderRadius: '16px',
+                        fontSize: '10px',
+                        fontWeight: '800',
+                        cursor: 'pointer'
+                      }}
+                      title="Stamp 6/6 & N6 on Left Eye (OS) only"
+                    >
+                      OS: 6/6 & N6
+                    </button>
+                  </div>
+                </div>
                 <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
                    <span style={{ fontSize: '12px', fontWeight: '800', color: '#64748b' }}>METHOD:</span>
                    <select className="clinical-input" name="va_method" value={formData.va_method} onChange={handleInputChange} style={{ height: '40px', width: '180px' }} disabled={isLocked}>
@@ -1056,7 +1979,14 @@ export const Consultations: React.FC = () => {
       case 'OcularExam':
         return (
           <div className="animate-slide-up">
-            <SectionHeader title="Section 2: Ocular Examination" icon={Eye} onMarkNormal={() => markSectionNormal('OcularExam')} onSave={() => handleSave(false)} isSaving={isSaving} />
+            <SectionHeader 
+              title="Section 2: Ocular Examination" 
+              icon={Eye} 
+              onMarkNormal={() => markSectionNormal('OcularExam')} 
+              normalButtonLabel="QUICK-STAMP NORMAL EXAM (IOP 14)"
+              onSave={() => handleSave(false)} 
+              isSaving={isSaving} 
+            />
             <div className="clinical-section-card">
               <div className="clinical-group-header" style={{ marginBottom: '32px' }}>
                 <div className="clinical-group-title">Slit Lamp Biomicroscopy</div>
@@ -1569,7 +2499,7 @@ export const Consultations: React.FC = () => {
                     const isPaid = inv.billing_status === 'Paid';
                     const isCompleted = inv.status === 'Completed';
                     const canComment = user?.role === 'Admin' || user?.role === 'Optometrist';
-                    const borderColor = isPaid ? (isCompleted ? '#10b981' : '#2563eb') : '#f59e0b';
+                    const borderColor = isPaid ? (isCompleted ? 'var(--leh-success)' : 'var(--leh-forest)') : 'var(--leh-warning)';
                     return (
                       <div
                         key={inv.id}
@@ -1741,13 +2671,205 @@ export const Consultations: React.FC = () => {
             </div>
           </div>
         );
-      case 'Plan':
+      case 'Plan': {
+        const safetyAlerts = checkDrugSafety(formData.plan_meds, formData.medical_history, formData.allergies, formData.vitals_pulse);
         return (
           <div className="animate-slide-up">
-            <SectionHeader title="Section 9: Treatment Plan" icon={Pill} onSave={() => handleSave(false)} isSaving={isSaving} />
+            <SectionHeader 
+              title="Section 9: Treatment Plan" 
+              icon={Pill} 
+              extraAction={
+                <button
+                  type="button"
+                  className="leh-btn-outline"
+                  onClick={() => {
+                    setPrintMode('leaflet');
+                    setShowLeafletModal(true);
+                  }}
+                  style={{
+                    height: '36px',
+                    padding: '0 14px',
+                    fontSize: '11px',
+                    fontWeight: '800',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: '#f0fdf4',
+                    color: '#166534',
+                    borderColor: '#bbf7d0',
+                    boxShadow: '0 1px 3px rgba(22, 101, 52, 0.08)'
+                  }}
+                  title="Generate Bilingual Illustrated Patient Prescription Leaflet"
+                >
+                  <FileText size={14} style={{ color: '#16a34a' }} />
+                  <span>PATIENT LEAFLET</span>
+                </button>
+              }
+              onSave={() => handleSave(false)} 
+              isSaving={isSaving} 
+            />
             
             <div style={{ display: 'grid', gap: '32px' }}>
               <div className="clinical-section-card">
+                {/* AUTOMATED OPHTHALMIC DRUG SAFETY & CONTRAINDICATION GUARD */}
+                {safetyAlerts.length > 0 && (
+                  <div
+                    className="animate-slide-up"
+                    style={{
+                      background: 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)',
+                      border: '2px solid #fda4af',
+                      borderRadius: '16px',
+                      padding: '16px 20px',
+                      marginBottom: '24px',
+                      boxShadow: '0 4px 14px rgba(225, 29, 72, 0.08)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#ffe4e6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e11d48' }}>
+                          <ShieldAlert size={18} />
+                        </div>
+                        <span style={{ fontSize: '13px', fontWeight: '900', color: '#9f1239', letterSpacing: '-0.01em' }}>
+                          Drug Safety & Contraindication Guard
+                        </span>
+                        <span style={{ fontSize: '10px', fontWeight: '900', background: '#e11d48', color: '#ffffff', padding: '2px 8px', borderRadius: '10px' }}>
+                          {safetyAlerts.length} {safetyAlerts.length === 1 ? 'CONFLICT' : 'CONFLICTS'} DETECTED
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '11px', fontWeight: '700', color: '#be123c' }}>
+                        Non-blocking Alert • Review Recommended
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {safetyAlerts.map((alert) => (
+                        <div
+                          key={alert.id}
+                          style={{
+                            background: '#ffffff',
+                            border: '1px solid #fecdd3',
+                            borderRadius: '12px',
+                            padding: '12px 16px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            flexWrap: 'wrap',
+                            gap: '12px'
+                          }}
+                        >
+                          <div style={{ flex: 1, minWidth: '280px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                              <span style={{ fontSize: '12px', fontWeight: '900', color: '#be123c' }}>
+                                ⚠ {alert.drugName}
+                              </span>
+                              <span style={{ fontSize: '10px', fontWeight: '800', background: '#fee2e2', color: '#991b1b', padding: '1px 6px', borderRadius: '6px' }}>
+                                Contraindicated in {alert.triggerCondition}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#4b5563', lineHeight: '1.4' }}>
+                              {alert.rationale}
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button
+                              type="button"
+                              onClick={() => applyDrugSubstitution(alert)}
+                              disabled={isLocked}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                background: '#f0fdf4',
+                                border: '1px solid #86efac',
+                                color: '#166534',
+                                padding: '8px 14px',
+                                borderRadius: '10px',
+                                fontSize: '11px',
+                                fontWeight: '800',
+                                cursor: 'pointer',
+                                boxShadow: '0 1px 3px rgba(22, 101, 52, 0.1)',
+                                transition: 'all 0.15s ease'
+                              }}
+                              title={alert.suggestedAlternative.reason}
+                            >
+                              <ShieldCheck size={14} style={{ color: '#16a34a' }} />
+                              <span>1-Click Substitute: {alert.suggestedAlternative.drug_name}</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Standard Ophthalmic Regimen Presets Quick-Selector */}
+                <div style={{ 
+                  background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', 
+                  border: '1px solid #e2e8f0', 
+                  borderRadius: '16px', 
+                  padding: '16px 20px', 
+                  marginBottom: '24px' 
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Sparkles size={16} style={{ color: 'var(--leh-forest)' }} />
+                      <span style={{ fontSize: '13px', fontWeight: '900', color: '#1e293b', letterSpacing: '-0.01em' }}>
+                        Standard Ophthalmic Regimen Presets
+                      </span>
+                      <span style={{ fontSize: '10px', fontWeight: '800', background: '#eff6ff', color: 'var(--leh-forest)', padding: '2px 8px', borderRadius: '10px', border: '1px solid #dbeafe' }}>
+                        1-Click Smart Append
+                      </span>
+                    </div>
+                    {formData.plan_meds.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm('Clear all prescribed medications in this table?')) {
+                            setFormData((prev: any) => ({ ...prev, plan_meds: [] }));
+                            setIsDirty(true);
+                          }
+                        }}
+                        style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '11px', fontWeight: '800', cursor: 'pointer' }}
+                      >
+                        Clear Medications
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {OPHTHALMIC_REGIMENS.map((regimen) => (
+                      <button
+                        key={regimen.id}
+                        type="button"
+                        onClick={() => applyPrescriptionRegimen(regimen)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '7px 14px',
+                          background: regimen.badgeColor.bg,
+                          color: regimen.badgeColor.text,
+                          border: `1px solid ${regimen.badgeColor.border}`,
+                          borderRadius: '12px',
+                          fontSize: '11px',
+                          fontWeight: '800',
+                          cursor: 'pointer',
+                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                          transition: 'all 0.15s ease'
+                        }}
+                        title={`${regimen.name}\n${regimen.description}`}
+                      >
+                        <Pill size={13} />
+                        <span>{regimen.shortName}</span>
+                        <span style={{ opacity: 0.75, fontSize: '10px', background: 'rgba(255, 255, 255, 0.4)', padding: '1px 5px', borderRadius: '6px' }}>
+                          {regimen.medications.length}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="clinical-group-header" style={{ marginBottom: '24px' }}>
                    <div className="clinical-group-title">Medication & Therapeutics</div>
                    <button className="leh-btn-primary" onClick={addMedication} style={{ marginLeft: 'auto', padding: '8px 16px', borderRadius: '12px' }} disabled={isLocked}>
@@ -1881,6 +3003,167 @@ export const Consultations: React.FC = () => {
                 </div>
               </div>
 
+              {/* Follow-up & Review Scheduling */}
+              <div className="clinical-section-card">
+                <div className="clinical-group-header">
+                  <div className="clinical-group-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Calendar size={18} style={{ color: 'var(--leh-forest)' }} />
+                    <span>Follow-Up & Review Scheduling</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="leh-btn-outline"
+                    onClick={() => setShowBookingModal(true)}
+                    style={{
+                      height: '34px',
+                      padding: '0 14px',
+                      fontSize: '11px',
+                      fontWeight: '800',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: '#eff6ff',
+                      color: 'var(--leh-forest)',
+                      borderColor: '#bfdbfe',
+                      boxShadow: '0 1px 3px rgba(46, 90, 38, 0.10)'
+                    }}
+                    title="Open Outpatient Appointment Booking Scheduler"
+                  >
+                    <CalendarCheck size={14} />
+                    <span>APPOINTMENT SCHEDULE</span>
+                  </button>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', alignItems: 'start' }}>
+                  {/* Follow-up Date Input & Real-time Relative Badge */}
+                  <div>
+                    <ClinicalField label="Follow-up Review Date">
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input
+                          type="date"
+                          className="clinical-input"
+                          name="plan_followup_date"
+                          value={formData.plan_followup_date || ''}
+                          onChange={handleInputChange}
+                          disabled={isLocked}
+                          style={{ height: '42px', fontWeight: '700' }}
+                        />
+                        {formData.plan_followup_date && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData((prev: any) => ({ ...prev, plan_followup_date: '' }));
+                              setIsDirty(true);
+                            }}
+                            style={{
+                              background: '#f1f5f9',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '8px',
+                              height: '42px',
+                              padding: '0 10px',
+                              cursor: 'pointer',
+                              color: '#64748b'
+                            }}
+                            title="Clear date (Return SOS)"
+                          >
+                            <X size={15} />
+                          </button>
+                        )}
+                      </div>
+                    </ClinicalField>
+
+                    {/* Calculated Status Badge */}
+                    <div style={{ marginTop: '10px' }}>
+                      {formData.plan_followup_date ? (() => {
+                        const status = getFollowUpStatus(formData.plan_followup_date);
+                        if (!status) return null;
+                        const isPast = status.diffDays < 0;
+                        const isToday = status.diffDays === 0;
+                        return (
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '6px 12px',
+                            borderRadius: '10px',
+                            background: isPast ? '#fef2f2' : isToday ? '#fffbeb' : '#f0fdf4',
+                            border: `1px solid ${isPast ? '#fecaca' : isToday ? '#fde68a' : '#bbf7d0'}`,
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            color: isPast ? '#991b1b' : isToday ? '#b45309' : '#166534'
+                          }}>
+                            <CalendarDays size={14} />
+                            <span>
+                              {status.weekdayName}, {status.formattedDate}
+                              {' • '}
+                              {isToday ? 'Today' : isPast ? `${Math.abs(status.diffDays)} days ago` : `in ${status.diffDays} day${status.diffDays > 1 ? 's' : ''}`}
+                            </span>
+                          </div>
+                        );
+                      })() : (
+                        <div style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '6px 12px',
+                          borderRadius: '10px',
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          color: '#64748b'
+                        }}>
+                          <Clock size={13} />
+                          <span>No specific date set • Review on SOS / as needed</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Quick-Pill Calculator */}
+                  <div>
+                    <label className="clinical-label-premium" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                      <Sparkles size={13} style={{ color: 'var(--leh-forest)' }} />
+                      <span>Quick-Pill Date Calculator (Auto-Skips Sundays)</span>
+                    </label>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                      {FOLLOW_UP_PILLS.map((pill) => (
+                        <button
+                          key={pill.id}
+                          type="button"
+                          onClick={() => applyFollowUpPreset(pill)}
+                          disabled={isLocked}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '8px 14px',
+                            background: pill.color.bg,
+                            color: pill.color.text,
+                            border: `1px solid ${pill.color.border}`,
+                            borderRadius: '12px',
+                            fontSize: '11px',
+                            fontWeight: '800',
+                            cursor: 'pointer',
+                            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+                            transition: 'all 0.15s ease'
+                          }}
+                          title={`${pill.label}: ${pill.hint} (Skips Sunday to Monday clinic)`}
+                        >
+                          {pill.isSOS ? <AlertCircle size={13} /> : <Calendar size={13} />}
+                          <span>{pill.label}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    <div style={{ fontSize: '11px', color: '#64748b', marginTop: '8px' }}>
+                      ⚡ Automatically shifts Sunday appointments to Monday morning clinic and syncs to Reception notes.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Clinical Notes & Departmental Instructions */}
               <div className="clinical-section-card">
                 <div className="clinical-group-header">
@@ -1974,6 +3257,7 @@ export const Consultations: React.FC = () => {
             </div>
           </div>
         );
+      }
       case 'Surgery':
         return (
           <div className="animate-slide-up">
@@ -2014,11 +3298,11 @@ export const Consultations: React.FC = () => {
                  )}
               </div>
 
-              <div className="clinical-section-card" style={{ border: formData.admission_advised ? '2px solid #2563eb' : '' }}>
+              <div className="clinical-section-card" style={{ border: formData.admission_advised ? '2px solid var(--leh-forest)' : '' }}>
                  <div className="clinical-group-header">
                     <div className="clinical-group-title">Admission Plan</div>
                     <label className="checkbox-clinical-container" style={{ marginLeft: 'auto' }}>
-                      <span style={{ fontSize: '12px', fontWeight: '800', color: formData.admission_advised ? '#2563eb' : '#64748b' }}>ADVISE ADMISSION?</span>
+                      <span style={{ fontSize: '12px', fontWeight: '800', color: formData.admission_advised ? 'var(--leh-forest)' : '#64748b' }}>ADVISE ADMISSION?</span>
                       <input type="checkbox" className="clinical-checkbox" checked={formData.admission_advised} onChange={(e) => setFormData((prev: any) => ({ ...prev, admission_advised: e.target.checked }))} disabled={isLocked} />
                     </label>
                  </div>
@@ -2088,62 +3372,272 @@ export const Consultations: React.FC = () => {
         </div>
       )}
 
-      {/* ZONE 2: WORKSPACE HEADER */}
+      {/* ZONE 2: WORKSPACE HEADER (HORIZONTAL SCROLLING ACTION STRIP WITH CHEVRON INDICATORS) */}
       {selectedPatient && (
-        <div style={{ padding: '14px 32px', background: '#f8fafc', borderBottom: '1px solid var(--leh-border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 50 }} className="no-print">
-           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <VoiceRecordingBadge />
-              <button className="leh-btn-outline" onClick={() => setShowTriageModal(true)} style={{ background: 'white' }}>
-                 <HistoryIcon size={16} />
-                 <span style={{ fontSize: '11px' }}>VIEW TRIAGE</span>
+        <div style={{ position: 'relative', width: '100%', zIndex: 50 }} className="no-print">
+          {/* Left Fade Indicator & Peek Button */}
+          {canScrollStripLeft && (
+            <div
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: '64px',
+                background: 'linear-gradient(to right, #f8fafc 45%, rgba(248, 250, 252, 0) 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                paddingLeft: '8px',
+                zIndex: 60,
+                pointerEvents: 'none'
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  if (actionStripRef.current) {
+                    actionStripRef.current.scrollLeft -= 220;
+                  }
+                }}
+                style={{
+                  pointerEvents: 'auto',
+                  width: '30px',
+                  height: '30px',
+                  borderRadius: '50%',
+                  background: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  boxShadow: '0 4px 10px rgba(15, 23, 42, 0.12)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#1e293b',
+                  transition: 'all 0.15s ease'
+                }}
+                title="Scroll actions left (200px)"
+              >
+                <ChevronLeft size={16} />
               </button>
-              <button className="leh-btn-outline" onClick={() => setShowHistoryModal(true)} style={{ background: 'white', borderColor: 'var(--leh-primary)', color: 'var(--leh-primary)' }}>
-                 <ClipboardList size={16} />
-                 <span style={{ fontSize: '11px' }}>VIEW HISTORY</span>
+            </div>
+          )}
+
+          {/* Right Fade Indicator & Peek Button */}
+          {canScrollStripRight && (
+            <div
+              style={{
+                position: 'absolute',
+                right: 0,
+                top: 0,
+                bottom: 0,
+                width: '64px',
+                background: 'linear-gradient(to left, #f8fafc 45%, rgba(248, 250, 252, 0) 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                paddingRight: '8px',
+                zIndex: 60,
+                pointerEvents: 'none'
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  if (actionStripRef.current) {
+                    actionStripRef.current.scrollLeft += 220;
+                  }
+                }}
+                style={{
+                  pointerEvents: 'auto',
+                  width: '30px',
+                  height: '30px',
+                  borderRadius: '50%',
+                  background: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  boxShadow: '0 4px 10px rgba(15, 23, 42, 0.12)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#1e293b',
+                  transition: 'all 0.15s ease'
+                }}
+                title="Scroll actions right (200px)"
+              >
+                <ChevronRight size={16} />
               </button>
-              <button className="leh-btn-outline" onClick={() => {
-                notify('info', 'Preparing print layout...');
-                setTimeout(window.print, 500);
-              }} style={{ background: 'white' }}>
-                 <Printer size={16} />
-                 <span style={{ fontSize: '11px' }}>PRINT SUMMARY</span>
+            </div>
+          )}
+
+          <div 
+            ref={actionStripRef}
+            className="consultation-actions-scroll-strip"
+            onScroll={checkStripScrollLimits}
+            onWheel={(e) => {
+              if (e.deltaY !== 0) {
+                e.currentTarget.scrollLeft += e.deltaY;
+              }
+            }}
+          >
+            <VoiceRecordingBadge />
+            {!isAiAvailable && (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '5px 12px', borderRadius: '20px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', fontSize: '11px', fontWeight: '800', letterSpacing: '0.04em', flexShrink: 0 }}>
+                <MicOff size={13} />
+                <span>AI DICTATION PAUSED BY ADMIN</span>
+              </div>
+            )}
+            <button className="leh-btn-outline" onClick={() => setShowTriageModal(true)} style={{ background: 'white', flexShrink: 0 }}>
+               <HistoryIcon size={16} />
+               <span style={{ fontSize: '11px' }}>VIEW TRIAGE</span>
+            </button>
+            <button className="leh-btn-outline" onClick={() => setShowHistoryModal(true)} style={{ background: 'white', borderColor: 'var(--leh-primary)', color: 'var(--leh-primary)', flexShrink: 0 }}>
+               <ClipboardList size={16} />
+               <span style={{ fontSize: '11px' }}>VIEW HISTORY</span>
+            </button>
+            <button className="leh-btn-outline" onClick={() => {
+              setPrintMode('summary');
+              notify('info', 'Preparing print layout...');
+              setTimeout(window.print, 500);
+            }} style={{ background: 'white', flexShrink: 0 }}>
+               <Printer size={16} />
+               <span style={{ fontSize: '11px' }}>PRINT SUMMARY</span>
+            </button>
+            <button 
+              className="leh-btn-outline" 
+              onClick={() => {
+                setPrintMode('leaflet');
+                setShowLeafletModal(true);
+              }} 
+              style={{ 
+                background: '#f0fdf4', 
+                borderColor: '#86efac', 
+                color: '#166534',
+                boxShadow: '0 1px 3px rgba(22, 101, 52, 0.08)',
+                flexShrink: 0
+              }}
+              title="Bilingual Illustrated Drop Schedule Leaflet for Patient"
+            >
+               <FileText size={16} style={{ color: '#16a34a' }} />
+               <span style={{ fontSize: '11px', fontWeight: '800' }}>PATIENT LEAFLET</span>
+            </button>
+            <button className="leh-btn-outline" onClick={() => {
+              setPrintMode('summary');
+              notify('info', 'Generating PDF Document...');
+              setTimeout(window.print, 500);
+            }} style={{ background: 'white', flexShrink: 0 }}>
+               <Download size={16} />
+               <span style={{ fontSize: '11px' }}>DOWNLOAD PDF</span>
+            </button>
+
+            <div style={{ width: '1px', height: '24px', background: '#cbd5e1', margin: '0 4px', flexShrink: 0 }} />
+
+            {/* VIEW MODE TOGGLE (TABBED VS CONTINUOUS SCROLL) */}
+            <div style={{ display: 'inline-flex', alignItems: 'center', background: '#e2e8f0', borderRadius: '10px', padding: '3px', gap: '3px', flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={() => handleViewModeToggle('tabbed')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  fontSize: '11px',
+                  fontWeight: '800',
+                  border: 'none',
+                  background: viewMode === 'tabbed' ? '#ffffff' : 'transparent',
+                  color: viewMode === 'tabbed' ? 'var(--leh-forest)' : '#64748b',
+                  boxShadow: viewMode === 'tabbed' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  flexShrink: 0
+                }}
+                title="Single Section Tabbed View"
+              >
+                <Layers size={13} />
+                <span>TABBED</span>
               </button>
-              <button className="leh-btn-outline" onClick={() => {
-                notify('info', 'Generating PDF Document...');
-                setTimeout(window.print, 500);
-              }} style={{ background: 'white' }}>
-                 <Download size={16} />
-                 <span style={{ fontSize: '11px' }}>DOWNLOAD PDF</span>
+              <button
+                type="button"
+                onClick={() => handleViewModeToggle('continuous')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  fontSize: '11px',
+                  fontWeight: '800',
+                  border: 'none',
+                  background: viewMode === 'continuous' ? '#ffffff' : 'transparent',
+                  color: viewMode === 'continuous' ? 'var(--leh-forest)' : '#64748b',
+                  boxShadow: viewMode === 'continuous' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  flexShrink: 0
+                }}
+                title="Continuous Scroll with Real-Time IntersectionObserver Scrollspy"
+              >
+                <ScrollText size={13} />
+                <span>CONTINUOUS</span>
               </button>
-           </div>
-           <div style={{ display: 'flex', gap: '12px' }}>
-             <button 
-               className="leh-btn-primary" 
-               onClick={() => handleSave(false)} 
-               disabled={isSaving}
-               style={{ background: 'var(--leh-green)', height: '40px' }}
-             >
-                <Save size={18} />
-                <span>SAVE DRAFT</span>
-             </button>
-             <button 
-               className="leh-btn-primary" 
-               onClick={() => { if (window.confirm('Finalize this clinical visit? Finalized visits move to payment/pharmacy.')) { handleSave(true); } }} 
-               disabled={isSaving}
-               style={{ background: 'var(--leh-primary)', minWidth: '180px' }}
-             >
-                {isSaving ? <RefreshCcw size={18} className="animate-spin" /> : <CheckCircle size={18} />}
-                <span>{isSaving ? 'FINALIZING...' : 'FINALIZE VISIT'}</span>
-             </button>
-           </div>
+            </div>
+
+            <span 
+              style={{ 
+                display: 'inline-flex', 
+                alignItems: 'center', 
+                gap: '4px', 
+                fontSize: '10px', 
+                fontWeight: '800', 
+                color: '#64748b', 
+                background: '#ffffff', 
+                border: '1px solid #e2e8f0', 
+                padding: '5px 8px', 
+                borderRadius: '8px',
+                flexShrink: 0
+              }}
+              title="Quick Section Shortcuts: Hold Alt and press 1 to 9, or Alt + ↑ / ↓"
+            >
+              <kbd style={{ fontFamily: 'inherit', background: '#f1f5f9', padding: '1px 4px', borderRadius: '4px', border: '1px solid #cbd5e1' }}>Alt</kbd>+<kbd style={{ fontFamily: 'inherit', background: '#f1f5f9', padding: '1px 4px', borderRadius: '4px', border: '1px solid #cbd5e1' }}>1..9</kbd>
+            </span>
+
+            <div style={{ width: '1px', height: '24px', background: '#cbd5e1', margin: '0 4px', flexShrink: 0 }} />
+
+            <button 
+              className="leh-btn-primary" 
+              onClick={() => handleSave(false)} 
+              disabled={isSaving}
+              style={{ background: 'var(--leh-green)', height: '40px', flexShrink: 0 }}
+            >
+               <Save size={18} />
+               <span>SAVE DRAFT</span>
+            </button>
+            <button 
+              className="leh-btn-primary" 
+              onClick={handleInitiateFinalize} 
+              disabled={isSaving}
+              style={{ background: 'var(--leh-primary)', minWidth: '180px', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}
+              title="Run Completeness Audit and Finalize Clinical Visit"
+            >
+               {isSaving ? <RefreshCcw size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
+               <span>{isSaving ? 'FINALIZING...' : 'FINALIZE VISIT'}</span>
+            </button>
+          </div>
         </div>
       )}
 
       {/* ZONE 3: TWO-PANEL WORKSPACE */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 20%) 1fr', height: 'calc(100vh - 80px)', minHeight: '650px', overflow: 'hidden' }} className="no-print">
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 22%) 1fr', height: 'calc(100vh - 80px)', minHeight: '650px', overflow: 'hidden' }} className="no-print">
         
         {/* LEFT PANEL: NAVIGATION */}
-        <div style={{ background: 'white', borderRight: '1px solid var(--leh-border-light)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ 
+          background: 'linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%)', 
+          borderRight: '1px solid #e2e8f0', 
+          boxShadow: '4px 0 24px rgba(0, 0, 0, 0.02)', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          overflow: 'hidden' 
+        }}>
            {!selectedPatient ? (
               <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                  <div style={{ padding: '24px', borderBottom: '1px solid var(--leh-border-light)' }}>
@@ -2190,48 +3684,48 @@ export const Consultations: React.FC = () => {
                  </div>
               </div>
            ) : (
-              <div className="custom-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
-                 <h3 style={{ fontSize: '10px', fontWeight: '900', color: 'var(--leh-text-muted)', margin: '0 12px 16px', letterSpacing: '0.1em' }}>CLINICAL SECTIONS (PRD 6.5)</h3>
-                     {menuItems.map(item => (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        if (isDirty) {
-                          // Optional: Auto-save on tab change? 
-                          // The requirement says "show warning and auto-save after 30s inactivity"
-                        }
-                        setActiveTab(item.id);
-                      }}
-                      style={{
-                        width: '100%',
-                        padding: '14px 16px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        background: activeTab === item.id ? 'var(--leh-primary)' : 'transparent',
-                        color: activeTab === item.id ? 'white' : 'var(--leh-text-dark)',
-                        border: 'none',
-                        borderRadius: '10px',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        marginBottom: '4px',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                       <item.icon size={18} style={{ opacity: activeTab === item.id ? 1 : 0.6 }} />
-                       <span style={{ fontSize: '12px', fontWeight: '700', flex: 1 }}>{item.label}</span>
-                       {sectionStatus[item.id] && <CheckCircle2 size={14} style={{ color: activeTab === item.id ? 'white' : 'var(--leh-green)' }} />}
-                    </button>
-                 ))}
-                 <div style={{ marginTop: 'auto', padding: '20px 12px', borderTop: '1px solid var(--leh-border-light)' }}>
+              <div className="custom-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column' }}>
+                 <div style={{ padding: '4px 8px 12px', borderBottom: '1px solid #f1f5f9', marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+                      CLINICAL SECTIONS (PRD 6.5)
+                    </span>
+                    <span style={{ fontSize: '10px', fontWeight: '800', background: '#eff6ff', color: 'var(--leh-forest)', padding: '2px 8px', borderRadius: '12px', border: '1px solid #dbeafe' }}>
+                      {Object.values(sectionStatus).filter(Boolean).length}/12 DONE
+                    </span>
+                 </div>
+
+                 <InnerNavTabs
+                   orientation="vertical"
+                   tabs={menuItems.map(item => ({
+                     id: item.id,
+                     label: item.label,
+                     icon: item.icon,
+                     badge: item.shortcut,
+                     statusIcon: sectionStatus[item.id] ? (
+                       <CheckCircle2 size={15} style={{ color: activeTab === item.id ? '#ffffff' : '#10b981' }} />
+                     ) : undefined,
+                   }))}
+                   activeTab={activeTab}
+                   onChange={(newTab) => {
+                     handleSectionNavigation(newTab);
+                   }}
+                 />
+
+                 <div style={{ marginTop: 'auto', paddingTop: '20px', borderTop: '1px solid #e2e8f0', margin: '20px 0 0 0' }}>
                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                     <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--leh-text-muted)' }}>PROGRESS</span>
-                     <span style={{ fontSize: '11px', fontWeight: '900', color: 'var(--leh-primary)' }}>
+                     <span style={{ fontSize: '10px', fontWeight: '900', color: '#64748b', letterSpacing: '0.05em' }}>COMPLETION PROGRESS</span>
+                     <span style={{ fontSize: '11px', fontWeight: '900', color: 'var(--leh-forest)' }}>
                        {Object.values(sectionStatus).filter(Boolean).length} / 12 SECTIONS
                      </span>
                    </div>
-                   <div style={{ height: '6px', background: 'var(--leh-bg-light)', borderRadius: '3px', overflow: 'hidden' }}>
-                     <div style={{ height: '100%', width: `${(Object.values(sectionStatus).filter(Boolean).length / 12) * 100}%`, background: 'var(--leh-primary)', transition: 'width 0.3s ease' }}></div>
+                   <div style={{ height: '7px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                     <div style={{ 
+                       height: '100%', 
+                       width: `${(Object.values(sectionStatus).filter(Boolean).length / 12) * 100}%`, 
+                       background: 'linear-gradient(90deg, var(--leh-forest) 0%, var(--leh-lime) 100%)', 
+                       transition: 'width 0.3s ease',
+                       boxShadow: '0 0 8px rgba(46, 90, 38, 0.45)'
+                     }} />
                    </div>
                  </div>
               </div>
@@ -2239,14 +3733,18 @@ export const Consultations: React.FC = () => {
         </div>
 
         {/* RIGHT PANEL: WORKSPACE */}
-          <div className="custom-scrollbar" style={{ 
-            flex: 1, 
-            overflow: 'auto', 
-            background: '#f1f5f9', 
-            padding: '48px', 
-            display: 'block', 
-            position: 'relative' 
-          }}>
+          <div 
+            ref={workspaceScrollRef}
+            className="custom-scrollbar" 
+            style={{ 
+              flex: 1, 
+              overflow: 'auto', 
+              background: '#f1f5f9', 
+              padding: '48px', 
+              display: 'block', 
+              position: 'relative' 
+            }}
+          >
             {!selectedPatient ? (
               <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
                 <Stethoscope size={64} style={{ color: 'var(--leh-border)', marginBottom: '24px' }} />
@@ -2261,14 +3759,35 @@ export const Consultations: React.FC = () => {
                     <span>You have unsaved changes in this section. Progress will auto-save in 30s.</span>
                   </div>
                 )}
-                {renderTabContent()}
+                {viewMode === 'tabbed' ? (
+                  <div id={`clinical-section-${activeTab}`}>
+                    {renderTabContent(activeTab)}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '48px' }}>
+                    {menuItems.map((item, idx) => (
+                      <div 
+                        key={item.id} 
+                        id={`clinical-section-${item.id}`} 
+                        className="clinical-continuous-section"
+                        style={{ 
+                          scrollMarginTop: '20px',
+                          paddingBottom: idx < menuItems.length - 1 ? '48px' : '0',
+                          borderBottom: idx < menuItems.length - 1 ? '2px dashed #e2e8f0' : 'none'
+                        }}
+                      >
+                        {renderTabContent(item.id)}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
       </div>
 
       {/* HIGH-FIDELITY PRINT AREA (Sections A-L) */}
-      <div id="print-area" className="print-only" style={{ padding: '40px', color: '#000', fontFamily: '"Inter", sans-serif', width: '210mm', minHeight: '297mm', margin: '0 auto', background: 'white' }}>
+      <div id="print-area" className="print-only" style={{ display: printMode === 'summary' ? 'block' : 'none', padding: '40px', color: '#000', fontFamily: '"Inter", sans-serif', width: '210mm', minHeight: '297mm', margin: '0 auto', background: 'white' }}>
         {selectedPatient && (
           <>
             {/* DOCUMENT HEADER */}
@@ -2676,7 +4195,7 @@ export const Consultations: React.FC = () => {
 
                   {formData.admission_advised ? (
                     <div style={{ border: '1px solid #93c5fd', padding: '8px', borderRadius: '6px', background: '#eff6ff' }}>
-                      <p style={{ fontWeight: 'bold', color: '#2563eb', margin: '0 0 4px 0' }}>Admission Advised:</p>
+                      <p style={{ fontWeight: 'bold', color: 'var(--leh-forest)', margin: '0 0 4px 0' }}>Admission Advised:</p>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '9px' }}>
                         <div><strong>Reason:</strong> {formData.admission_reason}</div>
                         <div><strong>Urgency:</strong> {formData.admission_urgency}</div>
@@ -2708,6 +4227,219 @@ export const Consultations: React.FC = () => {
               </div>
             </div>
           </>
+        )}
+      </div>
+
+      {/* BILINGUAL PATIENT PRESCRIPTION & DROP SCHEDULE LEAFLET (PRINT AREA) */}
+      <div
+        id="leaflet-print-area"
+        className="print-only"
+        style={{
+          display: printMode === 'leaflet' ? 'block' : 'none',
+          padding: '24px 32px',
+          color: '#0f172a',
+          fontFamily: '"Inter", sans-serif',
+          width: '210mm',
+          minHeight: '297mm',
+          margin: '0 auto',
+          background: 'white'
+        }}
+      >
+        {selectedPatient && (
+          <div>
+            {/* LEAFLET HEADER */}
+            <div style={{ textAlign: 'center', borderBottom: '3px solid var(--leh-forest)', paddingBottom: '16px', marginBottom: '20px' }}>
+              <div style={{ display: 'inline-block', background: '#eff6ff', color: '#1e40af', padding: '4px 16px', borderRadius: '20px', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', marginBottom: '6px' }}>
+                Luna Eye Hospital • Asibitin Ido na Luna
+              </div>
+              <h1 style={{ fontSize: '22px', margin: '4px 0', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.02em' }}>
+                Patient Prescription & Drop Schedule Leaflet
+              </h1>
+              <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--leh-forest)' }}>
+                Jadawalin Maganin Ido & Bayanin Kula da Lafiya
+              </div>
+            </div>
+
+            {/* PATIENT INFO BANNER */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '12px 16px', marginBottom: '20px', fontSize: '11px', background: '#f8fafc' }}>
+              <div>
+                <strong style={{ color: '#64748b', display: 'block', fontSize: '10px', textTransform: 'uppercase' }}>Patient / Majiyyaci:</strong>
+                <span style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a' }}>{selectedPatient.name || selectedPatient.patient_name || selectedPatient.full_name}</span>
+              </div>
+              <div>
+                <strong style={{ color: '#64748b', display: 'block', fontSize: '10px', textTransform: 'uppercase' }}>File No / Lamba:</strong>
+                <span style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a' }}>#{selectedPatient.hospital_id || selectedPatient.id}</span>
+              </div>
+              <div>
+                <strong style={{ color: '#64748b', display: 'block', fontSize: '10px', textTransform: 'uppercase' }}>Date / Rana:</strong>
+                <span style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a' }}>{formatDateStandard(new Date().toISOString())}</span>
+              </div>
+              <div>
+                <strong style={{ color: '#64748b', display: 'block', fontSize: '10px', textTransform: 'uppercase' }}>Doctor / Likita:</strong>
+                <span style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a' }}>{user?.full_name || 'Consultant'}</span>
+              </div>
+            </div>
+
+            {/* PICTOGRAPHIC DOSING SCHEDULE */}
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '13px', fontWeight: '900', color: '#1e293b', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                1. Dosing Time Schedule / Jadawalin Lokutan Saka Magani
+              </h3>
+
+              {formData.plan_meds && formData.plan_meds.length > 0 ? (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', border: '1px solid #cbd5e1' }}>
+                  <thead>
+                    <tr style={{ background: '#f1f5f9' }}>
+                      <th style={{ border: '1px solid #cbd5e1', padding: '8px 10px', textAlign: 'left', width: '28%' }}>
+                        Medication / Magani
+                      </th>
+                      <th style={{ border: '1px solid #cbd5e1', padding: '8px 6px', textAlign: 'center', width: '15%' }}>
+                        <div>🌅 Morning</div>
+                        <div style={{ fontSize: '9px', fontWeight: '600', color: '#64748b' }}>Safiya (08:00 AM)</div>
+                      </th>
+                      <th style={{ border: '1px solid #cbd5e1', padding: '8px 6px', textAlign: 'center', width: '15%' }}>
+                        <div>☀️ Afternoon</div>
+                        <div style={{ fontSize: '9px', fontWeight: '600', color: '#64748b' }}>Rana (01:00 PM)</div>
+                      </th>
+                      <th style={{ border: '1px solid #cbd5e1', padding: '8px 6px', textAlign: 'center', width: '15%' }}>
+                        <div>🌇 Evening</div>
+                        <div style={{ fontSize: '9px', fontWeight: '600', color: '#64748b' }}>Yamma (06:00 PM)</div>
+                      </th>
+                      <th style={{ border: '1px solid #cbd5e1', padding: '8px 6px', textAlign: 'center', width: '15%' }}>
+                        <div>🌙 Bedtime</div>
+                        <div style={{ fontSize: '9px', fontWeight: '600', color: '#64748b' }}>Dare (09:00 PM)</div>
+                      </th>
+                      <th style={{ border: '1px solid #cbd5e1', padding: '8px 10px', textAlign: 'center', width: '12%' }}>
+                        Duration / Kwanaki
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {formData.plan_meds.map((med: any, idx: number) => {
+                      const slots = getDropDosingSlots(med.frequency, med.dose, med.route);
+                      return (
+                        <tr key={idx} style={{ background: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                          <td style={{ border: '1px solid #cbd5e1', padding: '10px 10px' }}>
+                            <div style={{ fontWeight: '800', color: '#0f172a', fontSize: '12px' }}>{med.drug_name}</div>
+                            <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>
+                              {med.route || 'Topical'} • {med.instructions || 'As directed / Kamar yadda aka umarta'}
+                            </div>
+                          </td>
+                          <td style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'center' }}>
+                            {slots.morning ? (
+                              <span style={{ display: 'inline-block', background: '#eff6ff', color: '#1e40af', padding: '3px 6px', borderRadius: '6px', fontWeight: '800', fontSize: '10px' }}>
+                                {slots.morning}
+                              </span>
+                            ) : (
+                              <span style={{ color: '#cbd5e1' }}>—</span>
+                            )}
+                          </td>
+                          <td style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'center' }}>
+                            {slots.afternoon ? (
+                              <span style={{ display: 'inline-block', background: '#fef3c7', color: '#92400e', padding: '3px 6px', borderRadius: '6px', fontWeight: '800', fontSize: '10px' }}>
+                                {slots.afternoon}
+                              </span>
+                            ) : (
+                              <span style={{ color: '#cbd5e1' }}>—</span>
+                            )}
+                          </td>
+                          <td style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'center' }}>
+                            {slots.evening ? (
+                              <span style={{ display: 'inline-block', background: '#fed7aa', color: '#9a3412', padding: '3px 6px', borderRadius: '6px', fontWeight: '800', fontSize: '10px' }}>
+                                {slots.evening}
+                              </span>
+                            ) : (
+                              <span style={{ color: '#cbd5e1' }}>—</span>
+                            )}
+                          </td>
+                          <td style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'center' }}>
+                            {slots.night ? (
+                              <span style={{ display: 'inline-block', background: '#e0e7ff', color: '#3730a3', padding: '3px 6px', borderRadius: '6px', fontWeight: '800', fontSize: '10px' }}>
+                                {slots.night}
+                              </span>
+                            ) : (
+                              <span style={{ color: '#cbd5e1' }}>—</span>
+                            )}
+                          </td>
+                          <td style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'center', fontWeight: '700' }}>
+                            {med.duration || '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : (
+                <div style={{ padding: '16px', border: '1px dashed #cbd5e1', borderRadius: '8px', textAlign: 'center', color: '#64748b' }}>
+                  No medications prescribed for this encounter.
+                </div>
+              )}
+            </div>
+
+            {/* BILINGUAL INSTRUCTION PICTOCARDS (2x2 GRID) */}
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '13px', fontWeight: '900', color: '#1e293b', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                2. Essential Eye Care Steps / Muhimman Dokokin Saka Magani
+              </h3>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px', background: '#f8fafc' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '900', fontSize: '11px', color: 'var(--leh-forest)', marginBottom: '4px' }}>
+                    <span>💧 5-Minute Spacing Rule / Dokar Minti Biyar</span>
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#334155', lineHeight: '1.4' }}>
+                    <strong>EN:</strong> If using multiple eye drops, wait 5 minutes between bottles so the first drop is absorbed.<br />
+                    <strong style={{ color: '#1e40af' }}>HA:</strong> Idan kuna saka magani fiye da guda ɗaya, ku jira minti 5 tsakanin kowanne magani kafin saka na gaba.
+                  </div>
+                </div>
+
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px', background: '#f8fafc' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '900', fontSize: '11px', color: 'var(--leh-forest)', marginBottom: '4px' }}>
+                    <span>🧼 Clean Hands & Bottle Tip / Wanke Hannaye da Tsabta</span>
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#334155', lineHeight: '1.4' }}>
+                    <strong>EN:</strong> Wash hands with soap. Never touch the bottle tip to your eye, fingers, or eyelashes.<br />
+                    <strong style={{ color: '#1e40af' }}>HA:</strong> A wanke hannu da sabulu. Kada kan kwalbar ya taɓa ido, yatsa, ko gashin ido.
+                  </div>
+                </div>
+
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px', background: '#f8fafc' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '900', fontSize: '11px', color: 'var(--leh-forest)', marginBottom: '4px' }}>
+                    <span>👁️ Punctal Occlusion / Matse Kusurwar Ido</span>
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#334155', lineHeight: '1.4' }}>
+                    <strong>EN:</strong> Press gently at the inner corner near your nose for 2 minutes to keep drop in the eye.<br />
+                    <strong style={{ color: '#1e40af' }}>HA:</strong> Bayan saka ɗigon, a rufe ido a matse kusurwar ido kusa da hanci na minti 2 don maganin ya zauna a ido.
+                  </div>
+                </div>
+
+                <div style={{ border: '1px solid #fecaca', borderRadius: '10px', padding: '12px', background: '#fef2f2' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '900', fontSize: '11px', color: '#dc2626', marginBottom: '4px' }}>
+                    <span>🚨 Emergency Warning / Gargadin Gaggawa</span>
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#7f1d1d', lineHeight: '1.4' }}>
+                    <strong>EN:</strong> Return immediately if sudden severe eye pain, vision drop, or extreme redness occurs.<br />
+                    <strong style={{ color: '#991b1b' }}>HA:</strong> Ku dawo asibiti nan take idan an ji tsananin ciwo, daukewar gani, ko kumburi mai tsanani.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* REVIEW DATE & FOOTER */}
+            <div style={{ borderTop: '2px solid #cbd5e1', paddingTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>
+              <div>
+                <strong style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase' }}>Next Review / Ranar Dawowa:</strong>
+                <div style={{ fontSize: '13px', fontWeight: '900', color: 'var(--leh-forest)', marginTop: '2px' }}>
+                  {formData.plan_followup_date ? `${formatDateStandard(formData.plan_followup_date)} (Morning Clinic / Asibitin Safiya)` : 'SOS (Return as needed / Idan buƙata ta taso)'}
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '11px', fontWeight: '800', color: '#0f172a' }}>Luna Eye Hospital Helpline:</div>
+                <div style={{ fontSize: '11px', color: '#64748b' }}>09044687558 • WhatsApp: 09114111418</div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
@@ -2967,6 +4699,1442 @@ export const Consultations: React.FC = () => {
                  <button className="leh-btn-primary" style={{ width: '100%', height: '54px', borderRadius: '16px' }} onClick={() => setShowHistoryModal(false)}>Acknowledge & Close</button>
               </div>
            </div>
+        </div>
+      )}
+
+      {/* CONSULTATION COMPLETENESS AUDITOR MODAL */}
+      {showAuditorModal && selectedPatient && (
+        <div 
+          className="no-print"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.72)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 1100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowAuditorModal(false);
+          }}
+        >
+          <div 
+            className="animate-slide-up"
+            style={{
+              width: '100%',
+              maxWidth: '640px',
+              maxHeight: '90vh',
+              background: '#ffffff',
+              borderRadius: '24px',
+              boxShadow: '0 25px 60px -15px rgba(15, 23, 42, 0.35)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              border: '1px solid #e2e8f0'
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+              color: '#ffffff',
+              padding: '20px 24px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '12px',
+                  background: auditResults.critical.length > 0 ? 'rgba(239, 68, 68, 0.18)' : 'rgba(16, 185, 129, 0.18)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: auditResults.critical.length > 0 ? '#f87171' : '#34d399',
+                  border: `1px solid ${auditResults.critical.length > 0 ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`
+                }}>
+                  {auditResults.critical.length > 0 ? <ShieldAlert size={22} /> : <ShieldCheck size={22} />}
+                </div>
+                <div>
+                  <div style={{ fontSize: '15px', fontWeight: '900', letterSpacing: '-0.01em' }}>
+                    Consultation Completeness Auditor
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', marginTop: '2px' }}>
+                    {selectedPatient.full_name || selectedPatient.patient_name} • #{selectedPatient.file_number || selectedPatient.id} • Pre-Discharge Quality Check
+                  </div>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setShowAuditorModal(false)}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: 'none',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Score Summary Bar */}
+            <div style={{
+              padding: '12px 24px',
+              background: '#f8fafc',
+              borderBottom: '1px solid #e2e8f0',
+              display: 'flex',
+              gap: '12px',
+              flexWrap: 'wrap',
+              alignItems: 'center'
+            }}>
+              <span style={{ fontSize: '11px', fontWeight: '800', color: '#64748b' }}>
+                AUDIT FINDINGS:
+              </span>
+              {auditResults.critical.length > 0 ? (
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: '900',
+                  background: '#fef2f2',
+                  color: '#dc2626',
+                  padding: '3px 10px',
+                  borderRadius: '12px',
+                  border: '1px solid #fecaca',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <AlertCircle size={13} />
+                  {auditResults.critical.length} Critical Core Section{auditResults.critical.length > 1 ? 's' : ''} Missing
+                </span>
+              ) : (
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: '900',
+                  background: '#ecfdf5',
+                  color: '#059669',
+                  padding: '3px 10px',
+                  borderRadius: '12px',
+                  border: '1px solid #a7f3d0',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <CheckCircle2 size={13} />
+                  Core Documentation Complete
+                </span>
+              )}
+
+              {auditResults.recommended.length > 0 && (
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: '800',
+                  background: '#fffbeb',
+                  color: '#d97706',
+                  padding: '3px 10px',
+                  borderRadius: '12px',
+                  border: '1px solid #fde68a',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <Info size={13} />
+                  {auditResults.recommended.length} Recommended Field{auditResults.recommended.length > 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+
+            {/* Body */}
+            <div className="custom-scrollbar" style={{ padding: '24px', overflowY: 'auto', maxHeight: '55vh', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              
+              {/* Critical Items Section */}
+              {auditResults.critical.length > 0 && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '900', color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      Required Clinical Core (Essential for Safe Discharge)
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {auditResults.critical.map((item, idx) => (
+                      <div 
+                        key={idx}
+                        style={{
+                          padding: '14px 16px',
+                          background: '#fff5f5',
+                          borderRadius: '14px',
+                          border: '1px solid #fed7d7',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                          <AlertTriangle size={18} style={{ color: '#e53e3e', marginTop: '2px', flexShrink: 0 }} />
+                          <div>
+                            <div style={{ fontSize: '13px', fontWeight: '800', color: '#9b1c1c' }}>
+                              {item.label}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#742a2a', marginTop: '2px', lineHeight: '1.4' }}>
+                              {item.issue}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleSectionNavigation(item.sectionId);
+                            setShowAuditorModal(false);
+                            notify('info', `Navigated to ${item.label}`);
+                          }}
+                          style={{
+                            padding: '8px 14px',
+                            background: 'var(--leh-forest)',
+                            color: 'var(--leh-lime)',
+                            border: 'none',
+                            borderRadius: '10px',
+                            fontSize: '11px',
+                            fontWeight: '800',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            whiteSpace: 'nowrap',
+                            boxShadow: '0 2px 8px rgba(46, 90, 38, 0.25)',
+                            transition: 'all 0.15s'
+                          }}
+                        >
+                          <span>Jump & Fill</span>
+                          <ArrowRight size={13} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Recommended Items Section */}
+              {auditResults.recommended.length > 0 && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '900', color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      Recommended Ophthalmic Best Practices
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {auditResults.recommended.map((item, idx) => (
+                      <div 
+                        key={idx}
+                        style={{
+                          padding: '12px 16px',
+                          background: '#fffdf5',
+                          borderRadius: '14px',
+                          border: '1px solid #fef3c7',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                          <Info size={17} style={{ color: '#d97706', marginTop: '2px', flexShrink: 0 }} />
+                          <div>
+                            <div style={{ fontSize: '13px', fontWeight: '800', color: '#92400e' }}>
+                              {item.label}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#78350f', marginTop: '2px' }}>
+                              {item.issue}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleSectionNavigation(item.sectionId);
+                            setShowAuditorModal(false);
+                            notify('info', `Navigated to ${item.label}`);
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            background: '#f8fafc',
+                            color: '#334155',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '10px',
+                            fontSize: '11px',
+                            fontWeight: '800',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          <span>Review</span>
+                          <ArrowRight size={13} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            </div>
+
+            {/* Footer with Actions */}
+            <div style={{
+              padding: '16px 24px',
+              background: '#f8fafc',
+              borderTop: '1px solid #e2e8f0',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '12px'
+            }}>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('Confirm Clinical Override: Finalize this visit and route to Pharmacy / Billing despite the auditor warnings?')) {
+                      setShowAuditorModal(false);
+                      handleSave(true, true);
+                    }
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: '1px dashed #cbd5e1',
+                    color: '#64748b',
+                    padding: '8px 14px',
+                    borderRadius: '10px',
+                    fontSize: '11px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                  title="Override completeness check for emergency encounters or direct referrals"
+                >
+                  <AlertTriangle size={14} style={{ color: '#d97706' }} />
+                  <span>Override & Finalize Anyway</span>
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowAuditorModal(false)}
+                  style={{
+                    padding: '9px 16px',
+                    background: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    fontWeight: '800',
+                    color: '#475569',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Return to Chart
+                </button>
+                {auditResults.critical.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const first = auditResults.critical[0];
+                      handleSectionNavigation(first.sectionId);
+                      setShowAuditorModal(false);
+                      notify('info', `Navigated to ${first.label}`);
+                    }}
+                    style={{
+                      padding: '9px 18px',
+                      background: 'var(--leh-forest)',
+                      border: 'none',
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      fontWeight: '800',
+                      color: 'var(--leh-lime)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxShadow: '0 4px 12px rgba(46, 90, 38, 0.3)'
+                    }}
+                  >
+                    <span>Jump to First Issue</span>
+                    <ArrowRight size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* OUTPATIENT FOLLOW-UP APPOINTMENT SCHEDULER MODAL */}
+      {showBookingModal && selectedPatient && (
+        <div
+          className="no-print"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowBookingModal(false);
+          }}
+        >
+          <div
+            className="animate-slide-up"
+            style={{
+              width: '100%',
+              maxWidth: '560px',
+              backgroundColor: '#ffffff',
+              borderRadius: '24px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              border: '1px solid #e2e8f0',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: '20px 24px',
+                borderBottom: '1px solid #f1f5f9',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: 'linear-gradient(135deg, var(--leh-forest-tint) 0%, #ffffff 100%)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '12px',
+                    background: 'var(--leh-lime)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--leh-forest)',
+                    boxShadow: '0 2px 8px rgba(192, 255, 114, 0.4)'
+                  }}
+                >
+                  <CalendarCheck size={22} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '900', color: '#0f172a' }}>
+                    Outpatient Follow-Up Scheduler
+                  </h3>
+                  <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>
+                    Luna Eye Hospital • Specialized Eye Clinic Schedule
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBookingModal(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  padding: '6px',
+                  borderRadius: '8px'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              {/* Patient Card Preview */}
+              <div
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '16px',
+                  padding: '16px 20px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>
+                    Patient Identity
+                  </div>
+                  <div style={{ fontSize: '15px', fontWeight: '900', color: '#0f172a', marginTop: '2px' }}>
+                    {selectedPatient.name || selectedPatient.patient_name}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                    File: #{selectedPatient.hospital_id || selectedPatient.id} • {selectedPatient.gender || 'Patient'}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>
+                    Clinician
+                  </div>
+                  <div style={{ fontSize: '12px', fontWeight: '800', color: 'var(--leh-forest)', marginTop: '2px' }}>
+                    {user?.full_name || 'Attending Ophthalmologist'}
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
+                    Consultant Eye Clinic
+                  </div>
+                </div>
+              </div>
+
+              {/* Target Appointment Details */}
+              <div
+                style={{
+                  border: '1px solid var(--leh-border)',
+                  background: 'var(--leh-forest-tint)',
+                  borderRadius: '16px',
+                  padding: '18px 20px'
+                }}
+              >
+                <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--leh-forest)', textTransform: 'uppercase', marginBottom: '8px' }}>
+                  Scheduled Review Window
+                </div>
+                {formData.plan_followup_date ? (() => {
+                  const status = getFollowUpStatus(formData.plan_followup_date);
+                  return (
+                    <div>
+                      <div style={{ fontSize: '18px', fontWeight: '900', color: 'var(--leh-ink)' }}>
+                        {status ? `${status.weekdayName}, ${status.formattedDate}` : formData.plan_followup_date}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: '800', background: 'var(--leh-lime)', color: 'var(--leh-forest)', padding: '3px 10px', borderRadius: '12px' }}>
+                          Morning Clinic (08:30 - 13:30)
+                        </span>
+                        {status && (
+                          <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--leh-forest)' }}>
+                            {status.diffDays >= 0 ? `Target in ${status.diffDays} day${status.diffDays === 1 ? '' : 's'}` : `${Math.abs(status.diffDays)} days in past`}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })() : (
+                  <div>
+                    <div style={{ fontSize: '15px', fontWeight: '800', color: '#dc2626' }}>
+                      No Specific Calendar Date (SOS / Return as Needed)
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                      Patient is instructed to report immediately if acute symptoms (pain, redness, vision loss) manifest.
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Reception / Cashier Sync Handover */}
+              <div>
+                <label className="clinical-label-premium" style={{ marginBottom: '6px' }}>
+                  Reception & Cashier Handover Note
+                </label>
+                <textarea
+                  className="clinical-textarea"
+                  value={formData.notes_reception || ''}
+                  onChange={(e) => {
+                    setFormData((prev: any) => ({ ...prev, notes_reception: e.target.value }));
+                    setIsDirty(true);
+                  }}
+                  placeholder="Notes for front-desk to queue or book the appointment..."
+                  style={{ height: '70px', fontSize: '12px' }}
+                />
+                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                  ℹ️ This handover note appears automatically on the patient's checkout card and receipt.
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div
+              style={{
+                padding: '16px 24px',
+                borderTop: '1px solid #f1f5f9',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                background: '#f8fafc'
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  const slip = `LUNA EYE HOSPITAL - APPOINTMENT SLIP\nPatient: ${selectedPatient.name || selectedPatient.patient_name} (File #${selectedPatient.hospital_id || selectedPatient.id})\nFollow-up Date: ${formData.plan_followup_date || 'SOS / As Needed'}\nClinic: Morning Consultant Ophthalmology (08:30 - 13:30)\nDoctor: ${user?.full_name || 'Consultant'}`;
+                  navigator.clipboard.writeText(slip);
+                  notify('success', 'Appointment slip copied to clipboard!');
+                }}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '10px',
+                  padding: '8px 14px',
+                  fontSize: '11px',
+                  fontWeight: '800',
+                  color: '#475569',
+                  cursor: 'pointer'
+                }}
+              >
+                Copy Slip
+              </button>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowBookingModal(false)}
+                  style={{
+                    background: 'var(--leh-forest)',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '8px 20px',
+                    fontSize: '12px',
+                    fontWeight: '800',
+                    color: 'var(--leh-lime)',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(46, 90, 38, 0.25)'
+                  }}
+                >
+                  Confirm & Return to Chart
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BILINGUAL PATIENT PRESCRIPTION & DROP SCHEDULE LEAFLET PREVIEW MODAL */}
+      {showLeafletModal && selectedPatient && (
+        <div
+          className="no-print"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 1150,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowLeafletModal(false);
+          }}
+        >
+          <div
+            className="animate-slide-up"
+            style={{
+              width: '100%',
+              maxWidth: '860px',
+              maxHeight: '92vh',
+              background: '#ffffff',
+              borderRadius: '24px',
+              boxShadow: '0 25px 60px -15px rgba(15, 23, 42, 0.4)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              border: '1px solid #e2e8f0'
+            }}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #065f46 0%, #047857 100%)',
+                color: '#ffffff',
+                padding: '18px 24px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.15)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div
+                  style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '12px',
+                    background: 'rgba(255, 255, 255, 0.18)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#ffffff'
+                  }}
+                >
+                  <FileText size={22} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '900', letterSpacing: '-0.01em' }}>
+                    Patient Prescription & Drop Schedule Leaflet
+                  </h3>
+                  <div style={{ fontSize: '11px', color: '#a7f3d0', fontWeight: '700', marginTop: '2px' }}>
+                    Jadawalin Maganin Ido & Bayanin Kula • {selectedPatient.full_name || selectedPatient.patient_name} (#{selectedPatient.hospital_id || selectedPatient.file_number || selectedPatient.id})
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowLeafletModal(false)}
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    background: 'rgba(255, 255, 255, 0.12)',
+                    border: 'none',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            {/* Language Controls & Helper Banner */}
+            <div
+              style={{
+                padding: '12px 24px',
+                background: '#f8fafc',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '12px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '11px', fontWeight: '800', color: '#475569' }}>
+                  LANGUAGE / YARE:
+                </span>
+                <div style={{ display: 'inline-flex', background: '#e2e8f0', borderRadius: '10px', padding: '3px', gap: '3px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setLeafletLang('bilingual')}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '11px',
+                      fontWeight: '800',
+                      borderRadius: '8px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: leafletLang === 'bilingual' ? '#ffffff' : 'transparent',
+                      color: leafletLang === 'bilingual' ? '#047857' : '#64748b',
+                      boxShadow: leafletLang === 'bilingual' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                    }}
+                  >
+                    Bilingual (EN + HA)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLeafletLang('english')}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '11px',
+                      fontWeight: '800',
+                      borderRadius: '8px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: leafletLang === 'english' ? '#ffffff' : 'transparent',
+                      color: leafletLang === 'english' ? '#047857' : '#64748b',
+                      boxShadow: leafletLang === 'english' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                    }}
+                  >
+                    English Only
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLeafletLang('hausa')}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '11px',
+                      fontWeight: '800',
+                      borderRadius: '8px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: leafletLang === 'hausa' ? '#ffffff' : 'transparent',
+                      color: leafletLang === 'hausa' ? '#047857' : '#64748b',
+                      boxShadow: leafletLang === 'hausa' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                    }}
+                  >
+                    Hausa (Harshen Hausa)
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ fontSize: '11px', color: '#047857', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }} />
+                <span>Illustrated pictograms for elderly & low-literacy patients</span>
+              </div>
+            </div>
+
+            {/* Scrollable Document Preview Container */}
+            <div
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '24px',
+                background: '#f1f5f9'
+              }}
+            >
+              {/* White A4-styled preview card */}
+              <div
+                style={{
+                  background: '#ffffff',
+                  borderRadius: '16px',
+                  padding: '28px 32px',
+                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.06)',
+                  border: '1px solid #e2e8f0',
+                  color: '#0f172a',
+                  fontFamily: '"Inter", sans-serif'
+                }}
+              >
+                {/* Header Banner */}
+                <div style={{ textAlign: 'center', borderBottom: '3px solid #059669', paddingBottom: '16px', marginBottom: '20px' }}>
+                  <div style={{ display: 'inline-block', background: '#ecfdf5', color: '#047857', padding: '3px 14px', borderRadius: '20px', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', marginBottom: '6px' }}>
+                    Luna Eye Hospital • Asibitin Ido na Luna
+                  </div>
+                  <h2 style={{ fontSize: '20px', margin: '4px 0', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.02em' }}>
+                    {leafletLang === 'hausa' ? 'Jadawalin Maganin Ido & Bayanin Kula' : 'Patient Prescription & Drop Schedule Leaflet'}
+                  </h2>
+                  {leafletLang === 'bilingual' && (
+                    <div style={{ fontSize: '12px', fontWeight: '700', color: '#059669' }}>
+                      Jadawalin Maganin Ido & Bayanin Kula da Lafiya
+                    </div>
+                  )}
+                </div>
+
+                {/* Patient Summary Strip */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px 16px', marginBottom: '20px', fontSize: '11px', background: '#f8fafc' }}>
+                  <div>
+                    <strong style={{ color: '#64748b', display: 'block', fontSize: '10px', textTransform: 'uppercase' }}>
+                      {leafletLang === 'hausa' ? 'Majiyyaci:' : leafletLang === 'english' ? 'Patient:' : 'Patient / Majiyyaci:'}
+                    </strong>
+                    <span style={{ fontSize: '12px', fontWeight: '800', color: '#0f172a' }}>
+                      {selectedPatient.name || selectedPatient.patient_name || selectedPatient.full_name}
+                    </span>
+                  </div>
+                  <div>
+                    <strong style={{ color: '#64748b', display: 'block', fontSize: '10px', textTransform: 'uppercase' }}>
+                      {leafletLang === 'hausa' ? 'Lambar Fayil:' : leafletLang === 'english' ? 'File No:' : 'File No / Lamba:'}
+                    </strong>
+                    <span style={{ fontSize: '12px', fontWeight: '800', color: '#0f172a' }}>
+                      #{selectedPatient.hospital_id || selectedPatient.file_number || selectedPatient.id}
+                    </span>
+                  </div>
+                  <div>
+                    <strong style={{ color: '#64748b', display: 'block', fontSize: '10px', textTransform: 'uppercase' }}>
+                      {leafletLang === 'hausa' ? 'Rana:' : leafletLang === 'english' ? 'Date:' : 'Date / Rana:'}
+                    </strong>
+                    <span style={{ fontSize: '12px', fontWeight: '800', color: '#0f172a' }}>
+                      {formatDateStandard(new Date().toISOString())}
+                    </span>
+                  </div>
+                  <div>
+                    <strong style={{ color: '#64748b', display: 'block', fontSize: '10px', textTransform: 'uppercase' }}>
+                      {leafletLang === 'hausa' ? 'Likita:' : leafletLang === 'english' ? 'Doctor:' : 'Doctor / Likita:'}
+                    </strong>
+                    <span style={{ fontSize: '12px', fontWeight: '800', color: '#0f172a' }}>
+                      {user?.full_name || 'Consultant'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Section 1: Pictographic Medication Schedule */}
+                <div style={{ marginBottom: '24px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                    <Pill size={16} style={{ color: '#059669' }} />
+                    <h3 style={{ fontSize: '13px', fontWeight: '900', color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      {leafletLang === 'hausa' 
+                        ? '1. Jadawalin Lokutan Saka Magani' 
+                        : leafletLang === 'english' 
+                        ? '1. Daily Eye Drop & Medication Schedule' 
+                        : '1. Dosing Time Schedule / Jadawalin Lokutan Saka Magani'}
+                    </h3>
+                  </div>
+
+                  {formData.plan_meds && formData.plan_meds.length > 0 ? (
+                    <div style={{ border: '1px solid #cbd5e1', borderRadius: '10px', overflow: 'hidden' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                        <thead>
+                          <tr style={{ background: '#f1f5f9' }}>
+                            <th style={{ borderBottom: '2px solid #cbd5e1', padding: '10px 12px', textAlign: 'left', width: '28%' }}>
+                              {leafletLang === 'hausa' ? 'Magani' : leafletLang === 'english' ? 'Medication' : 'Medication / Magani'}
+                            </th>
+                            <th style={{ borderBottom: '2px solid #cbd5e1', borderLeft: '1px solid #e2e8f0', padding: '8px 6px', textAlign: 'center', width: '15%' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', color: '#1e40af', fontWeight: '800' }}>
+                                <Sunrise size={14} />
+                                <span>{leafletLang === 'hausa' ? 'Safiya' : 'Morning'}</span>
+                              </div>
+                              <div style={{ fontSize: '9px', fontWeight: '600', color: '#64748b', marginTop: '2px' }}>
+                                {leafletLang === 'bilingual' ? 'Safiya (08:00 AM)' : '08:00 AM'}
+                              </div>
+                            </th>
+                            <th style={{ borderBottom: '2px solid #cbd5e1', borderLeft: '1px solid #e2e8f0', padding: '8px 6px', textAlign: 'center', width: '15%' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', color: '#b45309', fontWeight: '800' }}>
+                                <Sun size={14} />
+                                <span>{leafletLang === 'hausa' ? 'Rana' : 'Afternoon'}</span>
+                              </div>
+                              <div style={{ fontSize: '9px', fontWeight: '600', color: '#64748b', marginTop: '2px' }}>
+                                {leafletLang === 'bilingual' ? 'Rana (01:00 PM)' : '01:00 PM'}
+                              </div>
+                            </th>
+                            <th style={{ borderBottom: '2px solid #cbd5e1', borderLeft: '1px solid #e2e8f0', padding: '8px 6px', textAlign: 'center', width: '15%' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', color: '#c2410c', fontWeight: '800' }}>
+                                <Sunset size={14} />
+                                <span>{leafletLang === 'hausa' ? 'Yamma' : 'Evening'}</span>
+                              </div>
+                              <div style={{ fontSize: '9px', fontWeight: '600', color: '#64748b', marginTop: '2px' }}>
+                                {leafletLang === 'bilingual' ? 'Yamma (06:00 PM)' : '06:00 PM'}
+                              </div>
+                            </th>
+                            <th style={{ borderBottom: '2px solid #cbd5e1', borderLeft: '1px solid #e2e8f0', padding: '8px 6px', textAlign: 'center', width: '15%' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', color: '#3730a3', fontWeight: '800' }}>
+                                <Moon size={14} />
+                                <span>{leafletLang === 'hausa' ? 'Dare' : 'Bedtime'}</span>
+                              </div>
+                              <div style={{ fontSize: '9px', fontWeight: '600', color: '#64748b', marginTop: '2px' }}>
+                                {leafletLang === 'bilingual' ? 'Dare (09:00 PM)' : '09:00 PM'}
+                              </div>
+                            </th>
+                            <th style={{ borderBottom: '2px solid #cbd5e1', borderLeft: '1px solid #e2e8f0', padding: '8px 8px', textAlign: 'center', width: '12%' }}>
+                              {leafletLang === 'hausa' ? 'Kwanaki' : leafletLang === 'english' ? 'Duration' : 'Duration / Kwanaki'}
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {formData.plan_meds.map((med: any, idx: number) => {
+                            const slots = getDropDosingSlots(med.frequency, med.dose, med.route);
+                            return (
+                              <tr key={idx} style={{ background: idx % 2 === 0 ? '#ffffff' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                                <td style={{ padding: '10px 12px' }}>
+                                  <div style={{ fontWeight: '800', color: '#0f172a', fontSize: '12px' }}>{med.drug_name}</div>
+                                  <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>
+                                    {med.route || 'Topical'} • {med.instructions || (leafletLang === 'hausa' ? 'Kamar yadda aka umarta' : leafletLang === 'english' ? 'As directed' : 'As directed / Kamar yadda aka umarta')}
+                                  </div>
+                                </td>
+                                <td style={{ borderLeft: '1px solid #e2e8f0', padding: '8px', textAlign: 'center' }}>
+                                  {slots.morning ? (
+                                    <span style={{ display: 'inline-block', background: '#eff6ff', color: '#1e40af', padding: '3px 8px', borderRadius: '6px', fontWeight: '800', fontSize: '10px' }}>
+                                      {leafletLang === 'hausa' ? slots.morning.replace(/.*\/ /, '') : leafletLang === 'english' ? slots.morning.replace(/ \/.*/, '') : slots.morning}
+                                    </span>
+                                  ) : (
+                                    <span style={{ color: '#cbd5e1' }}>—</span>
+                                  )}
+                                </td>
+                                <td style={{ borderLeft: '1px solid #e2e8f0', padding: '8px', textAlign: 'center' }}>
+                                  {slots.afternoon ? (
+                                    <span style={{ display: 'inline-block', background: '#fef3c7', color: '#92400e', padding: '3px 8px', borderRadius: '6px', fontWeight: '800', fontSize: '10px' }}>
+                                      {leafletLang === 'hausa' ? slots.afternoon.replace(/.*\/ /, '') : leafletLang === 'english' ? slots.afternoon.replace(/ \/.*/, '') : slots.afternoon}
+                                    </span>
+                                  ) : (
+                                    <span style={{ color: '#cbd5e1' }}>—</span>
+                                  )}
+                                </td>
+                                <td style={{ borderLeft: '1px solid #e2e8f0', padding: '8px', textAlign: 'center' }}>
+                                  {slots.evening ? (
+                                    <span style={{ display: 'inline-block', background: '#fed7aa', color: '#9a3412', padding: '3px 8px', borderRadius: '6px', fontWeight: '800', fontSize: '10px' }}>
+                                      {leafletLang === 'hausa' ? slots.evening.replace(/.*\/ /, '') : leafletLang === 'english' ? slots.evening.replace(/ \/.*/, '') : slots.evening}
+                                    </span>
+                                  ) : (
+                                    <span style={{ color: '#cbd5e1' }}>—</span>
+                                  )}
+                                </td>
+                                <td style={{ borderLeft: '1px solid #e2e8f0', padding: '8px', textAlign: 'center' }}>
+                                  {slots.night ? (
+                                    <span style={{ display: 'inline-block', background: '#e0e7ff', color: '#3730a3', padding: '3px 8px', borderRadius: '6px', fontWeight: '800', fontSize: '10px' }}>
+                                      {leafletLang === 'hausa' ? slots.night.replace(/.*\/ /, '') : leafletLang === 'english' ? slots.night.replace(/ \/.*/, '') : slots.night}
+                                    </span>
+                                  ) : (
+                                    <span style={{ color: '#cbd5e1' }}>—</span>
+                                  )}
+                                </td>
+                                <td style={{ borderLeft: '1px solid #e2e8f0', padding: '8px', textAlign: 'center', fontWeight: '700' }}>
+                                  {med.duration || '—'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div style={{ padding: '24px', border: '1px dashed #cbd5e1', borderRadius: '10px', textAlign: 'center', color: '#64748b', fontSize: '12px' }}>
+                      No medications entered in Section 9 yet. Use the Regimen Presets or Add Medication in the chart to populate this schedule.
+                    </div>
+                  )}
+                </div>
+
+                {/* Section 2: Care Guidelines Pictocards (2x2 Grid) */}
+                <div style={{ marginBottom: '24px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                    <ShieldCheck size={16} style={{ color: '#059669' }} />
+                    <h3 style={{ fontSize: '13px', fontWeight: '900', color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      {leafletLang === 'hausa'
+                        ? '2. Muhimman Dokokin Saka Maganin Ido'
+                        : leafletLang === 'english'
+                        ? '2. Essential Eye Drop Guidelines'
+                        : '2. Essential Eye Care Steps / Muhimman Dokokin Saka Magani'}
+                    </h3>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px', background: '#f8fafc' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '900', fontSize: '11px', color: 'var(--leh-forest)', marginBottom: '4px' }}>
+                        <span>💧 {leafletLang === 'hausa' ? 'Dokar Minti Biyar' : leafletLang === 'english' ? '5-Minute Spacing Rule' : '5-Minute Spacing Rule / Dokar Minti Biyar'}</span>
+                      </div>
+                      <div style={{ fontSize: '10px', color: '#334155', lineHeight: '1.4' }}>
+                        {(leafletLang === 'bilingual' || leafletLang === 'english') && (
+                          <div><strong>EN:</strong> If using multiple eye drops, wait 5 minutes between bottles so the first drop is absorbed.</div>
+                        )}
+                        {(leafletLang === 'bilingual' || leafletLang === 'hausa') && (
+                          <div style={{ color: '#1e40af', marginTop: leafletLang === 'bilingual' ? '4px' : '0' }}>
+                            <strong>HA:</strong> Idan kuna saka magani fiye da guda ɗaya, ku jira minti 5 tsakanin kowanne magani kafin saka na gaba.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px', background: '#f8fafc' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '900', fontSize: '11px', color: 'var(--leh-forest)', marginBottom: '4px' }}>
+                        <span>🧼 {leafletLang === 'hausa' ? 'Wanke Hannaye da Tsabta' : leafletLang === 'english' ? 'Clean Hands & Tip' : 'Clean Hands & Bottle Tip / Wanke Hannaye da Tsabta'}</span>
+                      </div>
+                      <div style={{ fontSize: '10px', color: '#334155', lineHeight: '1.4' }}>
+                        {(leafletLang === 'bilingual' || leafletLang === 'english') && (
+                          <div><strong>EN:</strong> Wash hands with soap. Never touch the bottle tip to your eye, fingers, or eyelashes.</div>
+                        )}
+                        {(leafletLang === 'bilingual' || leafletLang === 'hausa') && (
+                          <div style={{ color: '#1e40af', marginTop: leafletLang === 'bilingual' ? '4px' : '0' }}>
+                            <strong>HA:</strong> A wanke hannu da sabulu. Kada kan kwalbar ya taɓa ido, yatsa, ko gashin ido.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px', background: '#f8fafc' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '900', fontSize: '11px', color: 'var(--leh-forest)', marginBottom: '4px' }}>
+                        <span>👁️ {leafletLang === 'hausa' ? 'Matse Kusurwar Ido' : leafletLang === 'english' ? 'Punctal Occlusion' : 'Punctal Occlusion / Matse Kusurwar Ido'}</span>
+                      </div>
+                      <div style={{ fontSize: '10px', color: '#334155', lineHeight: '1.4' }}>
+                        {(leafletLang === 'bilingual' || leafletLang === 'english') && (
+                          <div><strong>EN:</strong> Press gently at the inner corner near your nose for 2 minutes to keep drop in the eye.</div>
+                        )}
+                        {(leafletLang === 'bilingual' || leafletLang === 'hausa') && (
+                          <div style={{ color: '#1e40af', marginTop: leafletLang === 'bilingual' ? '4px' : '0' }}>
+                            <strong>HA:</strong> Bayan saka ɗigon, a rufe ido a matse kusurwar ido kusa da hanci na minti 2 don maganin ya zauna a ido.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ border: '1px solid #fecaca', borderRadius: '10px', padding: '12px', background: '#fef2f2' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '900', fontSize: '11px', color: '#dc2626', marginBottom: '4px' }}>
+                        <span>🚨 {leafletLang === 'hausa' ? 'Gargadin Gaggawa' : leafletLang === 'english' ? 'Emergency Warning' : 'Emergency Warning / Gargadin Gaggawa'}</span>
+                      </div>
+                      <div style={{ fontSize: '10px', color: '#7f1d1d', lineHeight: '1.4' }}>
+                        {(leafletLang === 'bilingual' || leafletLang === 'english') && (
+                          <div><strong>EN:</strong> Return immediately if sudden severe eye pain, vision drop, or extreme redness occurs.</div>
+                        )}
+                        {(leafletLang === 'bilingual' || leafletLang === 'hausa') && (
+                          <div style={{ color: '#991b1b', marginTop: leafletLang === 'bilingual' ? '4px' : '0' }}>
+                            <strong>HA:</strong> Ku dawo asibiti nan take idan an ji tsananin ciwo, daukewar gani, ko kumburi mai tsanani.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 3: Next Review & Helpline */}
+                <div style={{ borderTop: '2px solid #cbd5e1', paddingTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', flexWrap: 'wrap', gap: '12px' }}>
+                  <div>
+                    <strong style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase' }}>
+                      {leafletLang === 'hausa' ? 'Ranar Dawowa:' : leafletLang === 'english' ? 'Next Appointment:' : 'Next Review / Ranar Dawowa:'}
+                    </strong>
+                    <div style={{ fontSize: '13px', fontWeight: '900', color: '#059669', marginTop: '2px' }}>
+                      {formData.plan_followup_date 
+                        ? `${formatDateStandard(formData.plan_followup_date)} (Morning Clinic / Asibitin Safiya)` 
+                        : (leafletLang === 'hausa' ? 'SOS (Idan buƙata ta taso)' : leafletLang === 'english' ? 'SOS (Return as needed)' : 'SOS (Return as needed / Idan buƙata ta taso)')}
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '11px', fontWeight: '800', color: '#0f172a' }}>Luna Eye Hospital Helpline:</div>
+                    <div style={{ fontSize: '11px', color: '#64748b' }}>09044687558 • WhatsApp: 09114111418</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div
+              style={{
+                padding: '16px 24px',
+                background: '#f8fafc',
+                borderTop: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '12px'
+              }}
+            >
+              <div style={{ fontSize: '11px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Printer size={14} style={{ color: '#059669' }} />
+                <span>Pre-formatted for standard A4 thermal or laser printing as a patient discharge handout.</span>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowLeafletModal(false)}
+                  style={{
+                    padding: '9px 16px',
+                    background: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    fontWeight: '800',
+                    color: '#475569',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Close Preview
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPrintMode('leaflet');
+                    notify('info', 'Preparing Bilingual Patient Leaflet print layout...');
+                    setTimeout(() => {
+                      window.print();
+                    }, 400);
+                  }}
+                  style={{
+                    padding: '9px 20px',
+                    background: '#059669',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    fontWeight: '800',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)'
+                  }}
+                >
+                  <Printer size={15} />
+                  <span>Print Patient Leaflet</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FLOATING SECTION MINI-MAP & QUICK-JUMP WIDGET */}
+      {selectedPatient && (
+        <div 
+          ref={miniMapRef}
+          className="no-print" 
+          style={{ 
+            position: 'fixed', 
+            bottom: '24px', 
+            right: '88px', 
+            zIndex: 1000, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'flex-end',
+            fontFamily: 'inherit'
+          }}
+        >
+          {/* POPOVER CHECKLIST CARD */}
+          {showMiniMap && (
+            <div 
+              className="animate-slide-up"
+              style={{
+                width: '340px',
+                maxHeight: '480px',
+                background: '#ffffff',
+                borderRadius: '20px',
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 20px 40px -10px rgba(15, 23, 42, 0.22)',
+                marginBottom: '12px',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}
+            >
+              {/* Header */}
+              <div style={{
+                background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                color: '#ffffff',
+                padding: '16px 20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <ListChecks size={18} style={{ color: '#38bdf8' }} />
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: '900', letterSpacing: '-0.01em' }}>Clinical Section Mini-Map</div>
+                    <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700' }}>12-Point Documentation Tracker</div>
+                  </div>
+                </div>
+                <span 
+                  onClick={() => {
+                    const audit = runCompletenessAudit();
+                    setAuditResults(audit);
+                    setShowAuditorModal(true);
+                  }}
+                  style={{ 
+                    fontSize: '11px', 
+                    fontWeight: '900', 
+                    background: completedCount === 12 ? 'var(--leh-success)' : 'var(--leh-forest)', 
+                    color: '#ffffff', 
+                    padding: '3px 10px', 
+                    borderRadius: '12px',
+                    cursor: 'pointer'
+                  }}
+                  title="Click to run completeness audit report"
+                >
+                  {completedCount}/12 DONE
+                </span>
+              </div>
+
+              {/* Quick Jump Action Button */}
+              <div style={{ padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                {nextIncompleteSection ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleSectionNavigation(nextIncompleteSection.id);
+                      setShowMiniMap(false);
+                      notify('info', `Jumped to: ${nextIncompleteSection.label}`);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      background: 'var(--leh-forest)',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '12px',
+                      fontWeight: '800',
+                      fontSize: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(46, 90, 38, 0.35)',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <ArrowRight size={15} />
+                      <span>Jump to Next Incomplete</span>
+                    </span>
+                    <span style={{ fontSize: '10px', background: 'rgba(255, 255, 255, 0.25)', padding: '2px 6px', borderRadius: '6px' }}>
+                      {nextIncompleteSection.label.split('.')[0]}
+                    </span>
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px', background: '#ecfdf5', color: '#065f46', borderRadius: '12px', fontSize: '12px', fontWeight: '800' }}>
+                    <CheckCircle2 size={16} />
+                    <span>All 12 Clinical Sections Complete!</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Scrollable checklist items */}
+              <div className="custom-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '8px 12px', maxHeight: '280px' }}>
+                {menuItems.map((item) => {
+                  const isDone = Boolean(sectionStatus[item.id]);
+                  const isActive = activeTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        handleSectionNavigation(item.id);
+                        setShowMiniMap(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '9px 12px',
+                        borderRadius: '10px',
+                        border: 'none',
+                        background: isActive ? '#eff6ff' : 'transparent',
+                        color: isActive ? '#1d4ed8' : '#334155',
+                        fontWeight: isActive ? '800' : '700',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        marginBottom: '3px',
+                        transition: 'background 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isActive) e.currentTarget.style.background = '#f1f5f9';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) e.currentTarget.style.background = 'transparent';
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
+                        {isDone ? (
+                          <CheckCircle2 size={15} style={{ color: '#10b981', flexShrink: 0 }} />
+                        ) : (
+                          <Circle size={15} style={{ color: '#cbd5e1', flexShrink: 0 }} />
+                        )}
+                        <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                          {item.label}
+                        </span>
+                      </div>
+                      <span style={{ 
+                        fontSize: '10px', 
+                        fontFamily: 'monospace', 
+                        color: isDone ? '#059669' : '#94a3b8', 
+                        background: isDone ? '#ecfdf5' : '#f8fafc',
+                        padding: '2px 6px',
+                        borderRadius: '5px',
+                        border: `1px solid ${isDone ? '#a7f3d0' : '#e2e8f0'}`,
+                        flexShrink: 0,
+                        marginLeft: '8px'
+                      }}>
+                        {isDone ? 'DONE' : item.shortcut}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Popover Footer */}
+              <div style={{ padding: '10px 16px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10px', color: '#64748b' }}>
+                <span>Shortcuts: <kbd style={{ background: '#ffffff', border: '1px solid #cbd5e1', padding: '1px 4px', borderRadius: '3px' }}>Alt</kbd>+<kbd style={{ background: '#ffffff', border: '1px solid #cbd5e1', padding: '1px 4px', borderRadius: '3px' }}>1..9</kbd></span>
+                <button
+                  type="button"
+                  onClick={() => setShowMiniMap(false)}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--leh-forest)', fontWeight: '800', cursor: 'pointer', fontSize: '11px' }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* FLOATING ACTION PILL */}
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            background: '#0f172a',
+            color: '#ffffff',
+            borderRadius: '30px',
+            padding: '4px',
+            boxShadow: '0 10px 25px -4px rgba(15, 23, 42, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+            gap: '4px'
+          }}>
+            {/* Quick 1-Click Jump to Next Incomplete Button */}
+            <button
+              type="button"
+              onClick={handleJumpToNextIncomplete}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 14px',
+                background: 'transparent',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '24px',
+                fontSize: '12px',
+                fontWeight: '800',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              title={nextIncompleteSection ? `Jump directly to ${nextIncompleteSection.label}` : 'All sections completed'}
+            >
+              <div style={{
+                width: '24px',
+                height: '24px',
+                borderRadius: '50%',
+                background: completedCount === 12 ? 'var(--leh-success)' : 'var(--leh-forest)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '11px',
+                fontWeight: '900',
+                color: '#ffffff'
+              }}>
+                {completedCount === 12 ? <CheckCircle2 size={14} /> : `${completedCount}`}
+              </div>
+              <span>
+                {nextIncompleteSection 
+                  ? `Next: ${nextIncompleteSection.label.length > 18 ? nextIncompleteSection.label.slice(0, 16) + '...' : nextIncompleteSection.label}`
+                  : 'All Sections Done'}
+              </span>
+              <ArrowRight size={14} style={{ color: '#38bdf8' }} />
+            </button>
+
+            {/* Popover Checklist Trigger */}
+            <button
+              type="button"
+              onClick={() => setShowMiniMap(!showMiniMap)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '34px',
+                height: '34px',
+                borderRadius: '50%',
+                background: showMiniMap ? 'var(--leh-forest)' : 'rgba(255, 255, 255, 0.1)',
+                color: '#ffffff',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              title={showMiniMap ? 'Close Mini-Map Checklist' : 'Open Section Mini-Map Checklist'}
+            >
+              <ListChecks size={16} />
+            </button>
+          </div>
         </div>
       )}
 

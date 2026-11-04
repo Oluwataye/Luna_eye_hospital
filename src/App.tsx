@@ -20,7 +20,16 @@ import { Settings } from './pages/Settings';
 import { Triage } from './pages/Triage';
 import { Profile } from './pages/Profile';
 import { PatientRegistration } from './pages/PatientRegistration';
+import { FamilyProfile } from './pages/FamilyProfile';
 import ReprintManagement from './pages/ReprintManagement';
+import { InsuranceClaims } from './pages/insurance/InsuranceClaims';
+import { InsuranceClaimDetail } from './pages/insurance/InsuranceClaimDetail';
+import { InsuranceAuthorizations } from './pages/insurance/InsuranceAuthorizations';
+import { InsuranceEnrollees } from './pages/insurance/InsuranceEnrollees';
+import { PayersPlans } from './pages/insurance/PayersPlans';
+import { InsuranceTariffs } from './pages/insurance/InsuranceTariffs';
+import { InsuranceRemittances } from './pages/insurance/InsuranceRemittances';
+import { InsuranceReports } from './pages/insurance/InsuranceReports';
 import { Footer } from './components/Footer';
 
 const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) => {
@@ -99,6 +108,7 @@ function App() {
                 <Route path="patients">
                   <Route index element={<ProtectedRoute allowedRoles={['Admin', 'Optometrist', 'Consultant', 'Receptionist', 'Nurse']}><Patients /></ProtectedRoute>} />
                   <Route path="register" element={<ProtectedRoute allowedRoles={['Admin', 'Receptionist']}><PatientRegistration /></ProtectedRoute>} />
+                  <Route path="family/:id" element={<ProtectedRoute allowedRoles={['Admin', 'Optometrist', 'Consultant', 'Receptionist', 'Nurse']}><FamilyProfile /></ProtectedRoute>} />
                   <Route path="profile/*" element={<ProtectedRoute allowedRoles={['Admin', 'Optometrist', 'Consultant', 'Receptionist', 'Nurse']}><Patients view="profile" /></ProtectedRoute>} />
                   <Route path="check-in/*" element={<ProtectedRoute allowedRoles={['Admin', 'Receptionist', 'Nurse']}><Patients view="checkin" /></ProtectedRoute>} />
                 </Route>
@@ -110,11 +120,29 @@ function App() {
                 <Route path="inventory" element={<ProtectedRoute allowedRoles={['Admin']}><Inventory /></ProtectedRoute>} />
                 <Route path="procurement" element={<ProtectedRoute allowedRoles={['Admin']}><Procurement /></ProtectedRoute>} />
                 <Route path="reports" element={<ProtectedRoute allowedRoles={['Admin']}><Reports /></ProtectedRoute>} />
+                <Route path="profit-loss" element={<ProtectedRoute allowedRoles={['Admin']}><Reports initialTab="profit_loss" /></ProtectedRoute>} />
+                <Route path="expenses" element={<ProtectedRoute allowedRoles={['Admin']}><Reports initialTab="expenses" /></ProtectedRoute>} />
+                <Route path="payroll" element={<ProtectedRoute allowedRoles={['Admin']}><Reports initialTab="payroll" /></ProtectedRoute>} />
+                <Route path="tax" element={<ProtectedRoute allowedRoles={['Admin']}><Reports initialTab="tax" /></ProtectedRoute>} />
                 <Route path="users" element={<ProtectedRoute allowedRoles={['Admin']}><UserManagement /></ProtectedRoute>} />
                 <Route path="audit-logs" element={<ProtectedRoute allowedRoles={['Admin']}><AuditLogs /></ProtectedRoute>} />
                 <Route path="admin/reprint-management" element={<ProtectedRoute allowedRoles={['Admin']}><ReprintManagement /></ProtectedRoute>} />
                 <Route path="settings" element={<ProtectedRoute allowedRoles={['Admin']}><Settings /></ProtectedRoute>} />
                 <Route path="profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+
+                {/* Medical Insurance & Claims Module (Admin only) */}
+                <Route path="insurance">
+                  <Route index element={<Navigate to="/insurance/claims" replace />} />
+                  <Route path="claims" element={<ProtectedRoute allowedRoles={['Admin']}><InsuranceClaims /></ProtectedRoute>} />
+                  <Route path="claims/:id" element={<ProtectedRoute allowedRoles={['Admin']}><InsuranceClaimDetail /></ProtectedRoute>} />
+                  <Route path="authorizations" element={<ProtectedRoute allowedRoles={['Admin']}><InsuranceAuthorizations /></ProtectedRoute>} />
+                  <Route path="enrollees" element={<ProtectedRoute allowedRoles={['Admin']}><InsuranceEnrollees /></ProtectedRoute>} />
+                  <Route path="payers" element={<ProtectedRoute allowedRoles={['Admin']}><PayersPlans /></ProtectedRoute>} />
+                  <Route path="tariffs" element={<ProtectedRoute allowedRoles={['Admin']}><InsuranceTariffs /></ProtectedRoute>} />
+                  <Route path="remittances" element={<ProtectedRoute allowedRoles={['Admin']}><InsuranceRemittances /></ProtectedRoute>} />
+                  <Route path="reports" element={<ProtectedRoute allowedRoles={['Admin']}><InsuranceReports /></ProtectedRoute>} />
+                </Route>
+
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Route>
               </Routes>

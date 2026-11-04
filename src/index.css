@@ -1,48 +1,109 @@
-/* --- Standardized Enterprise Design System (VisionCare v2.5.0) --- */
+/* =============================================================
+   VisionCare EMR — Luna Eye Hospital Brand Design System v3.0
+   =============================================================
+   Brand palette taken from hospital invoice & logo:
+     Forest Green  #2E5A26  → Primary (sidebar, buttons, headings)
+     Lime Green    #C0FF72  → Accent  (active nav, table headers, badges)
+     Gold          #B8963E  → Trim    (thin dividers ONLY, never large areas)
+     Ink           #14210F  → Text    (headings + body, replaces pure black)
+     Page Tint     #F2FBE6  → Canvas  (page background; cards stay white)
+   WCAG AA rules enforced:
+     • Text on Lime → always Ink #14210F (contrast > 11:1). NEVER white on lime.
+     • Text on Forest → white #FFFFFF or pale tint #F2FBE6 (contrast > 7:1).
+     • Semantic statuses use Crimson / Amber / Teal – never brand green.
+   ============================================================= */
 
 :root {
-  /* Core Colors */
-  --leh-primary: #2563eb;
-  --leh-primary-hover: #1d4ed8;
-  --leh-primary-light: #eff6ff;
-  
-  --leh-text-dark: #111827; /* Near black */
-  --leh-text-grey: #374151; /* Dark grey for labels/headers */
-  --leh-text-muted: #6b7280; /* Muted grey for subtitles/titles */
-  --leh-text-light: #9ca3af; /* Light grey for placeholders */
-  
-  --leh-border: #d1d5db;
-  --leh-border-light: #e5e7eb;
-  --leh-bg-light: #f9fafb;
-  
-  --leh-blue: #3b82f6;
-  --leh-amber: #f59e0b;
-  --leh-green: #10b981;
-  --leh-red: #ef4444;
-  
-  --leh-radius-card: 14px;
-  --leh-radius-input: 8px;
-  --leh-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03); /* Softer shadow */
-  --leh-shadow-focus: 0 0 0 3px rgba(59, 130, 246, 0.12);
-  
+  /* ── Brand Core ── */
+  --leh-forest:        #2E5A26;
+  --leh-forest-hover:  #24471E;
+  --leh-forest-active: #1B3519;
+  --leh-forest-tint:   #EAF2E7;   /* very light green, card backgrounds */
+  --leh-lime:          #C0FF72;
+  --leh-lime-hover:    #AAEE5C;
+  --leh-lime-soft:     #E8FFD0;   /* muted lime for light accents */
+  --leh-gold:          #B8963E;   /* dividers & thin trim ONLY */
+
+  /* ── Aliases used throughout codebase (keeps backward compat) ── */
+  --leh-primary:       var(--leh-forest);
+  --leh-primary-hover: var(--leh-forest-hover);
+  --leh-primary-light: var(--leh-forest-tint);
+
+  /* ── Text ── */
+  --leh-ink:       #14210F;   /* headings + body (replaces #111827) */
+  --leh-muted:     #4A5E45;   /* secondary text, subtitles, timestamps */
+  --leh-placeholder: #8AA887; /* input placeholders */
+  /* legacy aliases */
+  --leh-text-dark: var(--leh-ink);
+  --leh-text-grey: var(--leh-ink);
+  --leh-text-muted: var(--leh-muted);
+  --leh-text-light: var(--leh-placeholder);
+
+  /* ── Surfaces ── */
+  --leh-bg:           #F2FBE6;   /* page canvas tint */
+  --leh-bg-light:     #F2FBE6;   /* compat alias */
+  --leh-surface:      #FFFFFF;   /* cards, modals, inputs */
+  --leh-surface-raised: #FFFFFF;
+
+  /* ── Borders & Dividers ── */
+  --leh-border:       #D3E6BC;   /* soft green tone */
+  --leh-border-light: #E4EFDA;   /* lighter variant */
+
+  /* ── Semantic Status (Clinically Distinct – never confused with brand green) ── */
+  --leh-danger:        #DC2626;  /* critical, unpaid, rejected */
+  --leh-danger-bg:     #FEF2F2;
+  --leh-danger-border: #FECACA;
+  --leh-warning:       #D97706;  /* pending, attention */
+  --leh-warning-bg:    #FFFBEB;
+  --leh-warning-border:#FDE68A;
+  --leh-success:       #0D9488;  /* cleared, normal, paid — teal, NOT green */
+  --leh-success-bg:    #F0FDFA;
+  --leh-success-border:#99F6E4;
+  --leh-info:          #0284C7;  /* informational */
+  --leh-info-bg:       #F0F9FF;
+  --leh-info-border:   #BAE6FD;
+  --leh-neutral:       #475569;
+  --leh-neutral-bg:    #F8FAFC;
+
+  /* ── Legacy color aliases ── */
+  --leh-blue:   var(--leh-info);
+  --leh-amber:  var(--leh-warning);
+  --leh-green:  var(--leh-success);
+  --leh-red:    var(--leh-danger);
+
+  /* ── Spacing & Shape ── */
+  --leh-radius-card:   14px;
+  --leh-radius-input:  8px;
+  --leh-radius-pill:   99px;
+
+  /* ── Elevation ── */
+  --leh-shadow:       0 1px 4px 0 rgba(46, 90, 38, 0.06), 0 1px 2px 0 rgba(46, 90, 38, 0.04);
+  --leh-shadow-md:    0 4px 12px -2px rgba(46, 90, 38, 0.10), 0 2px 6px -1px rgba(46, 90, 38, 0.06);
+  --leh-shadow-focus: 0 0 0 3px rgba(192, 255, 114, 0.35);
+
+  /* ── Typography ── */
+  --leh-font:   'Montserrat', system-ui, -apple-system, sans-serif;
+
+  /* ── Shell ── */
   --sidebar-width: 280px;
   --sidebar-collapsed-width: 68px;
 }
 
-/* Base Reset */
+/* ── Base Reset ── */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: #f8fafc;
-  color: var(--leh-text-grey);
+  font-family: var(--leh-font);
+  background-color: var(--leh-bg);
+  color: var(--leh-ink);
   -webkit-font-smoothing: antialiased;
   line-height: 1.5;
   overflow-x: hidden;
 }
 
-h1,h2,h3,h4 {
-  font-family: 'Inter', sans-serif;
-  color: var(--leh-text-dark);
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--leh-font);
+  color: var(--leh-ink);
+  font-weight: 700;
 }
 
 button:disabled {
@@ -136,9 +197,9 @@ button:disabled {
   padding: 0 12px;
   border-radius: var(--leh-radius-input);
   border: 1px solid var(--leh-border);
-  background: white;
-  color: var(--leh-text-dark);
-  font-family: 'Inter', sans-serif;
+  background: var(--leh-surface);
+  color: var(--leh-ink);
+  font-family: var(--leh-font);
   font-size: 13px;
   font-weight: 600;
   outline: none;
@@ -148,13 +209,14 @@ button:disabled {
 }
 
 .leh-date-input:focus {
-  border-color: var(--leh-primary);
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+  border-color: var(--leh-forest);
+  box-shadow: 0 0 0 4px rgba(192, 255, 114, 0.25);
+  outline: none;
 }
 
-/* Custom Calendar Icon for Chrome/Safari */
+/* Custom Calendar Icon for Chrome/Safari — Forest Green */
 .leh-date-input::-webkit-calendar-picker-indicator {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3Cline x1='16' y1='2' x2='16' y2='6'%3E%3C/line%3E%3Cline x1='8' y1='2' x2='8' y2='6'%3E%3C/line%3E%3Cline x1='3' y1='10' x2='21' y2='10'%3E%3C/line%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%232E5A26' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3Cline x1='16' y1='2' x2='16' y2='6'%3E%3C/line%3E%3Cline x1='8' y1='2' x2='8' y2='6'%3E%3C/line%3E%3Cline x1='3' y1='10' x2='21' y2='10'%3E%3C/line%3E%3C/svg%3E");
   cursor: pointer;
   padding: 6px;
   border-radius: 8px;
@@ -163,7 +225,7 @@ button:disabled {
 }
 
 .leh-date-input::-webkit-calendar-picker-indicator:hover {
-  background-color: var(--leh-primary-light);
+  background-color: var(--leh-lime-soft);
   opacity: 1;
 }
 
@@ -195,7 +257,7 @@ button:disabled {
 
 .leh-stat-card {
   flex: 1;
-  background: #ffffff;
+  background: var(--leh-surface);
   border-radius: var(--leh-radius-card);
   padding: 24px;
   position: relative;
@@ -210,7 +272,7 @@ button:disabled {
 
 .leh-stat-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--leh-shadow-md);
 }
 
 .leh-stat-card::before {
@@ -219,13 +281,13 @@ button:disabled {
   left: 0;
   top: 0;
   bottom: 0;
-  width: 4px; /* 4px Solid Border on left edge */
+  width: 4px;
 }
 
-.leh-stat-card.blue::before { background: var(--leh-blue); }
-.leh-stat-card.amber::before { background: var(--leh-amber); }
-.leh-stat-card.green::before { background: var(--leh-green); }
-.leh-stat-card.red::before { background: var(--leh-red); }
+.leh-stat-card.blue::before  { background: var(--leh-info); }
+.leh-stat-card.amber::before { background: var(--leh-warning); }
+.leh-stat-card.green::before { background: var(--leh-forest); }
+.leh-stat-card.red::before   { background: var(--leh-danger); }
 
 .leh-stat-card-top {
   display: flex;
@@ -250,15 +312,15 @@ button:disabled {
   font-size: 18px;
 }
 
-.blue .leh-stat-icon-box { background: #eff6ff; color: var(--leh-blue); }
-.amber .leh-stat-icon-box { background: #fffbeb; color: var(--leh-amber); }
-.green .leh-stat-icon-box { background: #f0fdf4; color: var(--leh-green); }
-.red .leh-stat-icon-box { background: #fef2f2; color: var(--leh-red); }
+.blue .leh-stat-icon-box  { background: var(--leh-info-bg);    color: var(--leh-info); }
+.amber .leh-stat-icon-box { background: var(--leh-warning-bg);  color: var(--leh-warning); }
+.green .leh-stat-icon-box { background: var(--leh-forest-tint); color: var(--leh-forest); }
+.red .leh-stat-icon-box   { background: var(--leh-danger-bg);   color: var(--leh-danger); }
 
 .leh-stat-value {
-  font-size: 34px; /* ~32-36px bold */
-  font-weight: 700;
-  color: var(--leh-text-dark);
+  font-size: 34px;
+  font-weight: 800;
+  color: var(--leh-ink);
   margin-bottom: 8px;
   letter-spacing: -0.02em;
 }
@@ -268,15 +330,15 @@ button:disabled {
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: var(--leh-text-light); /* Muted grey */
+  color: var(--leh-muted);
 }
 
-.leh-trend-up { color: var(--leh-green); }
-.leh-trend-down { color: var(--leh-red); }
+.leh-trend-up   { color: var(--leh-success); }
+.leh-trend-down { color: var(--leh-danger); }
 
 /* --- DATA TABLES (Screenshot 2 Pattern) --- */
 .leh-table-card {
-  background: #ffffff;
+  background: var(--leh-surface);
   border-radius: var(--leh-radius-card);
   box-shadow: var(--leh-shadow);
   border: 1px solid var(--leh-border-light);
@@ -292,7 +354,7 @@ button:disabled {
   top: 0;
   bottom: 0;
   width: 4px;
-  background: var(--leh-blue);
+  background: var(--leh-forest);
 }
 
 .leh-table-header {
@@ -300,15 +362,15 @@ button:disabled {
 }
 
 .leh-table-title {
-  font-size: 19px; /* ~18-20px */
+  font-size: 18px;
   font-weight: 700;
-  color: var(--leh-text-dark);
+  color: var(--leh-ink);
   margin-bottom: 4px;
 }
 
 .leh-table-subtitle {
   font-size: 13px;
-  color: var(--leh-text-muted);
+  color: var(--leh-muted);
 }
 
 /* Filter Bar */
@@ -337,10 +399,11 @@ button:disabled {
   height: 38px;
   padding: 0 32px 0 12px;
   border-radius: 8px;
-  border: 1px solid var(--leh-border-light);
+  border: 1px solid var(--leh-border);
   font-size: 13px;
-  color: var(--leh-text-grey);
-  background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E") no-repeat right 12px center;
+  color: var(--leh-ink);
+  font-family: var(--leh-font);
+  background: var(--leh-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%234A5E45'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E") no-repeat right 12px center;
   background-size: 16px;
   appearance: none;
   min-width: 160px;
@@ -350,48 +413,19 @@ button:disabled {
   height: 38px;
   padding: 0 16px;
   border-radius: 8px;
-  border: 1px solid var(--leh-border-light);
-  background: white;
+  border: 1px solid var(--leh-border);
+  background: var(--leh-surface);
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 13px;
   font-weight: 500;
-  color: var(--leh-text-grey);
+  color: var(--leh-ink);
+  font-family: var(--leh-font);
 }
 
-.leh-btn-primary {
-  height: 42px;
-  padding: 0 24px;
-  background: var(--leh-primary);
-  color: white;
-  border: none;
-  border-radius: 12px;
-  font-weight: 700;
-  font-size: 13px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2), 
-              0 2px 4px -1px rgba(37, 99, 235, 0.1);
-}
-
-.leh-btn-primary:hover:not(:disabled) {
-  background: var(--leh-primary-hover);
-  transform: translateY(-1.5px);
-  box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
-}
-
-.leh-btn-primary:active:not(:disabled) {
-  transform: translateY(0);
-}
-
-.leh-btn-primary:disabled {
-  opacity: 0.6;
-  background: #cbd5e1;
-}
+/* NOTE: .leh-btn-primary is fully redefined below in the premium button section.
+   This early definition is intentionally removed to avoid duplication. */
 
 
 /* Table Elements */
@@ -405,33 +439,8 @@ button:disabled {
   border-collapse: collapse;
 }
 
-.leh-table th {
-  padding: 12px 16px;
-  text-align: left;
-  font-size: 13px;
-  font-weight: 500; /* Medium weight */
-  color: var(--leh-text-grey);
-  border-bottom: 1px solid var(--leh-border-light);
-  background: #ffffff; /* No dark background */
-  text-transform: none; /* Normal sentence case */
-}
-
-.leh-table td {
-  padding: 12px 16px;
-  font-size: 14px;
-  color: var(--leh-text-grey);
-  border-bottom: 1px solid var(--leh-border-light);
-  height: 54px; /* ~52-56px */
-  vertical-align: middle;
-}
-
-.leh-table tr:hover td {
-  background-color: rgba(249, 250, 251, 0.7);
-}
-
-.leh-table tr:last-child td {
-  border-bottom: none;
-}
+/* Table header/row styles — fully defined in the .leh-table block below.
+   These early rules removed to avoid specificity conflicts. */
 
 /* Circular Outlined Checkbox */
 .leh-checkbox-circle {
@@ -444,34 +453,39 @@ button:disabled {
   vertical-align: middle;
 }
 
-/* Status Badge (Pill Style) */
+/* ── Status Badge (Pill) — uses semantic tokens, never brand lime/forest ── */
 .leh-status-badge {
   padding: 4px 10px;
-  border-radius: 99px;
+  border-radius: var(--leh-radius-pill);
   font-size: 11px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  font-family: var(--leh-font);
+  letter-spacing: 0.02em;
 }
 
-.leh-status-badge.gray { background: #f1f5f9; color: #64748b; }
-.leh-status-badge.blue { background: #eff6ff; color: #2563eb; }
-.leh-status-badge.green { background: #ecfdf5; color: #10b981; }
-.leh-status-badge.amber { background: #fffbeb; color: #d97706; }
-.leh-status-badge.red { background: #fef2f2; color: #ef4444; }
-.leh-status-badge.purple { background: #f5f3ff; color: #8b5cf6; }
+.leh-status-badge.gray   { background: var(--leh-neutral-bg);  color: var(--leh-neutral); }
+.leh-status-badge.blue   { background: var(--leh-info-bg);     color: var(--leh-info); }
+.leh-status-badge.green  { background: var(--leh-success-bg);  color: var(--leh-success); }
+.leh-status-badge.amber  { background: var(--leh-warning-bg);  color: var(--leh-warning); }
+.leh-status-badge.red    { background: var(--leh-danger-bg);   color: var(--leh-danger); }
+.leh-status-badge.purple { background: #F5F3FF;                color: #7C3AED; }
+/* Brand lime badge — Ink text mandatory for contrast */
+.leh-status-badge.lime   { background: var(--leh-lime);        color: var(--leh-ink); font-weight: 800; }
+.leh-status-badge.forest { background: var(--leh-forest);      color: #FFFFFF; }
 
-.leh-table-bold { font-weight: 600; color: var(--leh-text-dark); }
+.leh-table-bold  { font-weight: 700; color: var(--leh-ink); }
 
-/* Status Text with Dot (Not Filled Pill) */
+/* Status Text with Dot (not filled pill) */
 .leh-status-text {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-weight: 600;
   font-size: 13px;
-  color: var(--leh-green);
+  color: var(--leh-success); /* teal, not brand green */
 }
 
 .leh-status-text::before {
@@ -482,8 +496,8 @@ button:disabled {
   border-radius: 50%;
 }
 
-.leh-table-qty { font-weight: 700; color: var(--leh-green); }
-.leh-table-price { color: var(--leh-text-dark); }
+.leh-table-qty   { font-weight: 700; color: var(--leh-forest); }
+.leh-table-price { color: var(--leh-ink); }
 
 /* --- Modernized Premium Modal System (v3.0) --- */
 .leh-modal-overlay {
@@ -537,20 +551,20 @@ button:disabled {
 }
 
 .leh-modal-title {
-  font-family: 'Outfit', sans-serif;
-  font-size: 24px;
-  font-weight: 900;
-  color: var(--leh-text-dark);
+  font-family: var(--leh-font);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--leh-ink);
   display: flex;
   align-items: center;
   gap: 14px;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   margin: 0;
 }
 
 .leh-modal-title svg {
-  color: var(--leh-primary);
-  filter: drop-shadow(0 4px 6px rgba(37, 99, 235, 0.2));
+  color: var(--leh-forest);
+  filter: drop-shadow(0 4px 6px rgba(46, 90, 38, 0.25));
 }
 
 .leh-modal-subtitle {
@@ -562,25 +576,25 @@ button:disabled {
 
 .leh-modal-close {
   position: absolute;
-  top: 32px; 
+  top: 32px;
   right: 32px;
   width: 36px;
   height: 36px;
   border-radius: 12px;
-  background: var(--leh-bg-light);
-  border: 1px solid var(--leh-border-light);
+  background: var(--leh-bg);
+  border: 1px solid var(--leh-border);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--leh-text-muted);
+  color: var(--leh-muted);
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .leh-modal-close:hover {
-  background: #fef2f2;
-  color: var(--leh-red);
-  border-color: #fee2e2;
+  background: var(--leh-danger-bg);
+  color: var(--leh-danger);
+  border-color: var(--leh-danger-border);
   transform: rotate(90deg) scale(1.1);
 }
 
@@ -589,21 +603,21 @@ button:disabled {
   overflow-y: auto;
   overflow-x: auto;
   flex-grow: 1;
-  background: #ffffff;
+  background: var(--leh-surface);
 }
 
 /* Scrollbar styling for modal body */
 .leh-modal-body::-webkit-scrollbar { width: 6px; }
 .leh-modal-body::-webkit-scrollbar-track { background: transparent; }
-.leh-modal-body::-webkit-scrollbar-thumb { 
-  background: var(--leh-border-light); 
-  border-radius: 10px; 
+.leh-modal-body::-webkit-scrollbar-thumb {
+  background: var(--leh-border);
+  border-radius: 10px;
 }
 
 .leh-modal-footer {
   padding: 24px 40px;
-  background: #f9fafb;
-  border-top: 1px solid var(--leh-border-light);
+  background: var(--leh-bg);
+  border-top: 1px solid var(--leh-border);
   display: flex;
   justify-content: flex-end;
   gap: 16px;
@@ -615,11 +629,11 @@ button:disabled {
 }
 
 .leh-form-section-title {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
-  color: var(--leh-primary);
+  color: var(--leh-forest);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   margin-bottom: 20px;
   display: flex;
   align-items: center;
@@ -630,7 +644,7 @@ button:disabled {
   content: '';
   flex: 1;
   height: 1px;
-  background: var(--leh-primary-light);
+  background: var(--leh-border);
 }
 
 .leh-form-grid {
@@ -649,44 +663,49 @@ button:disabled {
 
 .leh-form-label {
   display: block;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
-  color: var(--leh-text-muted);
+  color: var(--leh-muted);
   margin-bottom: 8px;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.07em;
 }
 
-.leh-form-input, .leh-form-select, .leh-select, .clinical-select, .leh-form-textarea, .leh-textarea, .clinical-textarea {
+.leh-form-input, .leh-form-select, .leh-select, .clinical-select,
+.leh-form-textarea, .leh-textarea, .clinical-textarea {
   width: 100%;
   height: 48px;
   padding: 0 16px;
-  border-radius: 14px;
-  border: 1.5px solid var(--leh-border-light);
+  border-radius: var(--leh-radius-input);
+  border: 1.5px solid var(--leh-border);
   font-size: 14px;
   font-weight: 500;
-  color: var(--leh-text-dark);
+  color: var(--leh-ink);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  background: var(--leh-bg-light);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--leh-surface);
+  font-family: var(--leh-font);
 }
 
-.leh-form-input:hover, .leh-form-select:hover, .leh-select:hover, .clinical-select:hover, .leh-form-textarea:hover, .leh-textarea:hover, .clinical-textarea:hover {
-  border-color: var(--leh-border);
-  background: #ffffff;
+.leh-form-input:hover, .leh-form-select:hover, .leh-select:hover,
+.clinical-select:hover, .leh-form-textarea:hover, .leh-textarea:hover,
+.clinical-textarea:hover {
+  border-color: var(--leh-forest);
+  background: var(--leh-surface);
 }
 
-.leh-form-input:focus, .leh-form-select:focus, .leh-select:focus, .clinical-select:focus, .leh-form-textarea:focus, .leh-textarea:focus, .clinical-textarea:focus {
+.leh-form-input:focus, .leh-form-select:focus, .leh-select:focus,
+.clinical-select:focus, .leh-form-textarea:focus, .leh-textarea:focus,
+.clinical-textarea:focus {
   outline: none;
-  border-color: var(--leh-primary);
-  background: #ffffff;
-  box-shadow: 0 0 0 4px var(--leh-primary-light);
+  border-color: var(--leh-forest);
+  background: var(--leh-surface);
+  box-shadow: var(--leh-shadow-focus);
 }
 
-.leh-form-select, .leh-select, .clinical-select, 
+.leh-form-select, .leh-select, .clinical-select,
 select.leh-input, select.clinical-input, select.leh-search-input {
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%234A5E45'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 16px center;
   background-size: 16px;
@@ -703,9 +722,9 @@ select.leh-input, select.clinical-input, select.leh-search-input {
 }
 
 .leh-summary-box {
-  background: var(--leh-primary-light);
-  border: 1px solid var(--leh-primary);
-  border-radius: 18px;
+  background: var(--leh-forest-tint);
+  border: 1px solid var(--leh-border);
+  border-radius: var(--leh-radius-card);
   padding: 20px;
   margin-top: 24px;
 }
@@ -722,13 +741,13 @@ select.leh-input, select.clinical-input, select.leh-search-input {
 .leh-summary-label {
   font-size: 13px;
   font-weight: 600;
-  color: var(--leh-primary);
+  color: var(--leh-forest);
 }
 
 .leh-summary-value {
   font-size: 18px;
-  font-weight: 900;
-  color: var(--leh-primary);
+  font-weight: 800;
+  color: var(--leh-forest);
 }
 
 .leh-form-actions {
@@ -741,13 +760,21 @@ select.leh-input, select.clinical-input, select.leh-search-input {
 .leh-btn-secondary {
   height: 40px;
   padding: 0 20px;
-  background: white;
+  background: var(--leh-surface);
   border: 1.5px solid var(--leh-border);
-  border-radius: 8px;
+  border-radius: var(--leh-radius-input);
   font-weight: 600;
   font-size: 13px;
-  color: var(--leh-text-grey);
+  color: var(--leh-ink);
+  font-family: var(--leh-font);
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.leh-btn-secondary:hover:not(:disabled) {
+  background: var(--leh-forest-tint);
+  border-color: var(--leh-forest);
+  color: var(--leh-forest);
 }
 
 /* Layout Utilities */
@@ -766,28 +793,35 @@ select.leh-input, select.clinical-input, select.leh-search-input {
 .leh-page-title {
   font-size: 26px;
   font-weight: 800;
-  color: var(--leh-text-dark);
+  color: var(--leh-ink);
   margin-bottom: 4px;
+  font-family: var(--leh-font);
 }
 
 .leh-page-subtitle {
   font-size: 14px;
-  color: var(--leh-text-muted);
+  color: var(--leh-muted);
 }
 
-/* Status Badges (Fallback) */
+/* ── Badges — semantic tokens, never brand lime/forest for status ── */
 .leh-badge {
   padding: 4px 10px;
-  border-radius: 20px;
+  border-radius: var(--leh-radius-pill);
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-family: var(--leh-font);
+  display: inline-flex;
+  align-items: center;
 }
 
-.leh-badge-blue { background: #eff6ff; color: #2563eb; }
-.leh-badge-green { background: #ecfdf5; color: #10b981; }
-.leh-badge-amber { background: #fffbeb; color: #b45309; }
-.leh-badge-red { background: #fef2f2; color: #ef4444; }
+.leh-badge-blue   { background: var(--leh-info-bg);    color: var(--leh-info); }
+.leh-badge-green  { background: var(--leh-success-bg); color: var(--leh-success); }
+.leh-badge-amber  { background: var(--leh-warning-bg); color: var(--leh-warning); }
+.leh-badge-red    { background: var(--leh-danger-bg);  color: var(--leh-danger); }
+.leh-badge-forest { background: var(--leh-forest);     color: #FFFFFF; }
+.leh-badge-lime   { background: var(--leh-lime);       color: var(--leh-ink); }
 
 /* FAB Styles */
 .fab-container {
@@ -810,25 +844,26 @@ select.leh-input, select.clinical-input, select.leh-search-input {
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--leh-primary) 0%, #1e40af 100%);
-  color: white;
+  background: var(--leh-forest);
+  color: var(--leh-lime);
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 12px 24px -6px rgba(37, 99, 235, 0.4);
+  box-shadow: 0 12px 24px -6px rgba(46, 90, 38, 0.4);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .fab-main:hover {
   transform: scale(1.1) rotate(90deg);
-  box-shadow: 0 16px 32px -8px rgba(37, 99, 235, 0.5);
+  box-shadow: 0 16px 32px -8px rgba(46, 90, 38, 0.5);
+  background: var(--leh-forest-hover);
 }
 
 .fab-main.active {
-  background: #f1f5f9;
-  color: var(--leh-text-dark);
+  background: var(--leh-bg);
+  color: var(--leh-ink);
   transform: scale(1) rotate(0deg);
 }
 
@@ -891,13 +926,13 @@ select.leh-input, select.clinical-input, select.leh-search-input {
 .leh-header-icon-box {
   width: 56px;
   height: 56px;
-  background: var(--leh-primary);
+  background: var(--leh-forest);
   border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  box-shadow: 0 8px 16px -4px rgba(37, 99, 235, 0.3);
+  color: var(--leh-lime);
+  box-shadow: 0 8px 16px -4px rgba(46, 90, 38, 0.35);
 }
 
 .leh-header-text {
@@ -971,20 +1006,7 @@ select.leh-input, select.clinical-input, select.leh-search-input {
   box-shadow: 0 12px 24px -6px rgba(239, 68, 68, 0.4);
 }
 
-.leh-status-badge {
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  background: var(--leh-primary-light);
-  color: var(--leh-primary);
-}
-
-.leh-status-badge.amber { background: #fffbeb; color: var(--leh-amber); }
-.leh-status-badge.green { background: #f0fdf4; color: var(--leh-green); }
-.leh-status-badge.red { background: #fef2f2; color: var(--leh-red); }
+/* .leh-status-badge already fully defined above — these overrides removed */
 
 /* --- PAGE LAYOUT & HEADERS --- */
 .leh-page-container {
@@ -1008,12 +1030,12 @@ select.leh-input, select.clinical-input, select.leh-search-input {
 }
 
 .leh-page-title {
-  font-family: 'Outfit', sans-serif;
-  font-size: 32px;
-  font-weight: 900;
-  color: var(--leh-text-dark);
-  letter-spacing: -0.02em;
-  line-height: 1.1;
+  font-family: var(--leh-font);
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--leh-ink);
+  letter-spacing: -0.01em;
+  line-height: 1.15;
 }
 
 .leh-page-subtitle {
@@ -1083,24 +1105,27 @@ select.leh-input, select.clinical-input, select.leh-search-input {
   min-width: 900px;
   border-collapse: collapse;
   text-align: left;
+  font-family: var(--leh-font);
 }
 
+/* Invoice-style header row: Lime Green background, Ink text — matches hospital invoice */
 .leh-table th {
-  background: var(--leh-bg-light);
-  padding: 12px 16px;
+  background: var(--leh-lime);
+  padding: 13px 16px;
   font-size: 11px;
   font-weight: 800;
-  color: var(--leh-text-muted);
+  color: var(--leh-ink);        /* WCAG AA: > 11:1 contrast on lime */
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  border-bottom: 1px solid var(--leh-border-light);
+  border-bottom: 2px solid var(--leh-border);
+  white-space: nowrap;
 }
 
 .leh-table td {
-  padding: 12px 16px;
-  font-size: 14px;
+  padding: 13px 16px;
+  font-size: 13.5px;
   font-weight: 500;
-  color: var(--leh-text-grey);
+  color: var(--leh-ink);
   border-bottom: 1px solid var(--leh-border-light);
   vertical-align: middle;
 }
@@ -1110,11 +1135,12 @@ select.leh-input, select.clinical-input, select.leh-search-input {
 }
 
 .leh-table-row {
-  transition: background 0.2s ease;
+  transition: background 0.15s ease;
 }
 
-.leh-table-row:hover {
-  background: var(--leh-primary-light);
+.leh-table-row:hover td,
+.leh-table tbody tr:hover td {
+  background: var(--leh-lime-soft);
 }
 
 /* --- FORM ELEMENTS (Professional Polish) --- */
@@ -1133,51 +1159,52 @@ select.leh-input, select.clinical-input, select.leh-search-input {
 .leh-input {
   width: 100%;
   height: 48px;
-  background: var(--leh-bg-light);
-  border: 1px solid var(--leh-border-light);
+  background: var(--leh-surface);
+  border: 1.5px solid var(--leh-border);
   border-radius: var(--leh-radius-input);
   padding: 0 16px 0 48px;
   font-size: 14px;
-  font-weight: 600;
-  color: var(--leh-text-dark);
+  font-weight: 500;
+  color: var(--leh-ink);
+  font-family: var(--leh-font);
   transition: all 0.2s ease;
 }
 
 .leh-input:focus {
-  background: white;
-  border-color: var(--leh-primary);
+  background: var(--leh-surface);
+  border-color: var(--leh-forest);
   box-shadow: var(--leh-shadow-focus);
   outline: none;
 }
 
-/* --- Modernized Premium Search Box --- */
+/* ── Search Box ── */
 .leh-search-box {
   position: relative;
   display: flex;
   align-items: center;
   width: 100%;
-  background: #ffffff;
-  border: 1.5px solid var(--leh-border-light);
-  border-radius: 99px;
+  background: var(--leh-surface);
+  border: 1.5px solid var(--leh-border);
+  border-radius: var(--leh-radius-pill);
   height: 48px;
   padding: 0 16px;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+  box-shadow: var(--leh-shadow);
 }
 
 .leh-search-box:focus-within {
-  border-color: var(--leh-primary);
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12), 0 4px 12px rgba(0,0,0,0.05);
+  border-color: var(--leh-forest);
+  box-shadow: var(--leh-shadow-focus), var(--leh-shadow-md);
   transform: translateY(-1px);
 }
 
 .leh-search-box .leh-search-icon {
-  color: var(--leh-text-light);
+  color: var(--leh-placeholder);
   transition: color 0.3s;
 }
 
 .leh-search-box:focus-within .leh-search-icon {
-  color: var(--leh-primary);
+  color: var(--leh-forest);
 }
 
 .leh-search-box input {
@@ -1186,19 +1213,20 @@ select.leh-input, select.clinical-input, select.leh-search-input {
   background: transparent;
   outline: none;
   padding: 0 12px;
-  font-size: 14.5px;
+  font-size: 14px;
   font-weight: 500;
-  color: var(--leh-text-dark);
+  color: var(--leh-ink);
+  font-family: var(--leh-font);
   width: 100%;
 }
 
 .leh-search-box input::placeholder {
-  color: var(--leh-text-light);
+  color: var(--leh-placeholder);
   font-weight: 400;
 }
 
 .leh-search-box .leh-search-clear {
-  color: var(--leh-text-light);
+  color: var(--leh-placeholder);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1212,103 +1240,153 @@ select.leh-input, select.clinical-input, select.leh-search-input {
 }
 
 .leh-search-box .leh-search-clear:hover {
-  background: var(--leh-bg-light);
-  color: var(--leh-red);
+  background: var(--leh-bg);
+  color: var(--leh-danger);
 }
 
-/* --- BUTTONS (Professional Polish) --- */
+/* ── BUTTONS ── */
+/* Primary: Forest Green background, Lime text for contrast */
 .leh-btn-primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  background: linear-gradient(135deg, var(--leh-primary) 0%, #1d4ed8 100%);
-  color: white;
+  gap: 10px;
+  background: var(--leh-forest);
+  color: var(--leh-lime);           /* Lime on Forest > 7:1 contrast */
   border: none;
-  border-radius: 14px;
-  padding: 0 32px;
-  height: 54px;
-  font-size: 14px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  border-radius: var(--leh-radius-input);
+  padding: 0 24px;
+  height: 44px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--leh-font);
+  letter-spacing: 0.04em;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 8px 20px -6px rgba(37, 99, 235, 0.4);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px -2px rgba(46, 90, 38, 0.35);
   white-space: nowrap;
   position: relative;
   overflow: hidden;
 }
 
 .leh-btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 15px 30px -8px rgba(37, 99, 235, 0.5);
-  background: linear-gradient(135deg, #3b82f6 0%, var(--leh-primary) 100%);
+  background: var(--leh-forest-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px -4px rgba(46, 90, 38, 0.45);
 }
 
 .leh-btn-primary:active:not(:disabled) {
   transform: translateY(0);
-  box-shadow: 0 5px 15px -4px rgba(37, 99, 235, 0.4);
+  background: var(--leh-forest-active);
+}
+
+.leh-btn-primary:focus-visible {
+  outline: 3px solid var(--leh-lime);
+  outline-offset: 2px;
 }
 
 .leh-btn-primary:disabled {
-  background: #f1f5f9;
-  color: #94a3b8;
+  background: var(--leh-border);
+  color: var(--leh-muted);
   cursor: not-allowed;
   box-shadow: none;
-  opacity: 0.7;
   transform: none;
 }
 
+/* Outline: Forest Green border, Forest text */
 .leh-btn-outline {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  background: white;
-  color: var(--leh-primary);
-  border: 1.5px solid var(--leh-primary);
-  border-radius: 14px;
-  padding: 0 32px;
-  height: 54px;
-  font-size: 14px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  gap: 10px;
+  background: var(--leh-surface);
+  color: var(--leh-forest);
+  border: 1.5px solid var(--leh-forest);
+  border-radius: var(--leh-radius-input);
+  padding: 0 24px;
+  height: 44px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--leh-font);
+  letter-spacing: 0.04em;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
 }
 
 .leh-btn-outline:hover:not(:disabled) {
-  background: #eff6ff;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px -6px rgba(37, 99, 235, 0.2);
+  background: var(--leh-forest-tint);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px -2px rgba(46, 90, 38, 0.15);
 }
 
 .leh-btn-outline:active:not(:disabled) {
   transform: translateY(0);
 }
 
+.leh-btn-outline:focus-visible {
+  outline: 3px solid var(--leh-forest);
+  outline-offset: 2px;
+}
+
+/* Danger button */
+.leh-btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--leh-danger);
+  color: #FFFFFF;
+  border: none;
+  border-radius: var(--leh-radius-input);
+  padding: 0 24px;
+  height: 44px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--leh-font);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px -2px rgba(220, 38, 38, 0.35);
+  white-space: nowrap;
+}
+
+.leh-btn-danger:hover:not(:disabled) {
+  background: #B91C1C;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px -4px rgba(220, 38, 38, 0.4);
+}
+
+.leh-btn-danger:focus-visible {
+  outline: 3px solid var(--leh-danger);
+  outline-offset: 2px;
+}
+
+/* Icon button */
 .leh-icon-btn {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: white;
-  border: 1px solid var(--leh-border-light);
-  border-radius: 10px;
-  color: var(--leh-text-muted);
+  background: var(--leh-surface);
+  border: 1px solid var(--leh-border);
+  border-radius: var(--leh-radius-input);
+  color: var(--leh-muted);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .leh-icon-btn:hover {
-  background: var(--leh-primary-light);
-  border-color: var(--leh-primary);
-  color: var(--leh-primary);
+  background: var(--leh-forest-tint);
+  border-color: var(--leh-forest);
+  color: var(--leh-forest);
   transform: translateY(-1px);
+}
+
+.leh-icon-btn:focus-visible {
+  outline: 3px solid var(--leh-forest);
+  outline-offset: 2px;
 }
 
 /* Topbar Styles */
@@ -1319,7 +1397,7 @@ select.leh-input, select.clinical-input, select.leh-search-input {
   height: 100vh;
   width: 100vw;
   overflow: hidden;
-  background-color: var(--leh-bg-light);
+  background-color: var(--leh-bg);
 }
 
 .content-wrapper {
@@ -1360,12 +1438,12 @@ select.leh-input, select.clinical-input, select.leh-search-input {
 }
 
 .main-content::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--leh-border);
   border-radius: 4px;
 }
 
 .main-content::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--leh-forest-tint);
 }
 
 /* App Footer Styling */
@@ -1532,18 +1610,18 @@ select.leh-input, select.clinical-input, select.leh-search-input {
 .transition-colors { transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease; }
 .z-\[10000\] { z-index: 10000; }
 
-/* Premium Greeting Banner Styles */
+/* Greeting Banner — Forest Green accent strip, lime/forest tones */
 .greeting-banner {
-  background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%);
-  border: 1px solid rgba(37, 99, 235, 0.15);
-  border-left: 5px solid var(--leh-primary);
+  background: var(--leh-surface);
+  border: 1px solid var(--leh-border);
+  border-left: 5px solid var(--leh-forest);
   border-radius: var(--leh-radius-card);
   padding: 24px 32px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   position: relative;
-  box-shadow: 0 4px 20px -2px rgba(37, 99, 235, 0.05);
+  box-shadow: var(--leh-shadow);
   margin-bottom: 32px;
   animation: greeting-slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
@@ -1554,10 +1632,10 @@ select.leh-input, select.clinical-input, select.leh-search-input {
 }
 
 .greeting-banner-title {
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--leh-font);
   font-size: 22px;
   font-weight: 800;
-  color: var(--leh-text-dark);
+  color: var(--leh-ink);
   margin: 0 0 6px 0;
   display: flex;
   align-items: center;
@@ -1603,7 +1681,7 @@ select.leh-input, select.clinical-input, select.leh-search-input {
 .greeting-banner .shadow-sm { box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
 .greeting-banner .border-slate-100 { border: 1px solid #f1f5f9; }
 .greeting-banner .text-primary { color: var(--leh-primary); }
-.greeting-banner .bg-primary\/10 { background-color: rgba(37, 99, 235, 0.1); }
+.greeting-banner .bg-primary\/10 { background-color: rgba(46, 90, 38, 0.1); }
 .greeting-banner .px-2 { padding-left: 8px; padding-right: 8px; }
 .greeting-banner .py-1 { padding-top: 4px; padding-bottom: 4px; }
 .greeting-banner .rounded-md { border-radius: 6px; }
@@ -1723,5 +1801,43 @@ select.leh-input, select.clinical-input, select.leh-search-input {
   .leh-search-box {
     width: 100% !important;
   }
+}
+
+/* --- STANDARDIZED INNER NAVIGATION BARS & TABS --- */
+/* Matches the bold, prominent visual identity of the external sidebar */
+.leh-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #334155;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.leh-tab:hover:not(.active) {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+.leh-tab.active {
+  background: var(--leh-forest) !important;
+  color: var(--leh-lime) !important;
+  border-color: var(--leh-forest) !important;
+  font-weight: 800;
+  box-shadow: 0 4px 14px rgba(46, 90, 38, 0.35) !important;
+}
+
+.leh-tab.active svg {
+  color: var(--leh-lime) !important;
 }
 

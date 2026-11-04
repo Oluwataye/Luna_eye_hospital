@@ -1,0 +1,17 @@
+---
+source_file: "server/index.ts"
+type: "code"
+community: "Community 4"
+location: "L4359"
+tags:
+  - graphify/code
+  - graphify/EXTRACTED
+  - community/Community_4
+---
+
+# DIST_PATH
+
+## Connections
+- [[serverindex.ts]] - `contains` [EXTRACTED]
+
+#graphify/code #graphify/EXTRACTED #community/Community_4

@@ -6,6 +6,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 const serverRootDir = __dirname.includes('dist') ? path.join(__dirname, '..') : __dirname;
 const isPackaged = typeof (process as any).pkg !== 'undefined';
 const writableRootDir = isPackaged ? path.dirname(process.execPath) : serverRootDir;
@@ -19,8 +20,7 @@ import compression from 'compression';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { PatientStatus } from './constants';
-import crypto from 'crypto';
-import { validateRequest, LoginSchema, CreateUserSchema, UpdateUserSchema, ChangePasswordSchema, CreatePatientSchema, UpdatePatientSchema, AuditLogQuerySchema, PatientListQuerySchema, ReprintQuerySchema, PaginationQuerySchema, RequiredReportQuerySchema } from './validation';
+import { validateRequest, LoginSchema, CreateUserSchema, UpdateUserSchema, ChangePasswordSchema, CreatePatientSchema, UpdatePatientSchema, CreateFamilySchema, UpdateFamilySchema, LinkPatientFamilySchema, AuditLogQuerySchema, PatientListQuerySchema, ReprintQuerySchema, PaginationQuerySchema, RequiredReportQuerySchema, CreateTransactionSchema } from './validation';
 import { registerSwaggerDocs } from './openapi';
 
 // Clean Architecture Imports
@@ -31,10 +31,16 @@ import { createAuthMiddleware } from './src/infrastructure/web/middlewares/auth.
 import { PatientRepositorySqlite } from './src/adapters/repositories/patient.repository.sqlite';
 import { PatientUseCase } from './src/usecases/patient/patient.usecase';
 import { PatientController } from './src/adapters/controllers/patient.controller';
+import { FamilyRepositorySqlite } from './src/adapters/repositories/family.repository.sqlite';
+import { FamilyUseCase } from './src/usecases/family/family.usecase';
+import { FamilyController } from './src/adapters/controllers/family.controller';
 import voiceRoutes from './routes/voice';
 import printRoutes from './routes/print';
+import { insuranceRouter } from './routes/insurance';
 import { startAudioCleanupJob } from './jobs/audioCleanup';
-import { setupVoiceWebSocket } from './websocket';
+import { sweepAndDispatchReadyBatches } from './src/services/ediBridge';
+import { startQueueWorker } from './src/services/ediQueue';
+import { setupVoiceWebSocket, broadcastWsVoiceStatus } from './websocket';
 import { spawn } from 'child_process';
 
 // Extend Express Request namespace for authenticateToken compatibility
@@ -97,6 +103,18 @@ setInterval(() => {
   sseClients = activeClients;
 }, 20000);
 
+// Broadcast Voice AI status change instantly to all connected SSE workstations and WebSockets
+export function broadcastVoiceAiStatus(ai_enabled: boolean) {
+  const payload = JSON.stringify({ ai_enabled, timestamp: Date.now() });
+  sseClients.forEach(client => {
+    try {
+      client.res.write(`event: voice_ai_status\ndata: ${payload}\n\n`);
+    } catch (err) {
+      console.warn(`[SSE] Cleaned up stale client connection: ID ${client.id}`);
+    }
+  });
+  broadcastWsVoiceStatus(ai_enabled);
+}
 
 const notify = (user_role: string, message: string, module: string, patient_id: string | null = null) => {
   db.run(
@@ -381,6 +399,10 @@ const patientRepository = new PatientRepositorySqlite();
 const patientUseCase = new PatientUseCase(patientRepository);
 const patientController = new PatientController(patientUseCase);
 
+const familyRepository = new FamilyRepositorySqlite();
+const familyUseCase = new FamilyUseCase(familyRepository, patientRepository);
+const familyController = new FamilyController(familyUseCase);
+
 const authorizeRoles = (allowedRoles: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) return res.status(401).json({ error: 'Authentication required' });
@@ -419,10 +441,14 @@ const apiRouter = express.Router();
 app.use('/api', apiRouter);
 
 // Voice Dictation & Live Transcription Routes
+app.set('broadcastVoiceAiStatus', broadcastVoiceAiStatus);
 app.use('/api/voice', voiceRoutes);
 
 // Direct Raw ESC/POS Thermal Printing Routes (Network Port 9100)
 app.use('/api/print', printRoutes);
+
+// Insurance & Claims Module (Admin only)
+app.use('/api/insurance', authorizeRoles(['Admin']), insuranceRouter);
 
 // --- LAN DOMAIN RESOLVER (NBNS/DNS) ---
 // This allows other computers on the LAN to find this server by typing 'lunaeyehospital'
@@ -583,7 +609,7 @@ app.get('/api/backup', authorizeRoles(['Admin']), (req, res) => {
 
 // GET all users
 app.get('/api/users', authorizeRoles(['Admin']), (req, res) => {
-  db.all('SELECT id, username, full_name, role, IFNULL(department, \'General\') as department, status FROM users ORDER BY id ASC', [], (err, rows) => {
+  db.all('SELECT id, username, email, full_name, role, IFNULL(department, \'General\') as department, status FROM users ORDER BY id ASC', [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
   });
@@ -591,14 +617,15 @@ app.get('/api/users', authorizeRoles(['Admin']), (req, res) => {
 
 // POST new user
 app.post('/api/users', authorizeRoles(['Admin']), validateRequest({ body: CreateUserSchema }), (req, res) => {
-  const { username, password, full_name, role, department } = req.sanitizedBody;
+  const { username, email, password, full_name, role, department } = req.sanitizedBody;
   const lowercaseUsername = username.toLowerCase().trim();
+  const normalizedEmail = email ? email.toLowerCase().trim() : `${lowercaseUsername}@lunaeye.com`;
   
   const hashedPassword = bcrypt.hashSync(password, 10);
   
   db.run(
-    'INSERT INTO users (username, password, full_name, role, department, status) VALUES (?, ?, ?, ?, ?, ?)',
-    [lowercaseUsername, hashedPassword, full_name, role, department || 'General', 'Active'],
+    'INSERT INTO users (username, email, password, full_name, role, department, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [lowercaseUsername, normalizedEmail, hashedPassword, full_name, role, department || 'General', 'Active'],
     function(err) {
       if (err) {
         if (err.message.includes('UNIQUE constraint failed')) {
@@ -607,15 +634,15 @@ app.post('/api/users', authorizeRoles(['Admin']), validateRequest({ body: Create
         return res.status(500).json({ error: err.message });
       }
       logAudit(req.user.id, req.user.username, req.user.role, 'USER_CREATE', 'Users', `Created new user: ${lowercaseUsername} (${role})`, 'Critical');
-      res.status(201).json({ id: this.lastID, username: lowercaseUsername, full_name, role, department: department || 'General', status: 'Active' });
+      res.status(201).json({ id: this.lastID, username: lowercaseUsername, email: normalizedEmail, full_name, role, department: department || 'General', status: 'Active' });
     }
   );
 });
 
-// PUT update user (role, status, password reset, department, username)
+// PUT update user (role, status, password reset, department, username, email)
 app.put('/api/users/:id', authorizeRoles(['Admin']), validateRequest({ body: UpdateUserSchema }), (req, res) => {
   const { id } = req.sanitizedParams;
-  const { username, role, status, password, full_name, department } = req.sanitizedBody;
+  const { username, email, role, status, password, full_name, department } = req.sanitizedBody;
   
   let updates: string[] = [];
   let params: any[] = [];
@@ -623,6 +650,10 @@ app.put('/api/users/:id', authorizeRoles(['Admin']), validateRequest({ body: Upd
   if (username) {
     updates.push('username = ?');
     params.push(username.toLowerCase().trim());
+  }
+  if (email !== undefined) {
+    updates.push('email = ?');
+    params.push(email ? email.toLowerCase().trim() : null);
   }
   if (role) { updates.push('role = ?'); params.push(role); }
   if (status) { updates.push('status = ?'); params.push(status); }
@@ -665,21 +696,24 @@ app.delete('/api/users/:id', authorizeRoles(['Admin']), (req, res) => {
 // GET current user profile
 app.get('/api/profile/:id', (req, res) => {
   const { id } = req.sanitizedParams;
-  db.get('SELECT id, username, full_name, role, phone_number, created_at FROM users WHERE id = ?', [id], (err, user: any) => {
+  db.get('SELECT id, username, email, full_name, role, phone_number, created_at FROM users WHERE id = ?', [id], (err, user: any) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user.email && user.username) {
+      user.email = `${user.username.toLowerCase()}@lunaeye.com`;
+    }
     res.json(user);
   });
 });
 
-// PUT update profile (name and phone)
+// PUT update profile (name, phone, and optional email)
 app.put('/api/profile/:id', (req, res) => {
   const { id } = req.sanitizedParams;
-  const { full_name, phone_number } = req.sanitizedBody;
+  const { full_name, phone_number, email } = req.sanitizedBody;
   
   db.run(
-    'UPDATE users SET full_name = ?, phone_number = ? WHERE id = ?',
-    [full_name, phone_number, id],
+    'UPDATE users SET full_name = ?, phone_number = ?, email = COALESCE(?, email) WHERE id = ?',
+    [full_name, phone_number, email ? email.toLowerCase().trim() : null, id],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
       logAudit(id, null, 'User', 'PROFILE_UPDATE', 'Profile', `Updated profile for user ID ${id}`, 'Standard');
@@ -753,6 +787,47 @@ app.post('/api/logout', (req, res) => {
   authController.logout(req, res);
 });
 
+// POST verify supervisor credentials for discount/override authorizations
+app.post('/api/auth/verify-supervisor', (req, res) => {
+  const { username, password } = req.sanitizedBody;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Supervisor username and password are required' });
+  }
+
+  db.get(
+    'SELECT id, username, password, full_name, role, status FROM users WHERE LOWER(username) = LOWER(?)',
+    [String(username).trim()],
+    (err, supervisor: any) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (!supervisor || supervisor.status !== 'Active') {
+        return res.status(401).json({ error: 'Supervisor account not found or is inactive' });
+      }
+
+      const allowedSupervisorRoles = ['Admin', 'Consultant', 'Doctor'];
+      if (!allowedSupervisorRoles.includes(supervisor.role)) {
+        return res.status(403).json({ 
+          error: `User "${supervisor.username}" (${supervisor.role}) is not authorized to approve supervisor overrides. Must be Admin, Consultant, or Doctor.` 
+        });
+      }
+
+      const isMatch = bcrypt.compareSync(String(password), supervisor.password || '');
+      if (!isMatch) {
+        return res.status(401).json({ error: 'Invalid supervisor password' });
+      }
+
+      res.json({
+        success: true,
+        supervisor: {
+          id: supervisor.id,
+          username: supervisor.username,
+          full_name: supervisor.full_name,
+          role: supervisor.role
+        }
+      });
+    }
+  );
+});
+
 // GET active status
 app.get('/api/status', (req, res) => {
   res.json({ status: 'active', version: '1.0.0', hospital: 'Luna Eye Hospital' });
@@ -768,7 +843,7 @@ app.get('/api/patients/by-number', (req, res) => {
   patientController.getPatientById(req, res);
 });
 
-// GET patient by ID (supports file numbers with slashes like 0001/26/LETH or 0024/26/LEH)
+// GET patient by ID (supports file numbers with slashes like 0001/26/LEH or 0024/26/LEH)
 app.get('/api/patients/{*id}', (req, res) => {
   patientController.getPatientById(req, res);
 });
@@ -786,6 +861,53 @@ app.put('/api/patients/by-number', authorizeRoles(['Admin', 'Receptionist']), (r
 // PUT update patient (supports wildcard slash paths)
 app.put('/api/patients/{*id}', authorizeRoles(['Admin', 'Receptionist']), (req, res) => {
   patientController.updatePatient(req, res);
+});
+
+// ==========================================
+// FAMILY HOUSEHOLD MANAGEMENT ENDPOINTS
+// ==========================================
+
+// GET all families (with search, pagination, members count)
+app.get('/api/families', (req, res) => {
+  familyController.getFamilies(req, res);
+});
+
+// GET family by ID or Card Number (includes all family members)
+app.get('/api/families/:id', (req, res) => {
+  familyController.getFamilyById(req, res);
+});
+
+// POST create new family household
+app.post('/api/families', authorizeRoles(['Admin', 'Receptionist']), validateRequest({ body: CreateFamilySchema }), (req, res) => {
+  familyController.createFamily(req, res);
+});
+
+// PUT update family household details
+app.put('/api/families/:id', authorizeRoles(['Admin', 'Receptionist']), validateRequest({ body: UpdateFamilySchema }), (req, res) => {
+  familyController.updateFamily(req, res);
+});
+
+// DELETE soft-deactivate family (protected: rejected if members have clinical history)
+app.delete('/api/families/:id', authorizeRoles(['Admin']), (req, res) => {
+  familyController.deactivateFamily(req, res);
+});
+
+// POST add a new member patient under this family
+app.post('/api/families/:id/members', authorizeRoles(['Admin', 'Receptionist']), (req, res) => {
+  familyController.addMember(req, res);
+});
+
+// POST link existing patient to this family
+app.post('/api/families/:id/link-patient', authorizeRoles(['Admin', 'Receptionist']), validateRequest({ body: LinkPatientFamilySchema }), (req, res) => {
+  familyController.linkPatient(req, res);
+});
+
+// POST/DELETE detach member from family (preserves patient and medical history)
+app.post('/api/families/:id/remove-member/:patientId', authorizeRoles(['Admin', 'Receptionist']), (req, res) => {
+  familyController.removeMember(req, res);
+});
+app.delete('/api/families/:id/members/:patientId', authorizeRoles(['Admin', 'Receptionist']), (req, res) => {
+  familyController.removeMember(req, res);
 });
 
 // POST check-in — routes existing today's visit to a target queue status
@@ -1270,13 +1392,103 @@ app.get('/api/services', (req, res) => {
   });
 });
 
+// POST new service (Admin only)
+app.post('/api/services', authorizeRoles(['Admin']), (req, res) => {
+  const { name, price, category, description } = req.sanitizedBody || req.body || {};
+  if (!name || typeof name !== 'string' || name.trim() === '') {
+    return res.status(400).json({ error: 'Service name is required' });
+  }
+  const numPrice = parseFloat(price);
+  if (isNaN(numPrice) || numPrice < 0) {
+    return res.status(400).json({ error: 'Valid non-negative service price is required' });
+  }
+  const cleanName = name.trim();
+  const cleanCategory = (category && typeof category === 'string' && category.trim()) ? category.trim() : 'Service';
+  const cleanDescription = (description && typeof description === 'string') ? description.trim() : '';
+
+  db.run(
+    'INSERT INTO services (name, price, category, description) VALUES (?, ?, ?, ?)',
+    [cleanName, numPrice, cleanCategory, cleanDescription],
+    function (this: any, err: Error | null) {
+      if (err) {
+        if (err.message.includes('UNIQUE constraint failed')) {
+          return res.status(400).json({ error: `Service with name "${cleanName}" already exists` });
+        }
+        return res.status(500).json({ error: err.message });
+      }
+      const newId = this.lastID;
+      logAudit(req.user?.id, req.user?.username || 'Admin', req.user?.role || 'Admin', 'SERVICE_CREATE', 'Settings', `Created service: ${cleanName} (₦${numPrice.toLocaleString()})`);
+      res.status(201).json({ id: newId, name: cleanName, price: numPrice, category: cleanCategory, description: cleanDescription });
+    }
+  );
+});
+
+// PUT update service (Admin only)
+app.put('/api/services/:id', authorizeRoles(['Admin']), (req, res) => {
+  const serviceId = parseInt(req.params.id as string);
+  if (isNaN(serviceId)) return res.status(400).json({ error: 'Invalid service ID' });
+
+  const { name, price, category, description } = req.sanitizedBody || req.body || {};
+  if (!name || typeof name !== 'string' || name.trim() === '') {
+    return res.status(400).json({ error: 'Service name is required' });
+  }
+  const numPrice = parseFloat(price);
+  if (isNaN(numPrice) || numPrice < 0) {
+    return res.status(400).json({ error: 'Valid non-negative service price is required' });
+  }
+  const cleanName = name.trim();
+  const cleanCategory = (category && typeof category === 'string' && category.trim()) ? category.trim() : 'Service';
+  const cleanDescription = (description && typeof description === 'string') ? description.trim() : '';
+
+  db.run(
+    'UPDATE services SET name = ?, price = ?, category = ?, description = ? WHERE id = ?',
+    [cleanName, numPrice, cleanCategory, cleanDescription, serviceId],
+    function (this: any, err: Error | null) {
+      if (err) {
+        if (err.message.includes('UNIQUE constraint failed')) {
+          return res.status(400).json({ error: `Another service with name "${cleanName}" already exists` });
+        }
+        return res.status(500).json({ error: err.message });
+      }
+      if (this.changes === 0) return res.status(404).json({ error: 'Service not found' });
+      logAudit(req.user?.id, req.user?.username || 'Admin', req.user?.role || 'Admin', 'SERVICE_UPDATE', 'Settings', `Updated service ID ${serviceId}: ${cleanName} (₦${numPrice.toLocaleString()})`);
+      res.json({ id: serviceId, name: cleanName, price: numPrice, category: cleanCategory, description: cleanDescription });
+    }
+  );
+});
+
+// DELETE service (Admin only)
+app.delete('/api/services/:id', authorizeRoles(['Admin']), (req, res) => {
+  const serviceId = parseInt(req.params.id as string);
+  if (isNaN(serviceId)) return res.status(400).json({ error: 'Invalid service ID' });
+
+  db.get('SELECT name FROM services WHERE id = ?', [serviceId], (err, row: any) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!row) return res.status(404).json({ error: 'Service not found' });
+    const serviceName = row.name;
+
+    db.run('DELETE FROM services WHERE id = ?', [serviceId], function (this: any, delErr: Error | null) {
+      if (delErr) return res.status(500).json({ error: delErr.message });
+      logAudit(req.user?.id, req.user?.username || 'Admin', req.user?.role || 'Admin', 'SERVICE_DELETE', 'Settings', `Deleted service ID ${serviceId}: ${serviceName}`);
+      res.json({ success: true, message: `Service "${serviceName}" deleted successfully` });
+    });
+  });
+});
+
+
 // GET all transactions
 app.get('/api/transactions', (req, res) => {
   const limit = parseInt(req.sanitizedQuery.limit as string) || 200;
   db.all(`
-    SELECT t.*, p.full_name as patient_name 
+    SELECT t.*, 
+           CASE 
+             WHEN t.billing_type = 'family' THEN COALESCE(f.family_name || ' Family', t.patient_id)
+             WHEN t.billing_type = 'walk_in' THEN 'Walk-in Customer'
+             ELSE COALESCE(p.full_name, f.family_name || ' Family', 'Walk-in Customer')
+           END as patient_name 
     FROM transactions t 
     LEFT JOIN patients p ON t.patient_id = p.id 
+    LEFT JOIN families f ON (t.family_id IS NOT NULL AND t.family_id = f.id) OR (t.family_id IS NULL AND t.patient_id = f.family_card_number)
     ORDER BY t.created_at DESC
     LIMIT ${limit}
   `, [], (err, rows) => {
@@ -1286,42 +1498,283 @@ app.get('/api/transactions', (req, res) => {
 });
 
 
-// POST new transaction
-app.post('/api/transactions', authorizeRoles(['Admin', 'Receptionist']), (req, res) => {
+// POST new transaction with Role-Gated Maximum Discount and Ceiling enforcement
+app.post('/api/transactions', authorizeRoles(['Admin', 'Receptionist']), validateRequest({ body: CreateTransactionSchema }), (req, res) => {
   const { 
     patient_id, visit_id, amount_paid, discount, 
-    payment_method, payment_details, cashier, items 
+    payment_method, payment_details, cashier, items,
+    supervisor_username, supervisor_password,
+    discount_reason, discount_note,
+    billing_type: reqBillingType, family_id: reqFamilyId,
+    is_insurance_bill, payer_id: reqPayerId, claim_id: reqClaimId,
+    patient_portion: reqPatientPortion, payer_portion: reqPayerPortion
   } = req.sanitizedBody;
   
   if (!items || items.length === 0) return res.status(400).json({ error: 'No items to bill' });
   
   // Recompute total and validate financial inputs
-  const total_amount = items.reduce((sum, item) => sum + (item.qty * item.unit_price), 0);
+  const total_amount = items.reduce((sum: number, item: any) => sum + (item.qty * item.unit_price), 0);
   const final_discount = parseFloat(discount) || 0;
   const final_paid = parseFloat(amount_paid) || 0;
   const balance = total_amount - final_discount - final_paid;
   const status = balance <= 0 ? 'Paid' : (final_paid > 0 ? 'Partial' : 'Unpaid');
-  
-  // Generate Receipt No securely
-  const receipt_no = `REC-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000)}`;
-  
-  db.serialize(() => {
-    db.run('BEGIN IMMEDIATE TRANSACTION');
-    
-    const sql = `
-      INSERT INTO transactions (
-        receipt_no, patient_id, visit_id, total_amount, amount_paid, 
-        balance, discount, payment_method, payment_details, 
-        cashier, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-    
-    db.run(sql, [
-      receipt_no, patient_id, visit_id || null, total_amount, final_paid, 
-      balance, final_discount, payment_method, 
-      JSON.stringify(payment_details || {}), 
-      cashier, status
-    ], function(this: any, err) {
+
+  // Async Entity Existence Verification: return clean HTTP 400 with details on invalid entity
+  let effectiveBillingType: 'patient' | 'family' | 'walk_in' = reqBillingType || 'patient';
+  let effectiveFamilyId: number | null = reqFamilyId ? parseInt(String(reqFamilyId)) : null;
+
+  if (!reqBillingType && !reqFamilyId) {
+    if (!patient_id || patient_id === 'Walk-in' || patient_id === 'OTC') {
+      effectiveBillingType = 'walk_in';
+    }
+  }
+
+  const verifyAndProceed = () => {
+    if (effectiveBillingType === 'walk_in') {
+      return runDiscountAndInsert();
+    }
+
+    if (effectiveBillingType === 'family') {
+      const famQuery = effectiveFamilyId ? 'SELECT id FROM families WHERE id = ?' : 'SELECT id FROM families WHERE family_card_number = ?';
+      const famParam = effectiveFamilyId || patient_id;
+      return db.get(famQuery, [famParam], (errFam, famRow: any) => {
+        if (errFam) return res.status(500).json({ error: errFam.message });
+        if (!famRow) {
+          return res.status(400).json({
+            error: `Family record not found for reference "${famParam}".`,
+            details: [{ field: 'family_id', message: `Family record not found in families registry.` }]
+          });
+        }
+        effectiveFamilyId = famRow.id;
+        runDiscountAndInsert();
+      });
+    }
+
+    // Default: billing_type === 'patient'
+    db.get('SELECT id FROM patients WHERE id = ?', [patient_id], (errP, pRow: any) => {
+      if (errP) return res.status(500).json({ error: errP.message });
+      if (pRow) {
+        return runDiscountAndInsert();
+      }
+
+      // If not in patients, check if it is a family card number (auto-promotion fallback)
+      db.get('SELECT id FROM families WHERE family_card_number = ?', [patient_id], (errF, famRow: any) => {
+        if (errF) return res.status(500).json({ error: errF.message });
+        if (famRow) {
+          effectiveBillingType = 'family';
+          effectiveFamilyId = famRow.id;
+          return runDiscountAndInsert();
+        }
+
+        // Neither patient nor family exists
+        return res.status(400).json({
+          error: `Patient ID "${patient_id}" does not exist.`,
+          details: [{ field: 'patient_id', message: `Patient ID "${patient_id}" does not exist in patients registry.` }]
+        });
+      });
+    });
+  };
+
+  const runDiscountAndInsert = () => {
+    // Retrieve configurable role discount caps from settings table
+    db.all("SELECT key, value FROM settings WHERE key LIKE 'discount_cap_%'", [], (errSettings, settingRows: any[]) => {
+    if (errSettings) return res.status(500).json({ error: errSettings.message });
+
+    const capSettings: Record<string, number> = {
+      receptionist: 10,
+      nurse: 10,
+      optometrist: 15,
+      doctor: 25,
+      consultant: 25,
+      admin: 100,
+      supervisor_ceiling: 50
+    };
+
+    if (settingRows) {
+      settingRows.forEach(r => {
+        const roleKey = r.key.replace('discount_cap_', '').toLowerCase();
+        const parsed = parseFloat(r.value);
+        if (!isNaN(parsed)) capSettings[roleKey] = parsed;
+      });
+    }
+
+    const userRole = (req.user?.role || 'Receptionist').toLowerCase();
+    const effective_pct = total_amount > 0 ? (final_discount / total_amount) * 100 : 0;
+
+    // Check if discount is applied and requires validation
+    if (effective_pct > 0.01 && userRole !== 'admin') {
+      const userRoleCap = capSettings[userRole] ?? 10;
+      const supervisorCeiling = capSettings['supervisor_ceiling'] ?? 50;
+
+      // Rule 1: Absolute non-admin ceiling check
+      if (effective_pct > supervisorCeiling) {
+        return res.status(403).json({
+          error: `Discount of ${effective_pct.toFixed(1)}% exceeds the hospital ceiling (${supervisorCeiling}%). Maximum non-admin discount permitted is ${supervisorCeiling}%.`,
+          code: 'DISCOUNT_CEILING_EXCEEDED',
+          ceiling: supervisorCeiling,
+          effective_pct: Number(effective_pct.toFixed(1))
+        });
+      }
+
+      // Rule 2: Exceeding current user's role cap requires Supervisor / Admin authorization
+      if (effective_pct > userRoleCap) {
+        if (!supervisor_username || !supervisor_password) {
+          return res.status(403).json({
+            error: `Discount of ${effective_pct.toFixed(1)}% exceeds your ${req.user?.role || 'user'} allowance (${userRoleCap}%). Supervisor authorization required.`,
+            code: 'SUPERVISOR_AUTH_REQUIRED',
+            requires_supervisor: true,
+            role_cap: userRoleCap,
+            effective_pct: Number(effective_pct.toFixed(1))
+          });
+        }
+
+        // Verify supervisor credentials
+        db.get(
+          'SELECT id, username, password, full_name, role, status FROM users WHERE LOWER(username) = LOWER(?)',
+          [String(supervisor_username).trim()],
+          (supErr, supervisor: any) => {
+            if (supErr) return res.status(500).json({ error: supErr.message });
+            if (!supervisor || supervisor.status !== 'Active') {
+              return res.status(401).json({ error: 'Supervisor user not found or inactive.' });
+            }
+
+            const allowedRoles = ['Admin', 'Consultant', 'Doctor'];
+            if (!allowedRoles.includes(supervisor.role)) {
+              return res.status(403).json({ 
+                error: `User "${supervisor.username}" (${supervisor.role}) is not authorized to approve discount overrides.` 
+              });
+            }
+
+            const isMatch = bcrypt.compareSync(String(supervisor_password), supervisor.password || '');
+            if (!isMatch) {
+              return res.status(401).json({ error: 'Incorrect supervisor password.' });
+            }
+
+            const supervisorCap = supervisor.role === 'Admin' ? 100 : (capSettings[supervisor.role.toLowerCase()] ?? 25);
+            if (supervisor.role !== 'Admin' && effective_pct > supervisorCap) {
+              return res.status(403).json({
+                error: `Discount of ${effective_pct.toFixed(1)}% also exceeds approving supervisor's (${supervisor.role}) cap of ${supervisorCap}%.`
+              });
+            }
+
+            // Record override in payment details and audit log
+            const sanitizedReason = String(discount_reason || 'Not Specified').slice(0, 120);
+            const sanitizedNote = String(discount_note || '').slice(0, 300);
+            const updatedPaymentDetails = {
+              ...(payment_details || {}),
+              supervisor_override: {
+                id: supervisor.id,
+                username: supervisor.username,
+                role: supervisor.role,
+                timestamp: new Date().toISOString(),
+                discount_reason: sanitizedReason,
+                discount_note: sanitizedNote
+              }
+            };
+
+            logAudit(
+              supervisor.id,
+              supervisor.username,
+              supervisor.role,
+              'DISCOUNT_OVERRIDE',
+              'Billing',
+              `Approved discount override of ${effective_pct.toFixed(1)}% (₦${final_discount.toLocaleString()}) for cashier ${req.user?.username || cashier} — Reason: ${sanitizedReason}${sanitizedNote ? ` | Note: ${sanitizedNote}` : ''}`,
+              'Critical'
+            );
+
+            executeTransactionInsert(updatedPaymentDetails);
+          }
+        );
+        return;
+      }
+    }
+
+    // Execute transaction insert with active payment details
+    executeTransactionInsert(payment_details || {});
+
+    function executeTransactionInsert(activePaymentDetails: any) {
+      // Generate Receipt No securely
+      const receipt_no = `REC-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000)}`;
+
+      const isInsurance = is_insurance_bill ? 1 : 0;
+      const finalPayerId = reqPayerId || null;
+      const finalClaimId = reqClaimId || null;
+      const finalPatientPortion = reqPatientPortion !== null && reqPatientPortion !== undefined ? reqPatientPortion : final_paid;
+      const finalPayerPortion = reqPayerPortion !== null && reqPayerPortion !== undefined ? reqPayerPortion : (isInsurance ? (total_amount - final_paid) : 0);
+
+      const triggerInsuranceAutoDraft = (txId: number) => {
+        if (!isInsurance || !patient_id) return;
+        db.get(
+          `SELECT e.id as enrollee_id, e.payer_id, e.plan_id 
+           FROM enrollees e 
+           WHERE e.patient_id = ? AND e.status = 'ACTIVE' 
+           ORDER BY e.created_at DESC LIMIT 1`,
+          [patient_id],
+          (enrErr: any, enr: any) => {
+            if (enrErr || !enr) return;
+            const payerIdToUse = finalPayerId || enr.payer_id;
+            const planIdToUse = enr.plan_id;
+            const enrolleeIdToUse = enr.enrollee_id;
+            const serviceDate = new Date().toISOString().slice(0, 10);
+            const claimNo = `CLM-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000)}`;
+            const totalClaimedKobo = Math.round(finalPayerPortion * 100);
+            const totalBilledKobo = Math.round(total_amount * 100);
+            const patientCopayKobo = Math.round(final_paid * 100);
+
+            db.run(
+              `INSERT INTO claims (
+                claim_number, patient_id, enrollee_id, payer_id, plan_id, visit_id,
+                service_date, total_billed, total_claimed, patient_copay, status, created_by
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?)`,
+              [claimNo, patient_id, enrolleeIdToUse, payerIdToUse, planIdToUse, visit_id || null, serviceDate, totalBilledKobo, totalClaimedKobo, patientCopayKobo, cashier || 'System'],
+              function(this: any, clmErr: any) {
+                if (clmErr || !this.lastID) return;
+                const newClaimId = this.lastID;
+                db.run('UPDATE transactions SET claim_id = ? WHERE id = ?', [newClaimId, txId]);
+                const clmItemStmt = db.prepare(`
+                  INSERT INTO claim_items (
+                    claim_id, item_type, item_code, description, quantity, 
+                    unit_price, claimed_amount, status
+                  ) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING')
+                `);
+                items.forEach((it: any) => {
+                  const itCode = it.inventory_id || it.item_id || 'SVC';
+                  const itQty = it.qty || 1;
+                  const unitKobo = Math.round(it.unit_price * 100);
+                  const claimedKobo = Math.round(unitKobo * itQty);
+                  clmItemStmt.run(newClaimId, 'SERVICE', String(itCode), it.description || it.name || 'Item', itQty, unitKobo, claimedKobo);
+                });
+                clmItemStmt.finalize();
+                db.run(
+                  `INSERT INTO claim_status_history (claim_id, from_status, to_status, changed_by, notes)
+                   VALUES (?, NULL, 'DRAFT', ?, 'Auto-created from Billing')`,
+                  [newClaimId, cashier || 'System']
+                );
+              }
+            );
+          }
+        );
+      };
+      
+      db.serialize(() => {
+        db.run('BEGIN IMMEDIATE TRANSACTION');
+        
+        const sql = `
+          INSERT INTO transactions (
+            receipt_no, patient_id, billing_type, family_id, visit_id, total_amount, amount_paid, 
+            balance, discount, payment_method, payment_details, 
+            cashier, status,
+            payer_id, claim_id, patient_portion, payer_portion, is_insurance_bill
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+        
+        db.run(sql, [
+          receipt_no, patient_id, effectiveBillingType, effectiveFamilyId || null, visit_id || null, total_amount, final_paid, 
+          balance, final_discount, payment_method, 
+          JSON.stringify(activePaymentDetails || {}), 
+          cashier, status,
+          finalPayerId, finalClaimId, finalPatientPortion, finalPayerPortion, isInsurance
+        ], function(this: any, err) {
       if (err) {
         db.run('ROLLBACK');
         return res.status(500).json({ error: err.message });
@@ -1395,7 +1848,6 @@ app.post('/api/transactions', authorizeRoles(['Admin', 'Receptionist']), (req, r
             return res.status(400).json({ error: 'Transaction failed. Check stock levels or item details.' });
           } else {
             // Update visit status if fully paid (Status is 'Paid')
-            // Update visit status if fully paid (Status is 'Paid')
             if (visit_id && status === 'Paid') {
               const vId = parseInt(visit_id);
               // Check current status to decide next step
@@ -1418,8 +1870,9 @@ app.post('/api/transactions', authorizeRoles(['Admin', 'Receptionist']), (req, r
                   
                   db.run('COMMIT', (err) => {
                     if (err) return res.status(500).json({ error: err.message });
-                    logAudit(null, cashier, 'Staff', 'BILLING_CREATE', 'Billing', `New transaction ${receipt_no} for patient ID ${patient_id}. Total: ${total_amount}`);
-                    res.status(201).json({ receipt_no, transactionId, patient_id, total_amount, amount_paid: final_paid, balance, status });
+                    logAudit(null, cashier, 'Staff', 'BILLING_CREATE', 'Billing', `New transaction ${receipt_no} for patient ID ${patient_id} (${effectiveBillingType}). Total: ${total_amount}`);
+                    res.status(201).json({ receipt_no, transactionId, patient_id, billing_type: effectiveBillingType, family_id: effectiveFamilyId, total_amount, amount_paid: final_paid, balance, status });
+                    triggerInsuranceAutoDraft(transactionId);
                   });
                 });
               });
@@ -1431,15 +1884,22 @@ app.post('/api/transactions', authorizeRoles(['Admin', 'Receptionist']), (req, r
               
               db.run('COMMIT', (err) => {
                 if (err) return res.status(500).json({ error: err.message });
-                logAudit(null, cashier, 'Staff', 'BILLING_CREATE', 'Billing', `New transaction ${receipt_no} for patient ID ${patient_id}. Total: ${total_amount}`);
-                res.status(201).json({ receipt_no, transactionId, patient_id, total_amount, amount_paid: final_paid, balance, status });
+                logAudit(null, cashier, 'Staff', 'BILLING_CREATE', 'Billing', `New transaction ${receipt_no} for patient ID ${patient_id} (${effectiveBillingType}). Total: ${total_amount}`);
+                res.status(201).json({ receipt_no, transactionId, patient_id, billing_type: effectiveBillingType, family_id: effectiveFamilyId, total_amount, amount_paid: final_paid, balance, status });
+                triggerInsuranceAutoDraft(transactionId);
               });
             }
           }
         }
       }
+        });
+      });
+    }
     });
-  });
+  };
+
+  // Kick off asynchronous verification and insertion pipeline
+  verifyAndProceed();
 });
 
 // GET inventory items
@@ -2041,33 +2501,76 @@ app.get('/api/purchase-orders', (req, res) => {
   });
 });
 
-// POST new purchase order
+// POST new purchase order or procurement record
 app.post('/api/purchase-orders', authorizeRoles(['Admin']), (req, res) => {
   const { supplier_id, items } = req.sanitizedBody;
-  const po_number = `PO-${Date.now()}`;
-  const total_amount = items.reduce((sum, i) => sum + (i.qty * i.unit_cost), 0);
-  
-  db.serialize(() => {
-    db.run('BEGIN IMMEDIATE TRANSACTION');
-    db.run('INSERT INTO purchase_orders (po_number, supplier_id, total_amount, status) VALUES (?, ?, ?, ?)', 
-      [po_number, supplier_id, total_amount, 'Draft'], function(this: any, err) {
-      if (err) {
-        db.run('ROLLBACK');
-        return res.status(500).json({ error: err.message });
-      }
-      
-      const poId = this.lastID;
-      const stmt = db.prepare('INSERT INTO purchase_order_items (po_id, inventory_id, description, qty, unit_cost) VALUES (?, ?, ?, ?, ?)');
-      items.forEach(item => {
-        stmt.run(poId, item.inventory_id || null, item.description, item.qty, item.unit_cost);
-      });
-      stmt.finalize();
-      
-      db.run('COMMIT', () => {
-        res.status(201).json({ id: poId, po_number, total_amount });
+  if (Array.isArray(items)) {
+    const po_number = `PO-${Date.now()}`;
+    const total_amount = items.reduce((sum: number, i: any) => sum + (i.qty * i.unit_cost), 0);
+    
+    db.serialize(() => {
+      db.run('BEGIN IMMEDIATE TRANSACTION');
+      db.run('INSERT INTO purchase_orders (po_number, supplier_id, total_amount, status) VALUES (?, ?, ?, ?)', 
+        [po_number, supplier_id, total_amount, 'Draft'], function(this: any, err) {
+        if (err) {
+          db.run('ROLLBACK');
+          return res.status(500).json({ error: err.message });
+        }
+        
+        const poId = this.lastID;
+        const stmt = db.prepare('INSERT INTO purchase_order_items (po_id, inventory_id, description, qty, unit_cost) VALUES (?, ?, ?, ?, ?)');
+        items.forEach((item: any) => {
+          stmt.run(poId, item.inventory_id || null, item.description, item.qty, item.unit_cost);
+        });
+        stmt.finalize();
+        
+        db.run('COMMIT', () => {
+          res.status(201).json({ id: poId, po_number, total_amount });
+        });
       });
     });
-  });
+  } else {
+    const { 
+      item_name, quantity_received, unit_cost, total_cost, 
+      invoice_number, amount_paid, balance, status, purchase_date, received_by, notes 
+    } = req.sanitizedBody;
+
+    db.serialize(() => {
+      db.run('BEGIN IMMEDIATE TRANSACTION');
+      
+      db.run(`
+        INSERT INTO procurement (
+          supplier_id, item_name, quantity_received, unit_cost, total_cost, 
+          invoice_number, amount_paid, balance, status, purchase_date, received_by, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        supplier_id, item_name, quantity_received, unit_cost, total_cost, 
+        invoice_number, amount_paid || 0, balance || (total_cost - (amount_paid || 0)), 
+        status || 'Unpaid', purchase_date, received_by, notes
+      ], function(this: any, err) {
+        if (err) {
+          db.run('ROLLBACK');
+          return res.status(500).json({ error: err.message });
+        }
+
+        const insertedId = this.lastID;
+        // Update inventory stock if item exists
+        db.run(
+          'UPDATE inventory SET stock = stock + ? WHERE name = ?',
+          [quantity_received, item_name],
+          (err2: any) => {
+            if (err2) {
+              db.run('ROLLBACK');
+              return res.status(500).json({ error: err2.message });
+            }
+            db.run('COMMIT', () => {
+              res.status(201).json({ id: insertedId, success: true });
+            });
+          }
+        );
+      });
+    });
+  }
 });
 
 // POST receive goods for PO
@@ -2141,10 +2644,537 @@ app.get('/api/procurement/stats', (req, res) => {
   }).catch(err => res.status(500).json({ error: err.message }));
 });
 
+
+// ─── NIGERIA PAYE TAX ENGINE ───────────────────────────────────────────────
+// Computes annual PAYE per Nigeria Personal Income Tax Act (PITA as amended) & FIRS regulations.
+// Expects monthly basic, transport, housing, and other allowances.
+// Annualizes figures to compute CRA (higher of ₦200,000 or 1% of gross + 20% of gross),
+// statutory deductions (pension 8%, NHF 2.5%), applies graduated tax bands,
+// checks minimum tax (1% of gross), and resolves to monthly PAYE deduction.
+const computeNigeriaPAYE = (basic: number, transport: number, housing: number, others: number) => {
+  const monthlyGross = (basic || 0) + (transport || 0) + (housing || 0) + (others || 0);
+  const monthlyPensionable = (basic || 0) + (transport || 0) + (housing || 0);
+  const monthlyPensionEmployee = Math.round(monthlyPensionable * 0.08); // 8% employee contribution
+  const monthlyPensionEmployer = Math.round(monthlyPensionable * 0.10); // 10% employer contribution
+  const monthlyNhf = Math.round((basic || 0) * 0.025);                  // 2.5% NHF on basic
+
+  // Annualized values for FIRS tax computation
+  const annualGross = monthlyGross * 12;
+  const annualPensionEmployee = monthlyPensionEmployee * 12;
+  const annualNhf = monthlyNhf * 12;
+
+  // Consolidated Relief Allowance (CRA): Higher of ₦200,000 or 1% of gross, PLUS 20% of gross
+  const higherOf200kOr1Pct = Math.max(200000, annualGross * 0.01);
+  const cra = higherOf200kOr1Pct + (0.20 * annualGross);
+
+  // Annual Chargeable Income
+  const annualChargeable = Math.max(0, annualGross - cra - annualPensionEmployee - annualNhf);
+
+  // FIRS graduated tax bands (annual)
+  const bands = [
+    { limit: 300000,   rate: 0.07 },
+    { limit: 300000,   rate: 0.11 },
+    { limit: 500000,   rate: 0.15 },
+    { limit: 500000,   rate: 0.19 },
+    { limit: 1600000,  rate: 0.21 },
+    { limit: Infinity, rate: 0.24 },
+  ];
+
+  let remaining = annualChargeable;
+  let annualTax = 0;
+  for (const band of bands) {
+    if (remaining <= 0) break;
+    const taxable = Math.min(remaining, band.limit);
+    annualTax += taxable * band.rate;
+    remaining -= taxable;
+  }
+
+  // Minimum tax rule: 1% of gross income if computed tax is lower (applies to taxable earners)
+  if (annualGross > 360000 && annualTax < (annualGross * 0.01)) {
+    annualTax = annualGross * 0.01;
+  }
+
+  const paye_annual = Math.round(annualTax);
+  const paye_monthly = Math.round(paye_annual / 12);
+
+  return {
+    gross: monthlyGross,
+    pensionable: monthlyPensionable,
+    sra: Math.round(cra / 12),
+    cra_annual: Math.round(cra),
+    nhf: monthlyNhf,
+    pensionEmployee: monthlyPensionEmployee,
+    pensionEmployer: monthlyPensionEmployer,
+    chargeableIncome: Math.round(annualChargeable / 12),
+    chargeableIncome_annual: Math.round(annualChargeable),
+    paye_annual,
+    paye_monthly,
+  };
+};
+
+// ─── EXPENSES CRUD ──────────────────────────────────────────────────────────
+
+// GET expenses with filtering
+app.get('/api/expenses', authorizeRoles(['Admin']), (req, res) => {
+  const { start_date, end_date, category, expense_type } = req.sanitizedQuery;
+  let sql = `SELECT e.*, u.full_name as staff_name FROM expenses e LEFT JOIN users u ON e.staff_id = u.id WHERE 1=1`;
+  const params: any[] = [];
+  if (start_date && end_date) { sql += ' AND date(e.date) BETWEEN ? AND ?'; params.push(start_date, end_date); }
+  if (category) { sql += ' AND e.category = ?'; params.push(category); }
+  if (expense_type) { sql += ' AND e.expense_type = ?'; params.push(expense_type); }
+  sql += ' ORDER BY e.date DESC, e.id DESC LIMIT 500';
+  db.all(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+// POST create expense
+app.post('/api/expenses', authorizeRoles(['Admin']), (req, res) => {
+  const { date, category, expense_type, description, amount, recorded_by, approved_by, payment_ref, staff_id, month_year, notes } = req.sanitizedBody;
+  if (!description || !amount || !category) return res.status(400).json({ error: 'category, description and amount are required' });
+  db.run(
+    `INSERT INTO expenses (date, category, expense_type, description, amount, recorded_by, approved_by, payment_ref, staff_id, month_year, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [date || new Date().toISOString(), category, expense_type || 'Overhead', description, parseFloat(amount), recorded_by, approved_by, payment_ref, staff_id || null, month_year || null, notes],
+    function(this: any, err) {
+      if (err) return res.status(500).json({ error: err.message });
+      logAudit(req.user?.id, req.user?.username, req.user?.role, 'EXPENSE_CREATE', 'Finance', `Recorded expense: ${category} - ${description} = ₦${amount}`, 'Financial');
+      res.status(201).json({ id: this.lastID, success: true });
+    }
+  );
+});
+
+// PUT update expense
+app.put('/api/expenses/:id', authorizeRoles(['Admin']), (req, res) => {
+  const { id } = req.sanitizedParams;
+  const { date, category, expense_type, description, amount, recorded_by, approved_by, payment_ref, notes } = req.sanitizedBody;
+  db.run(
+    `UPDATE expenses SET date=?, category=?, expense_type=?, description=?, amount=?, recorded_by=?, approved_by=?, payment_ref=?, notes=? WHERE id=?`,
+    [date, category, expense_type || 'Overhead', description, parseFloat(amount), recorded_by, approved_by, payment_ref, notes, id],
+    function(this: any, err) {
+      if (err) return res.status(500).json({ error: err.message });
+      logAudit(req.user?.id, req.user?.username, req.user?.role, 'EXPENSE_UPDATE', 'Finance', `Updated expense ID ${id}`, 'Financial');
+      res.json({ success: true });
+    }
+  );
+});
+
+// DELETE expense
+app.delete('/api/expenses/:id', authorizeRoles(['Admin']), (req, res) => {
+  const { id } = req.sanitizedParams;
+  db.run('DELETE FROM expenses WHERE id = ?', [id], function(this: any, err) {
+    if (err) return res.status(500).json({ error: err.message });
+    logAudit(req.user?.id, req.user?.username, req.user?.role, 'EXPENSE_DELETE', 'Finance', `Deleted expense ID ${id}`, 'Critical');
+    res.json({ success: true });
+  });
+});
+
+// ─── STAFF SALARIES ─────────────────────────────────────────────────────────
+
+// GET staff salary schedules with optional status filter (active, archived, all)
+app.get('/api/staff-salaries', authorizeRoles(['Admin']), (req, res) => {
+  const { status } = req.sanitizedQuery;
+  let whereClause = 'WHERE ss.is_active = 1';
+  if (status === 'archived') {
+    whereClause = 'WHERE ss.is_active = 0';
+  } else if (status === 'all') {
+    whereClause = '';
+  }
+  db.all(`
+    SELECT ss.*, u.full_name, u.username, u.role, u.department, u.status as user_status,
+           (ss.basic_salary + ss.transport_allowance + ss.housing_allowance + ss.other_allowances) as gross_salary
+    FROM staff_salaries ss
+    JOIN users u ON ss.user_id = u.id
+    ${whereClause}
+    ORDER BY ss.is_active DESC, u.full_name ASC, ss.effective_from DESC
+  `, [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    // Attach PAYE preview to each row
+    const enriched = (rows as any[]).map((r: any) => {
+      const tax = computeNigeriaPAYE(r.basic_salary, r.transport_allowance, r.housing_allowance, r.other_allowances);
+      return { ...r, ...tax };
+    });
+    res.json(enriched);
+  });
+});
+
+// POST create/update staff salary record
+app.post('/api/staff-salaries', authorizeRoles(['Admin']), (req, res) => {
+  const { user_id, basic_salary, transport_allowance, housing_allowance, other_allowances, effective_from } = req.sanitizedBody;
+  if (!user_id || !basic_salary || !effective_from) return res.status(400).json({ error: 'user_id, basic_salary and effective_from are required' });
+  db.serialize(() => {
+    // Deactivate previous record
+    db.run('UPDATE staff_salaries SET is_active = 0, effective_to = ? WHERE user_id = ? AND is_active = 1', [effective_from, user_id]);
+    db.run(
+      `INSERT INTO staff_salaries (user_id, basic_salary, transport_allowance, housing_allowance, other_allowances, effective_from, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [user_id, parseFloat(basic_salary), parseFloat(transport_allowance || 0), parseFloat(housing_allowance || 0), parseFloat(other_allowances || 0), effective_from, req.user?.username],
+      function(this: any, err) {
+        if (err) return res.status(500).json({ error: err.message });
+        logAudit(req.user?.id, req.user?.username, req.user?.role, 'SALARY_SET', 'Payroll', `Set salary schedule for user_id=${user_id}: basic=₦${basic_salary}`, 'Critical');
+        res.status(201).json({ id: this.lastID, success: true });
+      }
+    );
+  });
+});
+
+// PUT update existing salary record
+app.put('/api/staff-salaries/:id', authorizeRoles(['Admin']), (req, res) => {
+  const { id } = req.sanitizedParams;
+  const { basic_salary, transport_allowance, housing_allowance, other_allowances, effective_from } = req.sanitizedBody;
+  if (!basic_salary) return res.status(400).json({ error: 'basic_salary is required' });
+  db.run(
+    'UPDATE staff_salaries SET basic_salary=?, transport_allowance=?, housing_allowance=?, other_allowances=?, effective_from=COALESCE(?, effective_from) WHERE id=?',
+    [parseFloat(basic_salary), parseFloat(transport_allowance || 0), parseFloat(housing_allowance || 0), parseFloat(other_allowances || 0), effective_from || null, id],
+    function(this: any, err) {
+      if (err) return res.status(500).json({ error: err.message });
+      logAudit(req.user?.id, req.user?.username, req.user?.role, 'SALARY_UPDATE', 'Payroll', `Updated salary schedule ID ${id}`, 'Critical');
+      res.json({ success: true });
+    }
+  );
+});
+
+// DELETE soft-delete (archive) staff salary record
+app.delete('/api/staff-salaries/:id', authorizeRoles(['Admin']), (req, res) => {
+  const { id } = req.sanitizedParams;
+  const today = new Date().toISOString().split('T')[0];
+  db.run(
+    'UPDATE staff_salaries SET is_active = 0, effective_to = COALESCE(effective_to, ?) WHERE id = ?',
+    [today, id],
+    function(this: any, err) {
+      if (err) return res.status(500).json({ error: err.message });
+      logAudit(req.user?.id, req.user?.username, req.user?.role, 'SALARY_ARCHIVE', 'Payroll', `Archived salary schedule ID ${id}`, 'Critical');
+      res.json({ success: true, archived: this.changes });
+    }
+  );
+});
+
+// PUT restore archived staff salary record
+app.put('/api/staff-salaries/:id/restore', authorizeRoles(['Admin']), (req, res) => {
+  const { id } = req.sanitizedParams;
+  db.get('SELECT ss.user_id, u.full_name FROM staff_salaries ss JOIN users u ON ss.user_id = u.id WHERE ss.id = ?', [id], (err, row: any) => {
+    if (err || !row) return res.status(404).json({ error: 'Salary record not found' });
+    const today = new Date().toISOString().split('T')[0];
+    db.serialize(() => {
+      // Deactivate any currently active schedule for this user
+      db.run('UPDATE staff_salaries SET is_active = 0, effective_to = ? WHERE user_id = ? AND is_active = 1', [today, row.user_id]);
+      // Reactivate this schedule
+      db.run('UPDATE staff_salaries SET is_active = 1, effective_to = NULL WHERE id = ?', [id], function(this: any, err2) {
+        if (err2) return res.status(500).json({ error: err2.message });
+        logAudit(req.user?.id, req.user?.username, req.user?.role, 'SALARY_RESTORE', 'Payroll', `Restored salary schedule ID ${id} for ${row.full_name}`, 'Critical');
+        res.json({ success: true });
+      });
+    });
+  });
+});
+
+// ─── PAYROLL ─────────────────────────────────────────────────────────────────
+
+// GET payroll runs (with optional month filter)
+app.get('/api/payroll', authorizeRoles(['Admin']), (req, res) => {
+  const { month_year } = req.sanitizedQuery;
+  let sql = `SELECT pr.*, u.username, u.role, u.department FROM payroll_runs pr JOIN users u ON pr.user_id = u.id`;
+  const params: any[] = [];
+  if (month_year) { sql += ' WHERE pr.month_year = ?'; params.push(month_year); }
+  sql += ' ORDER BY pr.month_year DESC, pr.full_name ASC';
+  db.all(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+// POST run payroll for a given month — computes PAYE/NHF/pension for all active staff with salary schedule
+app.post('/api/payroll/run', authorizeRoles(['Admin']), (req, res) => {
+  const { month_year } = req.sanitizedBody;
+  if (!month_year || !/^\d{4}-\d{2}$/.test(month_year)) {
+    return res.status(400).json({ error: 'month_year is required in YYYY-MM format' });
+  }
+  // Check if payroll already exists for this month
+  db.get('SELECT COUNT(*) as cnt FROM payroll_runs WHERE month_year = ?', [month_year], (err, row: any) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (row.cnt > 0) return res.status(409).json({ error: `Payroll for ${month_year} has already been processed. Delete or void it first.` });
+
+    db.all(`
+      SELECT ss.*, u.id as user_id, u.full_name, u.username, u.role, u.status as user_status
+      FROM staff_salaries ss
+      JOIN users u ON ss.user_id = u.id
+      WHERE ss.is_active = 1 AND u.status = 'Active'
+    `, [], (err2, salaries: any[]) => {
+      if (err2) return res.status(500).json({ error: err2.message });
+      if (!salaries.length) return res.status(404).json({ error: 'No active staff salary schedules found.' });
+
+      const processed = req.user?.username || 'Admin';
+      db.serialize(() => {
+        db.run('BEGIN IMMEDIATE TRANSACTION');
+        const stmt = db.prepare(`
+          INSERT INTO payroll_runs (month_year, user_id, full_name, basic_salary, transport_allowance, housing_allowance, other_allowances,
+            gross_salary, pensionable_salary, paye_annual, paye_monthly, pension_employee, pension_employer, nhf, total_deductions, net_salary, processed_by)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        const taxRows: any[] = [];
+        salaries.forEach((s: any) => {
+          const tax = computeNigeriaPAYE(s.basic_salary, s.transport_allowance, s.housing_allowance, s.other_allowances);
+          const totalDed = tax.paye_monthly + tax.nhf + tax.pensionEmployee;
+          const net = tax.gross - totalDed;
+          stmt.run(month_year, s.user_id, s.full_name, s.basic_salary, s.transport_allowance, s.housing_allowance, s.other_allowances,
+            tax.gross, tax.pensionable, tax.paye_annual, tax.paye_monthly, tax.pensionEmployee, tax.pensionEmployer, tax.nhf, totalDed, net);
+          taxRows.push({ user_id: s.user_id, name: s.full_name, ...tax, total_deductions: totalDed, net });
+        });
+        stmt.finalize();
+        // Post PAYE tax records
+        const taxStmt = db.prepare(`
+          INSERT INTO tax_records (tax_type, reference_type, vendor_name, gross_amount, tax_rate, tax_amount, period, status, recorded_by)
+          VALUES (?, 'payroll', ?, ?, ?, ?, ?, 'Accrued', ?)
+        `);
+        taxRows.forEach(t => {
+          if (t.paye_monthly > 0) taxStmt.run('PAYE', t.name, t.gross, 0, t.paye_monthly, month_year, processed);
+          if (t.nhf > 0) taxStmt.run('NHF', t.name, t.basic_salary, 2.5, t.nhf, month_year, processed);
+          if (t.pensionEmployee > 0) taxStmt.run('PENSION_EMPLOYEE', t.name, t.pensionable, 8, t.pensionEmployee, month_year, processed);
+          if (t.pensionEmployer > 0) taxStmt.run('PENSION_EMPLOYER', t.name, t.pensionable, 10, t.pensionEmployer, month_year, processed);
+        });
+        taxStmt.finalize();
+        db.run('COMMIT', (commitErr) => {
+          if (commitErr) { db.run('ROLLBACK'); return res.status(500).json({ error: commitErr.message }); }
+          logAudit(req.user?.id, req.user?.username, req.user?.role, 'PAYROLL_RUN', 'Payroll', `Processed payroll for ${month_year}: ${salaries.length} staff`, 'Critical');
+          res.json({ success: true, month_year, count: salaries.length, entries: taxRows });
+        });
+      });
+    });
+  });
+});
+
+// POST post payroll to expenses (bulk — marks all as expense entries)
+app.post('/api/payroll/post-to-expenses', authorizeRoles(['Admin']), (req, res) => {
+  const { month_year } = req.sanitizedBody;
+  if (!month_year) return res.status(400).json({ error: 'month_year is required' });
+  db.all('SELECT * FROM payroll_runs WHERE month_year = ? AND expense_id IS NULL', [month_year], (err, rows: any[]) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!rows.length) return res.status(404).json({ error: 'No unposted payroll entries found for this month.' });
+    db.serialize(() => {
+      db.run('BEGIN IMMEDIATE TRANSACTION');
+      let posted = 0;
+      rows.forEach(r => {
+        db.run(
+          `INSERT INTO expenses (date, category, expense_type, description, amount, recorded_by, month_year, staff_id, notes)
+           VALUES (date('now'), 'Salary', 'Salary', ?, ?, ?, ?, ?, 'Payroll auto-posted')`,
+          [`Salary - ${r.full_name} (${month_year})`, r.net_salary, req.user?.username, month_year, r.user_id, `PAYE:₦${r.paye_monthly} | NHF:₦${r.nhf} | Pension:₦${r.pension_employee}`],
+          function(this: any, err2) {
+            if (!err2) {
+              db.run('UPDATE payroll_runs SET expense_id = ?, payment_status = ? WHERE id = ?', [this.lastID, 'Paid', r.id]);
+              posted++;
+            }
+          }
+        );
+      });
+      db.run('COMMIT', () => {
+        logAudit(req.user?.id, req.user?.username, req.user?.role, 'PAYROLL_POST', 'Payroll', `Posted ${posted} payroll entries for ${month_year} to expenses`, 'Critical');
+        res.json({ success: true, posted });
+      });
+    });
+  });
+});
+
+// PUT mark single payroll entry as paid
+app.put('/api/payroll/:id/pay', authorizeRoles(['Admin']), (req, res) => {
+  const { id } = req.sanitizedParams;
+  const { payment_date, payment_ref, payment_method } = req.sanitizedBody;
+  db.run(
+    'UPDATE payroll_runs SET payment_status=?, payment_date=?, payment_ref=?, payment_method=? WHERE id=?',
+    ['Paid', payment_date || new Date().toISOString().split('T')[0], payment_ref, payment_method, id],
+    function(this: any, err) {
+      if (err) return res.status(500).json({ error: err.message });
+      logAudit(req.user?.id, req.user?.username, req.user?.role, 'PAYROLL_PAY', 'Payroll', `Marked payroll entry ${id} as paid`, 'Financial');
+      res.json({ success: true });
+    }
+  );
+});
+
+// DELETE payroll run for a month (admin void)
+app.delete('/api/payroll/:month_year', authorizeRoles(['Admin']), (req, res) => {
+  const { month_year } = req.sanitizedParams;
+  db.serialize(() => {
+    db.run('DELETE FROM tax_records WHERE reference_type=? AND period=?', ['payroll', month_year]);
+    db.run('DELETE FROM payroll_runs WHERE month_year=?', [month_year], function(this: any, err) {
+      if (err) return res.status(500).json({ error: err.message });
+      logAudit(req.user?.id, req.user?.username, req.user?.role, 'PAYROLL_DELETE', 'Payroll', `Voided payroll for ${month_year}`, 'Critical');
+      res.json({ success: true, deleted: this.changes });
+    });
+  });
+});
+
+// GET payroll summary by month
+app.get('/api/payroll/summary', authorizeRoles(['Admin']), (req, res) => {
+  const { month_year } = req.sanitizedQuery;
+  const period = month_year || new Date().toISOString().slice(0, 7);
+  db.get(`
+    SELECT
+      COUNT(*) as staff_count,
+      SUM(gross_salary) as total_gross,
+      SUM(paye_monthly) as total_paye,
+      SUM(pension_employee) as total_pension_ee,
+      SUM(pension_employer) as total_pension_er,
+      SUM(nhf) as total_nhf,
+      SUM(net_salary) as total_net,
+      SUM(total_deductions) as total_deductions,
+      SUM(CASE WHEN payment_status='Paid' THEN 1 ELSE 0 END) as paid_count,
+      SUM(CASE WHEN payment_status='Pending' THEN 1 ELSE 0 END) as pending_count
+    FROM payroll_runs WHERE month_year = ?
+  `, [period], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ month_year: period, ...(row || {}) });
+  });
+});
+
+// ─── TAX RECORDS ─────────────────────────────────────────────────────────────
+
+// GET tax records with filter
+app.get('/api/tax-records', authorizeRoles(['Admin']), (req, res) => {
+  const { tax_type, period, status } = req.sanitizedQuery;
+  let sql = 'SELECT * FROM tax_records WHERE 1=1';
+  const params: any[] = [];
+  if (tax_type) { sql += ' AND tax_type = ?'; params.push(tax_type); }
+  if (period) { sql += ' AND period = ?'; params.push(period); }
+  if (status) { sql += ' AND status = ?'; params.push(status); }
+  sql += ' ORDER BY created_at DESC LIMIT 500';
+  db.all(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+// GET tax summary for a period (for dashboard)
+app.get('/api/tax-records/summary', authorizeRoles(['Admin']), (req, res) => {
+  const { period } = req.sanitizedQuery;
+  const p = period || new Date().toISOString().slice(0, 7);
+  db.all(`
+    SELECT tax_type, SUM(tax_amount) as total, SUM(CASE WHEN status='Remitted' THEN tax_amount ELSE 0 END) as remitted,
+           SUM(CASE WHEN status='Accrued' THEN tax_amount ELSE 0 END) as accrued, COUNT(*) as count
+    FROM tax_records WHERE period = ?
+    GROUP BY tax_type
+  `, [p], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ period: p, breakdown: rows });
+  });
+});
+
+// PUT mark tax record as remitted
+app.put('/api/tax-records/:id/remit', authorizeRoles(['Admin']), (req, res) => {
+  const { id } = req.sanitizedParams;
+  const { remittance_date, remittance_ref } = req.sanitizedBody;
+  db.run(
+    "UPDATE tax_records SET status='Remitted', remittance_date=?, remittance_ref=?, remitted_by=? WHERE id=?",
+    [remittance_date || new Date().toISOString().split('T')[0], remittance_ref, req.user?.username, id],
+    function(this: any, err) {
+      if (err) return res.status(500).json({ error: err.message });
+      logAudit(req.user?.id, req.user?.username, req.user?.role, 'TAX_REMIT', 'Finance', `Remitted tax record ID ${id}`, 'Financial');
+      res.json({ success: true });
+    }
+  );
+});
+
+// PUT update payment status on procurement (supplier payment)
+app.put('/api/procurement/:id/payment', authorizeRoles(['Admin']), (req, res) => {
+  const { id } = req.sanitizedParams;
+  const { amount_paid, payment_ref, notes } = req.sanitizedBody;
+  db.get('SELECT * FROM procurement WHERE id = ?', [id], (err, p: any) => {
+    if (err || !p) return res.status(404).json({ error: 'Procurement record not found' });
+    const newPaid = (p.amount_paid || 0) + parseFloat(amount_paid);
+    const newBalance = Math.max(0, p.total_cost - newPaid);
+    const newStatus = newBalance <= 0 ? 'Paid' : (newPaid > 0 ? 'Partial' : 'Unpaid');
+    db.run(
+      'UPDATE procurement SET amount_paid=?, balance=?, status=?, notes=COALESCE(notes||? ,?) WHERE id=?',
+      [newPaid, newBalance, newStatus, notes ? ` | ${notes}` : '', notes || '', id],
+      function(this: any, err2) {
+        if (err2) return res.status(500).json({ error: err2.message });
+        logAudit(req.user?.id, req.user?.username, req.user?.role, 'PROCUREMENT_PAY', 'Procurement', `Payment of ₦${amount_paid} recorded for procurement ID ${id}. New status: ${newStatus}`, 'Financial');
+        res.json({ success: true, new_balance: newBalance, new_status: newStatus });
+      }
+    );
+  });
+});
+
+// GET single procurement record
+app.get('/api/procurement/:id', authorizeRoles(['Admin']), (req, res) => {
+  const { id } = req.sanitizedParams;
+  db.get(`SELECT p.*, s.name as supplier_name FROM procurement p LEFT JOIN suppliers s ON p.supplier_id = s.id WHERE p.id = ?`, [id], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!row) return res.status(404).json({ error: 'Not found' });
+    res.json(row);
+  });
+});
+
+// PUT full edit of a procurement record
+app.put('/api/procurement/:id/edit', authorizeRoles(['Admin']), (req, res) => {
+  const { id } = req.sanitizedParams;
+  const { supplier_id, item_name, quantity_received, unit_cost, amount_paid, invoice_number, purchase_date, received_by, notes } = req.sanitizedBody;
+  db.get('SELECT * FROM procurement WHERE id = ?', [id], (err, p: any) => {
+    if (err || !p) return res.status(404).json({ error: 'Procurement record not found' });
+    const qty = parseFloat(quantity_received) || p.quantity_received;
+    const uc = parseFloat(unit_cost) || p.unit_cost;
+    const total = qty * uc;
+    const paid = (amount_paid !== undefined && amount_paid !== null && String(amount_paid) !== '') ? parseFloat(amount_paid) : p.amount_paid;
+    const balance = Math.max(0, total - paid);
+    const status = balance <= 0 ? 'Paid' : (paid > 0 ? 'Partial' : 'Unpaid');
+    db.run(
+      `UPDATE procurement SET supplier_id=?, item_name=?, quantity_received=?, unit_cost=?, total_cost=?,
+       amount_paid=?, balance=?, status=?, invoice_number=?, purchase_date=?, received_by=?, notes=? WHERE id=?`,
+      [
+        supplier_id || p.supplier_id,
+        item_name || p.item_name,
+        qty, uc, total, paid, balance, status,
+        (invoice_number !== undefined && invoice_number !== null) ? invoice_number : p.invoice_number,
+        purchase_date || p.purchase_date,
+        received_by || p.received_by,
+        (notes !== undefined && notes !== null) ? notes : p.notes,
+        id
+      ],
+      function(this: any, err2) {
+        if (err2) return res.status(500).json({ error: err2.message });
+        logAudit(req.user?.id, req.user?.username, req.user?.role, 'PROCUREMENT_EDIT', 'Procurement',
+          `Edited procurement ID ${id}: ${item_name || p.item_name}`, 'Financial');
+        res.json({ success: true });
+      }
+    );
+  });
+});
+
+// DELETE procurement record
+app.delete('/api/procurement/:id', authorizeRoles(['Admin']), (req, res) => {
+  const { id } = req.sanitizedParams;
+  db.get('SELECT * FROM procurement WHERE id = ?', [id], (err, p: any) => {
+    if (err || !p) return res.status(404).json({ error: 'Procurement record not found' });
+    db.run('DELETE FROM procurement WHERE id = ?', [id], function(this: any, err2) {
+      if (err2) return res.status(500).json({ error: err2.message });
+      logAudit(req.user?.id, req.user?.username, req.user?.role, 'PROCUREMENT_DELETE', 'Procurement',
+        `Deleted procurement ID ${id}: ${p.item_name}`, 'Critical');
+      res.json({ success: true });
+    });
+  });
+});
+
+// GET procurement report with WHT data
+app.get('/api/reports/procurement/wht-summary', authorizeRoles(['Admin']), (req, res) => {
+  const { start_date, end_date } = req.sanitizedQuery;
+  db.get(`
+    SELECT
+      SUM(total_cost) as total_procurement,
+      SUM(wht_amount) as total_wht_accrued,
+      COUNT(*) as transaction_count,
+      SUM(CASE WHEN status='Paid' THEN total_cost ELSE 0 END) as total_paid
+    FROM procurement
+    WHERE date(purchase_date) BETWEEN ? AND ?
+  `, [start_date || '2000-01-01', end_date || '2099-12-31'], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(row);
+  });
+});
+
 // --- REPORTS API ---
 
 // Sales Report
 // Sales & Revenue Report Summary
+
 app.get('/api/reports/sales/summary', (req, res) => {
   const queries = {
     todaySales: `SELECT SUM(amount_paid) as total FROM transactions WHERE date(created_at, 'localtime') = date('now', 'localtime') AND status IN ('Paid', 'Partial')`,
@@ -2186,10 +3216,18 @@ app.get('/api/reports/sales', validateRequest({ query: RequiredReportQuerySchema
   const { start_date, end_date, limit, offset, cashier } = req.sanitizedQuery;
   
   let sql = `
-    SELECT t.*, p.full_name as patient_name, p.id as file_no, t.cashier as cashier_name,
+    SELECT t.*, 
+           CASE 
+             WHEN t.billing_type = 'family' THEN COALESCE(f.family_name || ' Family', t.patient_id)
+             WHEN t.billing_type = 'walk_in' THEN 'Walk-in Customer'
+             ELSE COALESCE(p.full_name, f.family_name || ' Family', 'Walk-in Customer')
+           END as patient_name, 
+           COALESCE(p.id, f.family_card_number, t.patient_id) as file_no, 
+           t.cashier as cashier_name,
            (SELECT GROUP_CONCAT(description, ', ') FROM transaction_items WHERE transaction_id = t.id) as items_summary
     FROM transactions t
     LEFT JOIN patients p ON t.patient_id = p.id
+    LEFT JOIN families f ON (t.family_id IS NOT NULL AND t.family_id = f.id) OR (t.family_id IS NULL AND t.patient_id = f.family_card_number)
     WHERE date(t.created_at) BETWEEN ? AND ?
   `;
   const params: any[] = [start_date, end_date];
@@ -2211,16 +3249,22 @@ app.get('/api/reports/sales', validateRequest({ query: RequiredReportQuerySchema
 // Patient Debtors Report (Detailed)
 app.get('/api/reports/debtors/details', (req, res) => {
   const sql = `
-    SELECT t.id as transaction_id, t.receipt_no, 
-           COALESCE(p.id, t.patient_id) as file_no, 
-           COALESCE(p.full_name, 'Unregistered / Walk-in Patient') as patient_name, 
-           COALESCE(p.phone, 'N/A') as phone, 
+    SELECT t.id as transaction_id, t.receipt_no, t.billing_type, t.family_id,
+           COALESCE(p.id, f.family_card_number, t.patient_id) as file_no, 
+           CASE 
+             WHEN t.billing_type = 'family' THEN COALESCE(f.family_name || ' Family', t.patient_id)
+             WHEN t.billing_type = 'walk_in' THEN 'Walk-in Customer'
+             ELSE COALESCE(p.full_name, f.family_name || ' Family', 'Unregistered / Walk-in Patient')
+           END as patient_name, 
+           COALESCE(p.phone, f.contact_person_phone, 'N/A') as phone, 
            date(t.created_at) as visit_date, t.total_amount, t.amount_paid, t.discount,
            (t.total_amount - t.amount_paid - t.discount) as balance_due,
            CAST((julianday('now') - julianday(t.created_at)) AS INTEGER) as days_outstanding
     FROM transactions t
     LEFT JOIN patients p ON t.patient_id = p.id
+    LEFT JOIN families f ON (t.family_id IS NOT NULL AND t.family_id = f.id) OR (t.family_id IS NULL AND t.patient_id = f.family_card_number)
     WHERE (t.total_amount - t.amount_paid - t.discount) > 0
+      AND (t.is_insurance_bill = 0 OR t.is_insurance_bill IS NULL)
     ORDER BY days_outstanding DESC
   `;
   db.all(sql, [], (err, rows) => {
@@ -2282,8 +3326,10 @@ app.get('/api/reports/debtors/summary', (req, res) => {
     SELECT 
       SUM(total_amount - amount_paid - discount) as total_outstanding,
       COUNT(DISTINCT patient_id) as number_of_debtors,
-      (SELECT (total_amount - amount_paid - discount) || ' - ' || p.full_name 
-       FROM transactions t2 JOIN patients p ON t2.patient_id = p.id 
+      (SELECT (total_amount - amount_paid - discount) || ' - ' || COALESCE(p.full_name, f.family_name || ' Family', t2.patient_id) 
+       FROM transactions t2 
+       LEFT JOIN patients p ON t2.patient_id = p.id 
+       LEFT JOIN families f ON t2.patient_id = f.family_card_number
        WHERE (total_amount - amount_paid - discount) > 0 
        ORDER BY (total_amount - amount_paid - discount) DESC LIMIT 1) as highest_debt,
       (SELECT SUM(amount_paid) FROM transactions WHERE date(created_at) LIKE ?) as cleared_this_month
@@ -2409,7 +3455,7 @@ db.serialize(() => {
     if (!err && row.count === 0) {
       db.run(`INSERT INTO audit_logs (user_name, user_role, action_type, module, details, ip_address) VALUES 
         ('System Administrator', 'Admin', 'LOGIN', 'Auth', 'Successful login from secure IP', '192.168.1.1'),
-        ('Dr. Sarah', 'Optometrist', 'PATIENT_EDIT', 'Records', 'Updated clinical history for 0012/26/LETH', '192.168.1.45'),
+        ('Dr. Sarah', 'Optometrist', 'PATIENT_EDIT', 'Records', 'Updated clinical history for 0012/26/LEH', '192.168.1.45'),
         ('Nurse Joy', 'Nurse', 'TRIAGE', 'Nursing', 'Recorded vitals for new patient', '192.168.1.22')`);
     }
   });
@@ -2469,39 +3515,202 @@ app.get('/api/reports/procurement/summary', (req, res) => {
 // Profit & Loss Summary (Detailed)
 app.get('/api/reports/profit-loss', (req, res) => {
   const { start_date, end_date } = req.sanitizedQuery;
-  
+
   db.serialize(() => {
-    // 1. Get Summary Stats
+    // 1. Revenue
     db.get(`
-      SELECT 
-        (SELECT SUM(amount_paid) FROM transactions WHERE date(created_at) BETWEEN ? AND ?) as revenue,
-        (SELECT SUM(total_amount) FROM purchase_orders WHERE status = 'Received' AND date(created_at) BETWEEN ? AND ?) as procurement_cost
-    `, [start_date, end_date, start_date, end_date], (err, summary: any) => {
+      SELECT
+        SUM(amount_paid) as revenue,
+        SUM(total_amount) as billed,
+        SUM(discount) as total_discounts
+      FROM transactions
+      WHERE date(created_at) BETWEEN ? AND ?
+        AND status IN ('Paid', 'Partial', 'Unpaid')
+    `, [start_date, end_date], (err, revRow: any) => {
       if (err) return res.status(500).json({ error: err.message });
-      
-      // 2. Get Detailed Rows
-      db.all(`
-        SELECT date(t.created_at) as date, i.category, i.name as description, 
-               (ti.qty * ti.unit_price) as revenue, (ti.qty * IFNULL(i.cost_price, 0)) as cost,
-               ((ti.qty * ti.unit_price) - (ti.qty * IFNULL(i.cost_price, 0))) as gross_profit
+
+      // 2. Cost of Goods Sold (from transaction items x inventory cost price)
+      db.get(`
+        SELECT SUM(ti.qty * COALESCE(i.cost_price, 0)) as cogs
         FROM transaction_items ti
         JOIN transactions t ON ti.transaction_id = t.id
         LEFT JOIN inventory i ON ti.inventory_id = i.id
         WHERE date(t.created_at) BETWEEN ? AND ?
-        ORDER BY t.created_at DESC
-      `, [start_date, end_date], (err2, details) => {
+          AND i.category NOT IN ('Test', 'Service', 'Registration')
+      `, [start_date, end_date], (err2, cogsRow: any) => {
         if (err2) return res.status(500).json({ error: err2.message });
-        
-        res.json({
-          summary: {
-            revenue: summary.revenue || 0,
-            procurement: summary.procurement_cost || 0,
-            expenses: (summary.procurement_cost || 0) * 0.2 // Placeholder for overheads (20% of procurement)
-          },
-          details: details || []
+
+        // 3. Procurement costs in period
+        db.get(`
+          SELECT SUM(total_cost) as procurement_cost
+          FROM procurement
+          WHERE date(purchase_date) BETWEEN ? AND ?
+        `, [start_date, end_date], (err3, procRow: any) => {
+          if (err3) return res.status(500).json({ error: err3.message });
+
+          // 4. Real overhead expenses (non-salary)
+          db.get(`
+            SELECT SUM(amount) as total_overhead
+            FROM expenses
+            WHERE date(date) BETWEEN ? AND ?
+              AND (expense_type != 'Salary' OR expense_type IS NULL)
+              AND category != 'Salary'
+          `, [start_date, end_date], (err4, ovRow: any) => {
+            if (err4) return res.status(500).json({ error: err4.message });
+
+            // 5. Salary/payroll expenses in period
+            db.get(`
+              SELECT SUM(amount) as total_salaries
+              FROM expenses
+              WHERE date(date) BETWEEN ? AND ?
+                AND (expense_type = 'Salary' OR category = 'Salary')
+            `, [start_date, end_date], (err5, salRow: any) => {
+              if (err5) return res.status(500).json({ error: err5.message });
+
+              // 6. Tax accruals in period (PAYE + WHT)
+              db.get(`
+                SELECT
+                  SUM(CASE WHEN tax_type='PAYE' THEN tax_amount ELSE 0 END) as paye_accrued,
+                  SUM(CASE WHEN tax_type='WHT' THEN tax_amount ELSE 0 END) as wht_accrued,
+                  SUM(CASE WHEN tax_type='NHF' THEN tax_amount ELSE 0 END) as nhf_accrued,
+                  SUM(CASE WHEN tax_type LIKE 'PENSION%' THEN tax_amount ELSE 0 END) as pension_accrued
+                FROM tax_records
+                WHERE period BETWEEN substr(?,1,7) AND substr(?,1,7)
+              `, [start_date, end_date], (err6, taxRow: any) => {
+                if (err6) return res.status(500).json({ error: err6.message });
+
+                // 7. Expense breakdown by category
+                db.all(`
+                  SELECT category, expense_type, SUM(amount) as total
+                  FROM expenses
+                  WHERE date(date) BETWEEN ? AND ?
+                  GROUP BY category, expense_type
+                  ORDER BY total DESC
+                `, [start_date, end_date], (err7, expBreak: any[]) => {
+                  if (err7) return res.status(500).json({ error: err7.message });
+
+                  // 8. Detailed transaction-level rows
+                  db.all(`
+                    SELECT date(t.created_at) as date, i.category, i.name as description,
+                           (ti.qty * ti.unit_price) as revenue,
+                           (ti.qty * COALESCE(i.cost_price, 0)) as cost,
+                           ((ti.qty * ti.unit_price) - (ti.qty * COALESCE(i.cost_price, 0))) as gross_profit
+                    FROM transaction_items ti
+                    JOIN transactions t ON ti.transaction_id = t.id
+                    LEFT JOIN inventory i ON ti.inventory_id = i.id
+                    WHERE date(t.created_at) BETWEEN ? AND ?
+                    ORDER BY t.created_at DESC
+                    LIMIT 500
+                  `, [start_date, end_date], (err8, details) => {
+                    if (err8) return res.status(500).json({ error: err8.message });
+
+                    const revenue = revRow?.revenue || 0;
+                    const cogs = cogsRow?.cogs || 0;
+                    const procurement_cost = procRow?.procurement_cost || 0;
+                    const total_overhead = ovRow?.total_overhead || 0;
+                    const total_salaries = salRow?.total_salaries || 0;
+                    const paye_accrued = taxRow?.paye_accrued || 0;
+                    const wht_accrued = taxRow?.wht_accrued || 0;
+                    const nhf_accrued = taxRow?.nhf_accrued || 0;
+                    const pension_accrued = taxRow?.pension_accrued || 0;
+                    const gross_profit = revenue - cogs;
+                    const total_expenses = total_overhead + total_salaries;
+                    const net_profit = gross_profit - total_expenses;
+
+                    res.json({
+                      summary: {
+                        revenue,
+                        billed: revRow?.billed || 0,
+                        total_discounts: revRow?.total_discounts || 0,
+                        cogs,
+                        procurement_cost,
+                        gross_profit,
+                        gross_margin_pct: revenue > 0 ? Math.round((gross_profit / revenue) * 1000) / 10 : 0,
+                        total_overhead,
+                        total_salaries,
+                        total_expenses,
+                        paye_accrued,
+                        wht_accrued,
+                        nhf_accrued,
+                        pension_accrued,
+                        net_profit,
+                        net_margin_pct: revenue > 0 ? Math.round((net_profit / revenue) * 1000) / 10 : 0,
+                        // Legacy compat field
+                        expenses: total_expenses,
+                        procurement: procurement_cost,
+                      },
+                      details: details || [],
+                      expenses_breakdown: expBreak || [],
+                    });
+                  });
+                });
+              });
+            });
+          });
         });
       });
     });
+  });
+});
+
+
+// P&L Monthly Trend (rolling 12 months)
+app.get('/api/reports/profit-loss/monthly-trend', authorizeRoles(['Admin']), (req, res) => {
+  const { months } = req.sanitizedQuery;
+  const numMonths = Math.min(Math.max(parseInt(months as string) || 12, 3), 24);
+
+  db.all(`
+    WITH RECURSIVE months(m) AS (
+      SELECT strftime('%Y-%m', date('now', 'localtime', '-${numMonths - 1} months'))
+      UNION ALL
+      SELECT strftime('%Y-%m', m || '-01', '+1 month')
+      FROM months WHERE m < strftime('%Y-%m', date('now', 'localtime'))
+    )
+    SELECT
+      m.m AS period,
+      COALESCE(rev.revenue, 0) AS revenue,
+      COALESCE(cogs.cogs, 0) AS cogs,
+      COALESCE(oh.overhead, 0) AS overhead,
+      COALESCE(sal.salaries, 0) AS salaries,
+      COALESCE(proc.procurement, 0) AS procurement_cost,
+      COALESCE(rev.revenue, 0) - COALESCE(cogs.cogs, 0) AS gross_profit,
+      COALESCE(rev.revenue, 0) - COALESCE(cogs.cogs, 0) - COALESCE(oh.overhead, 0) - COALESCE(sal.salaries, 0) AS net_profit
+    FROM months m
+    LEFT JOIN (
+      SELECT strftime('%Y-%m', created_at, 'localtime') as period, SUM(amount_paid) as revenue
+      FROM transactions WHERE status IN ('Paid','Partial','Unpaid')
+      GROUP BY 1
+    ) rev ON rev.period = m.m
+    LEFT JOIN (
+      SELECT strftime('%Y-%m', t.created_at, 'localtime') as period,
+             SUM(ti.qty * COALESCE(i.cost_price, 0)) as cogs
+      FROM transaction_items ti
+      JOIN transactions t ON ti.transaction_id = t.id
+      LEFT JOIN inventory i ON ti.inventory_id = i.id
+      WHERE i.category NOT IN ('Test','Service','Registration')
+      GROUP BY 1
+    ) cogs ON cogs.period = m.m
+    LEFT JOIN (
+      SELECT strftime('%Y-%m', date, 'localtime') as period, SUM(amount) as overhead
+      FROM expenses
+      WHERE expense_type != 'Salary' AND category != 'Salary'
+      GROUP BY 1
+    ) oh ON oh.period = m.m
+    LEFT JOIN (
+      SELECT strftime('%Y-%m', date, 'localtime') as period, SUM(amount) as salaries
+      FROM expenses
+      WHERE expense_type = 'Salary' OR category = 'Salary'
+      GROUP BY 1
+    ) sal ON sal.period = m.m
+    LEFT JOIN (
+      SELECT strftime('%Y-%m', purchase_date, 'localtime') as period, SUM(total_cost) as procurement
+      FROM procurement
+      GROUP BY 1
+    ) proc ON proc.period = m.m
+    ORDER BY m.m ASC
+  `, [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows || []);
   });
 });
 
@@ -2531,6 +3740,44 @@ app.get('/api/reports/admissions', (req, res) => {
   `, [start_date, end_date], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
+  });
+});
+
+// GET discounts & waivers audit report
+app.get('/api/reports/discounts', (req, res) => {
+  const { start_date, end_date } = req.sanitizedQuery;
+  const start = start_date || new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
+  const end = end_date || new Date().toISOString().split('T')[0];
+
+  db.all(`
+    SELECT 
+      t.id, t.receipt_no, t.created_at,
+      p.full_name AS patient_name, p.id AS file_no,
+      t.total_amount, t.discount, t.amount_paid, t.balance, t.status,
+      t.payment_method, t.cashier, t.payment_details,
+      ROUND(CASE WHEN t.total_amount > 0 THEN (t.discount * 100.0 / t.total_amount) ELSE 0 END, 1) AS discount_pct
+    FROM transactions t
+    LEFT JOIN patients p ON t.patient_id = p.id
+    WHERE t.discount > 0
+      AND date(t.created_at) BETWEEN ? AND ?
+    ORDER BY t.created_at DESC
+  `, [start, end], (err, rows: any[]) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const enriched = (rows || []).map(row => {
+      let pd: any = {};
+      try { pd = JSON.parse(row.payment_details || '{}'); } catch {}
+      const override = pd.supervisor_override || null;
+      return {
+        ...row,
+        supervisor_username: override?.username || null,
+        supervisor_role: override?.role || null,
+        discount_reason: override?.discount_reason || null,
+        discount_note: override?.discount_note || null,
+        override_timestamp: override?.timestamp || null,
+        requires_override: !!override
+      };
+    });
+    res.json(enriched);
   });
 });
 
@@ -3182,12 +4429,16 @@ app.get('/api/billing/receipts/:receipt_number', (req, res) => {
 
 // --- SERVE FRONTEND ---
 let DIST_PATH = path.join(serverRootDir, '..', 'dist');
-if (!fs.existsSync(DIST_PATH) && isPackaged) {
-  const diskDist = path.join(writableRootDir, '..', 'dist');
+if (isPackaged) {
+  const diskDist = path.join(writableRootDir, 'dist');
+  const parentDiskDist = path.join(writableRootDir, '..', 'dist');
   if (fs.existsSync(diskDist)) {
     DIST_PATH = diskDist;
+  } else if (fs.existsSync(parentDiskDist)) {
+    DIST_PATH = parentDiskDist;
   }
 }
+console.log(`[SERVER] Serving frontend static assets from: ${DIST_PATH}`);
 if (fs.existsSync(DIST_PATH)) {
   app.use(express.static(DIST_PATH));
   app.get(/^(?!\/api).+/, (req, res, next) => {
@@ -3363,6 +4614,27 @@ const server = app.listen(PORT, '0.0.0.0', () => {
     startAudioCleanupJob();
   } catch (cronErr) {
     console.error('[CRON] Failed to start audio cleanup job:', cronErr);
+  }
+
+  // EDI Clearinghouse Bridge — auto-dispatch batches every 30 minutes
+  try {
+    cron.schedule('*/30 * * * *', async () => {
+      try {
+        await sweepAndDispatchReadyBatches();
+      } catch (ediErr: any) {
+        console.error('[EDI CRON] Sweep error:', ediErr.message);
+      }
+    });
+    console.log('[EDI CRON] Auto-dispatch scheduler started (every 30 minutes)');
+  } catch (cronErr) {
+    console.error('[CRON] Failed to start EDI dispatch job:', cronErr);
+  }
+
+  // Start EDI asynchronous transmission queue worker
+  try {
+    startQueueWorker();
+  } catch (queueErr) {
+    console.error('[EDI QUEUE] Failed to start queue worker:', queueErr);
   }
 
   // Attach real-time Voice Dictation WebSocket server

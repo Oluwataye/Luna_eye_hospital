@@ -61,6 +61,17 @@ export const AlertProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       };
 
+      eventSource.addEventListener('voice_ai_status', (event: MessageEvent) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (typeof payload?.ai_enabled === 'boolean') {
+            window.dispatchEvent(new CustomEvent('voice-ai-status-change', { detail: payload }));
+          }
+        } catch (err) {
+          console.error('[SSE] Error parsing voice_ai_status event:', err);
+        }
+      });
+
       eventSource.onerror = (err) => {
         console.error("SSE connection error, auto-reconnecting...", err);
         setSseConnected(false);

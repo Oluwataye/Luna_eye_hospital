@@ -73,7 +73,7 @@
 .settings-tab.active {
   background-color: var(--primary-color);
   color: white;
-  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.2);
+  box-shadow: 0 8px 24px rgba(46, 90, 38, 0.25);
 }
 
 /* Content Layout */
@@ -149,7 +149,7 @@
   border-color: var(--primary-color);
   background: white;
   outline: none;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 4px 12px rgba(46, 90, 38, 0.12);
 }
 
 /* Tables inside Settings */

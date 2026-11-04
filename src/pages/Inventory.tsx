@@ -11,6 +11,7 @@ import { formatDateStandard } from '../utils/date';
 import { StatCard } from '../components/StatCard';
 import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { InnerNavTabs } from '../components/InnerNavTabs';
 
 export const Inventory: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -794,26 +795,16 @@ export const Inventory: React.FC = () => {
       </div>
 
       {/* Category Tabs */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '24px', borderBottom: '1px solid var(--leh-border-light)', paddingBottom: '12px' }}>
-        {categories.map(cat => (
-          <button
-            key={cat.id}
-            onClick={() => setActiveCategory(cat.name)}
-            style={{
-              padding: '10px 20px',
-              borderRadius: '10px',
-              border: 'none',
-              background: activeCategory === cat.name ? 'var(--leh-primary-light)' : 'transparent',
-              color: activeCategory === cat.name ? 'var(--leh-primary)' : 'var(--leh-text-muted)',
-              fontSize: '13px',
-              fontWeight: '800',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
-          >
-            {cat.name.toUpperCase()}
-          </button>
-        ))}
+      <div style={{ marginBottom: '24px' }}>
+        <InnerNavTabs
+          scrollable
+          tabs={categories.map(cat => ({
+            id: cat.name,
+            label: cat.name.toUpperCase()
+          }))}
+          activeTab={activeCategory}
+          onChange={setActiveCategory}
+        />
       </div>
 
       {/* Main Content: Inventory Table */}
@@ -955,30 +946,35 @@ export const Inventory: React.FC = () => {
             {editingItem && (
               <div style={{
                 display: 'flex', borderBottom: '1px solid var(--leh-border-light)',
-                padding: '0 32px', background: 'var(--leh-bg-light)'
+                padding: '8px 32px', background: 'var(--leh-bg-light)', gap: '8px'
               }}>
                 {[
                   { key: 'details', label: isAdmin ? 'Edit Details' : 'View Details', icon: <Edit3 size={14} /> },
                   ...(isAdmin && getCategoryTemplate(formData.category) !== 'TEST'
                     ? [{ key: 'stock', label: 'Stock Adjustment', icon: <TrendingUp size={14} /> }]
                     : [])
-                ].map(tab => (
-                  <button
-                    key={tab.key}
-                    onClick={() => { setModalTab(tab.key as any); setDeleteConfirm(false); }}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '6px',
-                      padding: '14px 18px', fontSize: '12px', fontWeight: '800',
-                      letterSpacing: '0.05em', border: 'none', background: 'transparent',
-                      cursor: 'pointer', borderBottom: modalTab === tab.key
-                        ? '2px solid var(--leh-primary)' : '2px solid transparent',
-                      color: modalTab === tab.key ? 'var(--leh-primary)' : 'var(--leh-text-muted)',
-                      transition: 'all 0.15s'
-                    }}
-                  >
-                    {tab.icon}{tab.label.toUpperCase()}
-                  </button>
-                ))}
+                ].map(tab => {
+                  const isActive = modalTab === tab.key;
+                  return (
+                    <button
+                      key={tab.key}
+                      onClick={() => { setModalTab(tab.key as any); setDeleteConfirm(false); }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        padding: '10px 18px', fontSize: '12px', fontWeight: '800',
+                        letterSpacing: '0.05em', border: 'none', 
+                        borderRadius: '8px',
+                        background: isActive ? 'var(--leh-primary)' : 'transparent',
+                        color: isActive ? '#ffffff' : '#475569',
+                        boxShadow: isActive ? '0 2px 8px rgba(46, 90, 38, 0.30)' : 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      {tab.icon}{tab.label.toUpperCase()}
+                    </button>
+                  );
+                })}
               </div>
             )}
 

@@ -220,6 +220,27 @@ export const api = {
     return Array.isArray(data) ? data : [];
   },
 
+  async createService(serviceData: any) {
+    return request('/services', {
+      method: 'POST',
+      body: JSON.stringify(serviceData)
+    });
+  },
+
+  async updateService(id: number | string, serviceData: any) {
+    return request(`/services/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(serviceData)
+    });
+  },
+
+  async deleteService(id: number | string) {
+    return request(`/services/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+
   async createInventoryItem(itemData: any) {
     return request('/inventory', {
       method: 'POST',
@@ -277,6 +298,61 @@ export const api = {
     }
   },
 
+  // Family Households API
+  async getFamilies(params?: { search?: string; limit?: number; offset?: number }) {
+    const query = new URLSearchParams();
+    if (params?.search) query.set('search', params.search);
+    if (params?.limit !== undefined) query.set('limit', String(params.limit));
+    if (params?.offset !== undefined) query.set('offset', String(params.offset));
+    const qs = query.toString();
+    const data = await request(qs ? `/families?${qs}` : '/families');
+    return Array.isArray(data) ? data : [];
+  },
+
+  async getFamily(idOrCardNumber: number | string) {
+    return request(`/families/${encodeURIComponent(String(idOrCardNumber))}`);
+  },
+
+  async createFamily(familyData: any) {
+    return request('/families', {
+      method: 'POST',
+      body: JSON.stringify(familyData)
+    });
+  },
+
+  async updateFamily(id: number | string, familyData: any) {
+    return request(`/families/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(familyData)
+    });
+  },
+
+  async deleteFamily(id: number | string) {
+    return request(`/families/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  async addFamilyMember(familyId: number | string, memberData: any) {
+    return request(`/families/${familyId}/members`, {
+      method: 'POST',
+      body: JSON.stringify(memberData)
+    });
+  },
+
+  async linkPatientToFamily(familyId: number | string, data: { patient_id: string; relationship_to_family: string }) {
+    return request(`/families/${familyId}/link-patient`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async removeFamilyMember(familyId: number | string, patientId: string) {
+    return request(`/families/${familyId}/members/${encodeURIComponent(patientId)}`, {
+      method: 'DELETE'
+    });
+  },
+
   async dischargePatient(id: string | number, summary: string) {
     return request(`/admissions/${id}`, {
       method: 'PUT',
@@ -292,6 +368,13 @@ export const api = {
     return request('/transactions', {
       method: 'POST',
       body: JSON.stringify(transactionData)
+    });
+  },
+
+  async verifySupervisor(credentials: { username: string; password: string }) {
+    return request('/auth/verify-supervisor', {
+      method: 'POST',
+      body: JSON.stringify(credentials)
     });
   },
 
@@ -437,6 +520,10 @@ export const api = {
   },
   async getAuditSummary() {
     return request('/reports/audit/summary');
+  },
+  async getDiscountsReport(startDate: string, endDate: string) {
+    const data = await request(`/reports/discounts?start_date=${startDate}&end_date=${endDate}`);
+    return Array.isArray(data) ? data : [];
   },
   async getUsersList() {
     const data = await request('/users');
@@ -787,5 +874,226 @@ export const api = {
       body: JSON.stringify(data)
     });
   },
+
+  // ── Expenses CRUD ──────────────────────────────────────────────────────────
+  async getExpenses(params: { start_date?: string; end_date?: string; category?: string; expense_type?: string } = {}) {
+    const q = new URLSearchParams(params as any).toString();
+    return request(`/expenses${q ? '?' + q : ''}`);
+  },
+  async createExpense(data: any) {
+    return request('/expenses', { method: 'POST', body: JSON.stringify(data) });
+  },
+  async updateExpense(id: number, data: any) {
+    return request(`/expenses/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  },
+  async deleteExpense(id: number) {
+    return request(`/expenses/${id}`, { method: 'DELETE' });
+  },
+
+  // ── Staff Salaries ────────────────────────────────────────────────────────
+  async getStaffSalaries(params: { status?: 'active' | 'archived' | 'all' } = {}) {
+    const q = new URLSearchParams(params as any).toString();
+    return request(`/staff-salaries${q ? '?' + q : ''}`);
+  },
+  async createStaffSalary(data: any) {
+    return request('/staff-salaries', { method: 'POST', body: JSON.stringify(data) });
+  },
+  async updateStaffSalary(id: number, data: any) {
+    return request(`/staff-salaries/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  },
+  async deleteStaffSalary(id: number) {
+    return request(`/staff-salaries/${id}`, { method: 'DELETE' });
+  },
+  async restoreStaffSalary(id: number) {
+    return request(`/staff-salaries/${id}/restore`, { method: 'PUT' });
+  },
+
+  // ── Payroll ───────────────────────────────────────────────────────────────
+  async getPayroll(month_year?: string) {
+    return request(`/payroll${month_year ? '?month_year=' + month_year : ''}`);
+  },
+  async getPayrollSummary(month_year?: string) {
+    return request(`/payroll/summary${month_year ? '?month_year=' + month_year : ''}`);
+  },
+  async runPayroll(month_year: string) {
+    return request('/payroll/run', { method: 'POST', body: JSON.stringify({ month_year }) });
+  },
+  async postPayrollToExpenses(month_year: string) {
+    return request('/payroll/post-to-expenses', { method: 'POST', body: JSON.stringify({ month_year }) });
+  },
+  async markPayrollEntryPaid(id: number, data: any) {
+    return request(`/payroll/${id}/pay`, { method: 'PUT', body: JSON.stringify(data) });
+  },
+  async deletePayroll(month_year: string) {
+    return request(`/payroll/${month_year}`, { method: 'DELETE' });
+  },
+
+  // ── Tax Records ───────────────────────────────────────────────────────────
+  async getTaxRecords(params: { tax_type?: string; period?: string; status?: string } = {}) {
+    const q = new URLSearchParams(params as any).toString();
+    return request(`/tax-records${q ? '?' + q : ''}`);
+  },
+  async getTaxSummary(period?: string) {
+    return request(`/tax-records/summary${period ? '?period=' + period : ''}`);
+  },
+  async remitTaxRecord(id: number, data: { remittance_date?: string; remittance_ref?: string }) {
+    return request(`/tax-records/${id}/remit`, { method: 'PUT', body: JSON.stringify(data) });
+  },
+
+  // ── Procurement Payment Update ────────────────────────────────────────────
+  async updateProcurementPayment(id: number, data: { amount_paid: number; payment_ref?: string; notes?: string }) {
+    return request(`/procurement/${id}/payment`, { method: 'PUT', body: JSON.stringify(data) });
+  },
+  async getProcurementWhtSummary(params: { start_date?: string; end_date?: string } = {}) {
+    const q = new URLSearchParams(params as any).toString();
+    return request(`/reports/procurement/wht-summary${q ? '?' + q : ''}`);
+  },
+  async getProcurementById(id: number) {
+    return request(`/procurement/${id}`);
+  },
+  async updateProcurement(id: number, data: any) {
+    return request(`/procurement/${id}/edit`, { method: 'PUT', body: JSON.stringify(data) });
+  },
+  async deleteProcurement(id: number) {
+    return request(`/procurement/${id}`, { method: 'DELETE' });
+  },
+  async getProfitLossTrend(months = 12) {
+    const data = await request(`/reports/profit-loss/monthly-trend?months=${months}`);
+    return Array.isArray(data) ? data : [];
+  },
+
+  // ── Medical Insurance & Claims Module ────────────────────────────────────
+  insurance: {
+    // Payers
+    getPayers: (activeOnly = false) => request(`/insurance/payers${activeOnly ? '?active_only=true' : ''}`),
+    getPayer: (id: number) => request(`/insurance/payers/${id}`),
+    createPayer: (data: any) => request('/insurance/payers', { method: 'POST', body: JSON.stringify(data) }),
+    updatePayer: (id: number, data: any) => request(`/insurance/payers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deletePayer: (id: number) => request(`/insurance/payers/${id}`, { method: 'DELETE' }),
+
+    // Plans
+    getPlans: (payerId?: number) => request(`/insurance/plans${payerId ? `?payer_id=${payerId}` : ''}`),
+    createPlan: (data: any) => request('/insurance/plans', { method: 'POST', body: JSON.stringify(data) }),
+    updatePlan: (id: number, data: any) => request(`/insurance/plans/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deletePlan: (id: number) => request(`/insurance/plans/${id}`, { method: 'DELETE' }),
+
+    // Tariffs
+    getTariffs: (params: any = {}) => {
+      const q = new URLSearchParams(params).toString();
+      return request(`/insurance/tariffs${q ? `?${q}` : ''}`);
+    },
+    createTariff: (data: any) => request('/insurance/tariffs', { method: 'POST', body: JSON.stringify(data) }),
+    updateTariff: (id: number, data: any) => request(`/insurance/tariffs/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteTariff: (id: number) => request(`/insurance/tariffs/${id}`, { method: 'DELETE' }),
+    lookupTariff: (payerId: number, planId: number, itemType: string, itemCode: string) => {
+      const q = new URLSearchParams({ payer_id: String(payerId), plan_id: String(planId), item_type: itemType, item_code: itemCode }).toString();
+      return request(`/insurance/tariffs/lookup?${q}`);
+    },
+
+    // Enrollees
+    getEnrollees: (params: any = {}) => {
+      const q = new URLSearchParams(params).toString();
+      return request(`/insurance/enrollees${q ? `?${q}` : ''}`);
+    },
+    getEnrollee: (id: number) => request(`/insurance/enrollees/${id}`),
+    createEnrollee: (data: any) => request('/insurance/enrollees', { method: 'POST', body: JSON.stringify(data) }),
+    updateEnrollee: (id: number, data: any) => request(`/insurance/enrollees/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    verifyEnrollee: (id: number, verification_status: string) => request(`/insurance/enrollees/${id}/verify`, { method: 'PATCH', body: JSON.stringify({ verification_status }) }),
+
+    // Authorizations
+    getAuthorizations: (params: any = {}) => {
+      const q = new URLSearchParams(params).toString();
+      return request(`/insurance/authorizations${q ? `?${q}` : ''}`);
+    },
+    createAuthorization: (data: any) => request('/insurance/authorizations', { method: 'POST', body: JSON.stringify(data) }),
+    decisionAuthorization: (id: number, data: any) => request(`/insurance/authorizations/${id}/decision`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+    // Claims
+    getClaimsSummary: () => request('/insurance/claims/summary'),
+    getClaims: (params: any = {}) => {
+      const q = new URLSearchParams(params).toString();
+      return request(`/insurance/claims${q ? `?${q}` : ''}`);
+    },
+    getClaim: (id: number) => request(`/insurance/claims/${id}`),
+    createClaim: (data: any) => request('/insurance/claims', { method: 'POST', body: JSON.stringify(data) }),
+    updateClaim: (id: number, data: any) => request(`/insurance/claims/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    updateClaimItems: (id: number, items: any[]) => request(`/insurance/claims/${id}/items`, { method: 'PUT', body: JSON.stringify({ items }) }),
+    transitionClaim: (id: number, to_status: string, reason?: string, note?: string) => 
+      request(`/insurance/claims/${id}/transition`, { method: 'PATCH', body: JSON.stringify({ to_status, reason, note }) }),
+    writeOffClaim: (id: number, reason: string) => request(`/insurance/claims/${id}/write-off`, { method: 'PATCH', body: JSON.stringify({ reason }) }),
+    addClaimNote: (id: number, note: string) => request(`/insurance/claims/${id}/notes`, { method: 'POST', body: JSON.stringify({ note }) }),
+
+    // Batches
+    getBatches: (params: any = {}) => {
+      const q = new URLSearchParams(params).toString();
+      return request(`/insurance/batches${q ? `?${q}` : ''}`);
+    },
+    createBatch: (data: any) => request('/insurance/batches', { method: 'POST', body: JSON.stringify(data) }),
+    getBatchClaims: (id: number) => request(`/insurance/batches/${id}/claims`),
+    submitBatch: (id: number, notes?: string) => request(`/insurance/batches/${id}/submit`, { method: 'PATCH', body: JSON.stringify({ notes }) }),
+
+    // Remittances
+    getRemittances: (params: any = {}) => {
+      const q = new URLSearchParams(params).toString();
+      return request(`/insurance/remittances${q ? `?${q}` : ''}`);
+    },
+    getRemittance: (id: number) => request(`/insurance/remittances/${id}`),
+    createRemittance: (data: any) => request('/insurance/remittances', { method: 'POST', body: JSON.stringify(data) }),
+    allocateRemittance: (id: number, allocations: any[]) => request(`/insurance/remittances/${id}/allocate`, { method: 'POST', body: JSON.stringify({ allocations }) }),
+
+    // Utilities & Settings
+    getRejectionReasons: () => request('/insurance/rejection-reasons'),
+    getIcd10: (q?: string) => request(`/insurance/icd10${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+    getSettings: () => request('/insurance/settings'),
+    updateSettings: (data: any) => request('/insurance/settings', { method: 'PUT', body: JSON.stringify(data) }),
+
+    // Reports
+    getReport: (reportName: string, params: any = {}) => {
+      const q = new URLSearchParams(params).toString();
+      return request(`/insurance/reports/${reportName}${q ? `?${q}` : ''}`);
+    },
+
+    // ── Bulk Tariff Import ───────────────────────────────────────────
+    /** Download the CSV template for bulk HMO tariff upload */
+    downloadTariffTemplate: async (): Promise<void> => {
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      const res = await fetch(`${baseUrl}/api/insurance/tariffs/template`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` },
+      });
+      if (!res.ok) throw new Error('Failed to download template');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'hmo_tariff_template.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    },
+    /** Import tariff rows in bulk (array of parsed CSV objects) */
+    importTariffs: (data: { payer_id: number; plan_id?: number | null; rows: any[] }) =>
+      request('/insurance/tariffs/import', { method: 'POST', body: JSON.stringify(data) }),
+
+    // ── EDI Clearinghouse Bridge ─────────────────────────────────────
+    getEdiConfigs: () => request('/insurance/edi/configs'),
+    getEdiConfig: (payerId: number) => request(`/insurance/edi/configs/${payerId}`),
+    updateEdiConfig: (payerId: number, data: any) =>
+      request(`/insurance/edi/configs/${payerId}`, { method: 'PUT', body: JSON.stringify(data) }),
+    transmitBatch: (batchId: number, sync = false) =>
+      request(`/insurance/edi/transmit/${batchId}${sync ? '?sync=true' : ''}`, { method: 'POST' }),
+    getBatchEdiJob: (batchId: number) => request(`/insurance/edi/jobs/${batchId}`),
+    getEdiJobs: (limit = 50) => request(`/insurance/edi/jobs?limit=${limit}`),
+    retryEdiJob: (jobId: number) => request(`/insurance/edi/jobs/${jobId}/retry`, { method: 'POST' }),
+    previewBatchEdi: (batchId: number, format: 'JSON' | 'CSV' = 'JSON') =>
+      request(`/insurance/edi/preview/${batchId}?format=${format}`),
+    getEdiTransmissions: () => request('/insurance/edi/transmissions'),
+  },
 };
+
+export default api;
+
+
+
+
 

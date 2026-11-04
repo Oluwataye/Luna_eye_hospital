@@ -182,8 +182,8 @@
   color: #d97706;
 }
 .luna-confirm__icon-wrap--primary {
-  background: #dbeafe;
-  color: #2563eb;
+  background: var(--leh-forest-tint);
+  color: var(--leh-forest);
 }
 
 .luna-confirm__title {
@@ -221,10 +221,10 @@
   background: #b45309;
 }
 .luna-confirm__action--primary {
-  background: var(--color-primary, #3b82f6);
+  background: var(--leh-forest);
 }
 .luna-confirm__action--primary:hover {
-  background: #2563eb;
+  background: var(--leh-forest-hover);
 }
 
 /* ── Responsive ──────────────────────────────────────────────── */

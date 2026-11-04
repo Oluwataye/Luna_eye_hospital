@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Database, HardDriveDownload, Users, Building2, Save, History, Upload, Download, Trash2, Edit3, Plus, Tags, Folders, RefreshCw, Shield, FileText, Printer, FileSpreadsheet, Filter, Calendar, User, ClipboardList, Mic, Sparkles, Cpu, CheckCircle2, AlertCircle, Server, Keyboard } from 'lucide-react';
+import { Database, HardDriveDownload, Users, Building2, Save, History, Upload, Download, Trash2, Edit3, Plus, Tags, Folders, RefreshCw, Shield, FileText, Printer, FileSpreadsheet, Filter, Calendar, User, ClipboardList, Mic, MicOff, Power, Sparkles, Cpu, CheckCircle2, AlertCircle, Server, Keyboard, Stethoscope, Search } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { api, API_BASE_URL } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -7,6 +7,7 @@ import { useNotification } from '../context/NotificationContext';
 import { formatDateStandard } from '../utils/date';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ThermalPrinterModal } from '../components/ThermalPrinterModal';
+import { InnerNavTabs } from '../components/InnerNavTabs';
 
 const actionTypes = [
   // Auth
@@ -33,6 +34,8 @@ const actionTypes = [
   'SUPPLIER_CREATE',
   // Admin
   'SETTINGS_UPDATE', 'BACKUP', 'BACKUP_CREATE',
+  // Services
+  'SERVICE_CREATE', 'SERVICE_UPDATE', 'SERVICE_DELETE',
   // Admissions
   'ADMISSION_CREATE', 'ADMISSION_DISCHARGE', 'ADMISSION_UPDATE',
 ];
@@ -59,10 +62,14 @@ export const Settings: React.FC = () => {
   const [inventoryCats, setInventoryCats] = useState<any[]>([]);
   const [investigationTemplates, setInvestigationTemplates] = useState<any[]>([]);
   const [investigations, setInvestigations] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
+  const [servicesSearch, setServicesSearch] = useState('');
+  const [servicesCategoryFilter, setServicesCategoryFilter] = useState('ALL');
   const [showMgmtModal, setShowMgmtModal] = useState(false);
   const [mgmtForm, setMgmtForm] = useState<any>({});
-  const [mgmtTarget, setMgmtTarget] = useState<'ward' | 'discount' | 'category' | 'template' | 'investigation' | null>(null);
+  const [mgmtTarget, setMgmtTarget] = useState<'ward' | 'discount' | 'category' | 'template' | 'investigation' | 'service' | null>(null);
   const [isEdit, setIsEdit] = useState(false);
+
 
   // Audit Logs States
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
@@ -78,16 +85,19 @@ export const Settings: React.FC = () => {
   // Voice AI & Local LLM States
   const [voiceSettings, setVoiceSettings] = useState<any>({
     active_whisper_model: 'base.en',
+    ai_enabled: true,
     llm_postprocessing_enabled: false,
     ollama_base_url: 'http://127.0.0.1:11434',
     ollama_model: 'llama3.2:latest',
     llm_temperature: 0.1,
     llm_prompt_template: 'You are an expert ophthalmic clinical scribe at Luna Eye Hospital. Clean and format the following dictated clinical notes into concise medical notation. Preserve all clinical findings, measurements, and eye designations (OD, OS, OU, VA, IOP, SLE, Fundus). Do not invent or assume information. Return ONLY the formatted clinical text with zero conversational remarks.'
   });
+  const [isTogglingAi, setIsTogglingAi] = useState(false);
   const [whisperEngineInfo, setWhisperEngineInfo] = useState<any>(null);
   const [isVoiceSaving, setIsVoiceSaving] = useState(false);
   const [isTestingLlm, setIsTestingLlm] = useState(false);
   const [llmTestResult, setLlmTestResult] = useState<any>(null);
+  const [isSavingCaps, setIsSavingCaps] = useState(false);
 
   // Hotkey config – stored in localStorage, not on the server
   const loadHotkey = () => {
@@ -121,7 +131,7 @@ export const Settings: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      const [stats, sets, baks, wrds, dscs, cats, tpls, invItems, voiceRes] = await Promise.all([
+      const [stats, sets, baks, wrds, dscs, cats, tpls, invItems, srvs, voiceRes] = await Promise.all([
         api.getDbStats(),
         api.getSettings(),
         api.getBackups(),
@@ -130,6 +140,7 @@ export const Settings: React.FC = () => {
         api.getInventoryCategories(),
         api.getInvestigationTemplates(),
         api.getInventory(),
+        api.getServices(),
         api.getVoiceSettings().catch(() => null)
       ]);
       setDbStats(stats);
@@ -139,8 +150,12 @@ export const Settings: React.FC = () => {
       setDiscounts(dscs);
       setInventoryCats(cats);
       setInvestigationTemplates(tpls);
+      setServices(Array.isArray(srvs) ? srvs : []);
       if (voiceRes?.config) {
-        setVoiceSettings(voiceRes.config);
+        setVoiceSettings({
+          ...voiceRes.config,
+          ai_enabled: voiceRes.config.ai_enabled !== false
+        });
       }
       if (voiceRes?.whisper_engine) {
         setWhisperEngineInfo(voiceRes.whisper_engine);
@@ -191,6 +206,37 @@ export const Settings: React.FC = () => {
     }
   };
 
+  const handleToggleAi = async (targetState: boolean) => {
+    setIsTogglingAi(true);
+    // Optimistic UI state update so user gets instant responsive feedback
+    setVoiceSettings((prev: any) => ({ ...prev, ai_enabled: targetState }));
+    try {
+      const res = await api.updateVoiceSettings({
+        ...voiceSettings,
+        ai_enabled: targetState
+      });
+      if (res && (res.success || res.config)) {
+        const finalAiEnabled = res.config?.ai_enabled !== undefined ? Boolean(res.config.ai_enabled) : targetState;
+        setVoiceSettings((prev: any) => ({
+          ...prev,
+          ...(res.config || {}),
+          ai_enabled: finalAiEnabled
+        }));
+        notify('success', finalAiEnabled
+          ? '✅ AI Voice Dictation is now ACTIVE — doctors can use voice input.'
+          : '⛔ AI Voice Dictation has been PAUSED — all voice input is disabled.');
+      } else {
+        throw new Error(res?.error || 'Failed to update settings');
+      }
+    } catch (error: any) {
+      // Revert optimistic update on error
+      setVoiceSettings((prev: any) => ({ ...prev, ai_enabled: !targetState }));
+      notify('error', 'Failed to update AI availability: ' + (error.message || 'Check server logs'));
+    } finally {
+      setIsTogglingAi(false);
+    }
+  };
+
   const handleTestLlm = async () => {
     setIsTestingLlm(true);
     setLlmTestResult(null);
@@ -210,6 +256,40 @@ export const Settings: React.FC = () => {
       notify('error', 'Ollama connection failed: ' + err.message);
     } finally {
       setIsTestingLlm(false);
+    }
+  };
+
+  const filteredServices = services.filter((srv: any) => {
+    const q = (servicesSearch || '').trim().toLowerCase();
+    const matchesSearch = !q || 
+      (srv.name || '').toLowerCase().includes(q) ||
+      (srv.description || '').toLowerCase().includes(q) ||
+      (srv.category || '').toLowerCase().includes(q);
+    const matchesCat = servicesCategoryFilter === 'ALL' || 
+      (srv.category || '').toLowerCase() === servicesCategoryFilter.toLowerCase();
+    return matchesSearch && matchesCat;
+  });
+
+  const handleSaveDiscountCaps = async () => {
+    setIsSavingCaps(true);
+    try {
+      const payload = {
+        ...settings,
+        discount_cap_receptionist: settings.discount_cap_receptionist ?? '10',
+        discount_cap_nurse: settings.discount_cap_nurse ?? '10',
+        discount_cap_optometrist: settings.discount_cap_optometrist ?? '15',
+        discount_cap_doctor: settings.discount_cap_doctor ?? '25',
+        discount_cap_consultant: settings.discount_cap_consultant ?? '25',
+        discount_cap_supervisor_ceiling: settings.discount_cap_supervisor_ceiling ?? '50',
+        discount_cap_admin: '100'
+      };
+      await api.updateSettings(payload);
+      setSettings(payload);
+      notify('success', 'Role discount limits & maximum ceilings saved successfully');
+    } catch (err: any) {
+      notify('error', 'Failed to save discount caps: ' + (err.message || 'Error'));
+    } finally {
+      setIsSavingCaps(false);
     }
   };
 
@@ -248,22 +328,33 @@ export const Settings: React.FC = () => {
     });
   };
 
-  const handleOpenMgmt = (target: 'ward' | 'discount' | 'category' | 'template' | 'investigation', item?: any) => {
+  const handleOpenMgmt = (target: 'ward' | 'discount' | 'category' | 'template' | 'investigation' | 'service', item?: any) => {
     setMgmtTarget(target);
     if (item) {
       setMgmtForm(item);
       setIsEdit(true);
     } else {
-      setMgmtForm(target === 'investigation' ? {
-        category: 'Laboratory',
-        stock: 0,
-        price: 0,
-        cost_price: 0,
-        reorder_level: 0,
-        expiry_date: '',
-        supplier: '',
-        batch_number: ''
-      } : {});
+      if (target === 'investigation') {
+        setMgmtForm({
+          category: 'Laboratory',
+          stock: 0,
+          price: 0,
+          cost_price: 0,
+          reorder_level: 0,
+          expiry_date: '',
+          supplier: '',
+          batch_number: ''
+        });
+      } else if (target === 'service') {
+        setMgmtForm({
+          name: '',
+          price: 0,
+          category: 'Service',
+          description: ''
+        });
+      } else {
+        setMgmtForm({});
+      }
       setIsEdit(false);
     }
     setShowMgmtModal(true);
@@ -280,6 +371,7 @@ export const Settings: React.FC = () => {
     const prevCategories = [...inventoryCats];
     const prevTemplates = [...investigationTemplates];
     const prevInvestigations = [...investigations];
+    const prevServices = [...services];
 
     // 2. Determine state setters
     let setList: React.Dispatch<React.SetStateAction<any[]>> = () => {};
@@ -294,6 +386,8 @@ export const Settings: React.FC = () => {
       setList = setInvestigationTemplates;
     } else if (target === 'investigation') {
       setList = setInvestigations;
+    } else if (target === 'service') {
+      setList = setServices;
     }
 
     // 3. Apply optimistic update to local state
@@ -334,9 +428,17 @@ export const Settings: React.FC = () => {
           attributes: mgmtForm.attributes || {}
         };
         res = isEdit ? await api.updateInventoryItem(mgmtForm.id, payload) : await api.createInventoryItem(payload);
+      } else if (target === 'service') {
+        const payload = {
+          name: mgmtForm.name,
+          price: parseFloat(mgmtForm.price) || 0,
+          category: mgmtForm.category || 'Service',
+          description: mgmtForm.description || ''
+        };
+        res = isEdit ? await api.updateService(mgmtForm.id, payload) : await api.createService(payload);
       }
 
-      notify('success', `${target === 'investigation' ? 'Investigation' : target} protocol ${isEdit ? 'updated' : 'initialized'} successfully`);
+      notify('success', `${target === 'investigation' ? 'Investigation' : (target === 'service' ? 'Service' : target)} ${isEdit ? 'updated' : 'initialized'} successfully`);
       
       // If we created a new item, update its ID from the response
       if (!isEdit && res && res.id) {
@@ -352,11 +454,12 @@ export const Settings: React.FC = () => {
       setInventoryCats(prevCategories);
       setInvestigationTemplates(prevTemplates);
       setInvestigations(prevInvestigations);
-      notify('error', error.message || 'Failed to save protocol');
+      setServices(prevServices);
+      notify('error', error.message || 'Failed to save item');
     }
   };
 
-  const handleDeleteMgmt = (target: 'ward' | 'discount' | 'category' | 'template' | 'investigation', id: number | string) => {
+  const handleDeleteMgmt = (target: 'ward' | 'discount' | 'category' | 'template' | 'investigation' | 'service', id: number | string) => {
     confirm({
       title: 'Decommission Protocol',
       message: `Are you sure you want to decommission this ${target}? This may affect historical clinical records.`,
@@ -367,6 +470,7 @@ export const Settings: React.FC = () => {
         const prevCategories = [...inventoryCats];
         const prevTemplates = [...investigationTemplates];
         const prevInvestigations = [...investigations];
+        const prevServices = [...services];
 
         // 2. Perform optimistic UI deletion
         if (target === 'ward') {
@@ -379,6 +483,8 @@ export const Settings: React.FC = () => {
           setInvestigationTemplates(prev => prev.filter(item => item.id !== id));
         } else if (target === 'investigation') {
           setInvestigations(prev => prev.filter(item => item.id !== id));
+        } else if (target === 'service') {
+          setServices(prev => prev.filter(item => item.id !== id));
         }
 
         try {
@@ -387,8 +493,9 @@ export const Settings: React.FC = () => {
           else if (target === 'category') await api.deleteInventoryCategory(id as number);
           else if (target === 'template') await api.deleteInvestigationTemplate(id as number);
           else if (target === 'investigation') await api.deleteInventoryItem(id as string);
+          else if (target === 'service') await api.deleteService(id);
           
-          notify('success', 'Protocol decommissioned successfully');
+          notify('success', `${target === 'service' ? 'Service' : target} decommissioned successfully`);
           fetchData();
         } catch (error: any) {
           // Rollback on failure
@@ -397,6 +504,7 @@ export const Settings: React.FC = () => {
           setInventoryCats(prevCategories);
           setInvestigationTemplates(prevTemplates);
           setInvestigations(prevInvestigations);
+          setServices(prevServices);
           notify('error', error.message || 'Failed to decommission');
         }
       }
@@ -485,41 +593,24 @@ export const Settings: React.FC = () => {
       <div className="settings-layout-row" style={{ display: 'flex', gap: '32px', overflow: 'hidden', minWidth: 0 }}>
         {/* Navigation Sidebar */}
         <div style={{ width: '280px', flexShrink: 0 }} className="no-print">
-          <div className="leh-table-card" style={{ padding: '8px' }}>
-            {[
+          <InnerNavTabs
+            orientation="vertical"
+            tabs={[
               { id: 'clinic', label: 'Clinical Metadata', icon: Building2 },
               { id: 'management', label: 'Resource Management', icon: Users },
+              { id: 'services', label: 'Services & Tariffs', icon: Stethoscope },
+              { id: 'discounts', label: 'Discount Management', icon: Tags },
               { id: 'investigations', label: 'Manage Investigations', icon: ClipboardList },
               { id: 'templates', label: 'Result Templates', icon: FileText },
               { id: 'voice_ai', label: 'AI Voice & Dictation', icon: Mic },
               { id: 'printer', label: 'Thermal Receipt Printer', icon: Printer },
               { id: 'database', label: 'Database & Security', icon: Database },
               { id: 'logs', label: 'System Audit Logs', icon: History }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '14px 16px',
-                  border: 'none',
-                  background: activeTab === tab.id ? 'var(--leh-primary-light)' : 'transparent',
-                  color: activeTab === tab.id ? 'var(--leh-primary)' : 'var(--leh-text-grey)',
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  fontWeight: activeTab === tab.id ? '800' : '600',
-                  fontSize: '14px',
-                  transition: 'all 0.2s'
-                }}
-              >
-                <tab.icon size={18} />
-                {tab.label}
-              </button>
-            ))}
-          </div>
+            ]}
+            activeTab={activeTab}
+            onChange={setActiveTab}
+            showChevronOnActive
+          />
 
           {activeTab === 'database' && dbStats && (
             <div style={{ marginTop: '24px', padding: '24px', background: 'var(--leh-bg-light)', borderRadius: '14px', border: '1px solid var(--leh-border-light)' }}>
@@ -717,6 +808,492 @@ export const Settings: React.FC = () => {
             </div>
           )}
 
+          {/* ===== SERVICES & TARIFFS TAB ===== */}
+          {activeTab === 'services' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {/* Header Card */}
+              <div className="leh-table-card" style={{ padding: '28px 32px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                  <div>
+                    <h3 className="leh-table-title" style={{ margin: '0 0 4px' }}>Hospital Services & Tariffs</h3>
+                    <p className="leh-label" style={{ margin: 0 }}>Configure clinical services, card registration fees, surgery tariffs, and clinical investigation prices.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenMgmt('service')}
+                    className="leh-btn-primary"
+                    style={{ height: '42px', padding: '0 20px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}
+                  >
+                    <Plus size={15} /> NEW SERVICE
+                  </button>
+                </div>
+              </div>
+
+              {/* Stats Row */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                {[
+                  { label: 'Total Services', value: services.length, color: 'var(--leh-primary)' },
+                  { label: 'Registration Cards', value: services.filter(s => (s.category || '').toLowerCase() === 'registration').length, color: 'var(--leh-green)' },
+                  { label: 'Surgeries & Procedures', value: services.filter(s => ['surgery', 'procedure'].includes((s.category || '').toLowerCase())).length, color: 'var(--leh-amber)' },
+                ].map(stat => (
+                  <div key={stat.label} className="leh-table-card" style={{ padding: '20px 24px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: `${stat.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Stethoscope size={20} style={{ color: stat.color }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '26px', fontWeight: '900', color: stat.color, lineHeight: 1 }}>{stat.value}</div>
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--leh-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '2px' }}>{stat.label}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Filter and Search Bar */}
+              <div className="leh-table-card" style={{ padding: '16px 24px' }}>
+                <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: '240px', position: 'relative' }}>
+                    <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                    <input
+                      type="text"
+                      className="leh-input"
+                      style={{ paddingLeft: '36px', height: '38px', background: '#ffffff' }}
+                      placeholder="Search services by name, category, or description..."
+                      value={servicesSearch}
+                      onChange={e => setServicesSearch(e.target.value)}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <Filter size={16} style={{ color: '#64748b' }} />
+                    <select
+                      className="leh-select"
+                      style={{ height: '38px', background: '#ffffff', minWidth: '170px' }}
+                      value={servicesCategoryFilter}
+                      onChange={e => setServicesCategoryFilter(e.target.value)}
+                    >
+                      <option value="ALL">All Categories</option>
+                      <option value="Registration">Registration</option>
+                      <option value="Service">Service</option>
+                      <option value="Consultation">Consultation</option>
+                      <option value="Diagnostic">Diagnostic</option>
+                      <option value="Procedure">Procedure</option>
+                      <option value="Surgery">Surgery</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Services Table */}
+              <div className="leh-table-card">
+                <div className="leh-table-wrapper">
+                  <table className="leh-table">
+                    <thead>
+                      <tr>
+                        <th style={{ paddingLeft: '24px', width: '60px' }}>#</th>
+                        <th style={{ width: '28%' }}>SERVICE NAME</th>
+                        <th style={{ width: '16%' }}>CATEGORY</th>
+                        <th style={{ width: '18%', textAlign: 'right' }}>TARIFF / FEE</th>
+                        <th style={{ width: '26%' }}>DESCRIPTION</th>
+                        <th style={{ width: '12%', paddingRight: '24px', textAlign: 'right' }}>ACTIONS</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredServices.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} style={{ padding: '60px 0', textAlign: 'center' }}>
+                            <Stethoscope size={40} style={{ color: '#cbd5e1', margin: '0 auto 12px', display: 'block' }} />
+                            <p className="leh-label" style={{ textAlign: 'center', fontStyle: 'italic' }}>
+                              No hospital services match your criteria. Click "NEW SERVICE" to add one.
+                            </p>
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredServices.map((srv: any, idx: number) => (
+                          <tr key={srv.id || idx}>
+                            <td style={{ paddingLeft: '24px', color: '#94a3b8', fontSize: '12px' }}>{idx + 1}</td>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  borderRadius: '8px',
+                                  background: 'var(--leh-forest-tint)',
+                                  color: 'var(--leh-forest)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0
+                                }}>
+                                  <Stethoscope size={16} />
+                                </div>
+                                <span style={{ fontWeight: '700', color: '#0f172a' }}>{srv.name}</span>
+                              </div>
+                            </td>
+                            <td>
+                              <span style={{
+                                padding: '4px 10px',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.04em',
+                                background: srv.category === 'Registration' ? '#e0f2fe' : (srv.category === 'Surgery' ? '#fee2e2' : '#f1f5f9'),
+                                color: srv.category === 'Registration' ? '#0369a1' : (srv.category === 'Surgery' ? '#b91c1c' : '#475569')
+                              }}>
+                                {srv.category || 'Service'}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'right', fontWeight: '800', color: '#0f172a', fontSize: '14px' }}>
+                              ₦{Number(srv.price || 0).toLocaleString()}
+                            </td>
+                            <td style={{ color: '#64748b', fontSize: '13px' }}>
+                              {srv.description || '—'}
+                            </td>
+                            <td style={{ paddingRight: '24px', textAlign: 'right' }}>
+                              <div style={{ display: 'inline-flex', gap: '6px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenMgmt('service', srv)}
+                                  className="leh-icon-btn"
+                                  title="Edit Service Tariff"
+                                >
+                                  <Edit3 size={15} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteMgmt('service', srv.id)}
+                                  className="leh-icon-btn leh-icon-btn-danger"
+                                  title="Delete Service"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ===== DISCOUNT MANAGEMENT TAB ===== */}
+          {activeTab === 'discounts' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {/* Header Card */}
+              <div className="leh-table-card" style={{ padding: '28px 32px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h3 className="leh-table-title" style={{ margin: '0 0 4px' }}>Discount & Yield Protocol Management</h3>
+                    <p className="leh-label" style={{ margin: 0 }}>Create, edit, activate, or deactivate billing discount protocols used at point-of-sale.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenMgmt('discount')}
+                    className="leh-btn-primary"
+                    style={{ height: '42px', padding: '0 20px', fontSize: '13px', flexShrink: 0 }}
+                  >
+                    <Plus size={15} /> NEW DISCOUNT
+                  </button>
+                </div>
+              </div>
+
+              {/* Stats Row */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                {[
+                  { label: 'Total Protocols', value: discounts.length, color: 'var(--leh-primary)' },
+                  { label: 'Active', value: discounts.filter(d => d.is_active).length, color: 'var(--leh-green)' },
+                  { label: 'Requires Auth', value: discounts.filter(d => d.requires_auth).length, color: 'var(--leh-amber)' },
+                ].map(stat => (
+                  <div key={stat.label} className="leh-table-card" style={{ padding: '20px 24px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: `${stat.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Tags size={20} style={{ color: stat.color }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '26px', fontWeight: '900', color: stat.color, lineHeight: 1 }}>{stat.value}</div>
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--leh-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '2px' }}>{stat.label}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Discounts Table */}
+              <div className="leh-table-card">
+                <div className="leh-table-wrapper">
+                  <table className="leh-table">
+                    <thead>
+                      <tr>
+                        <th style={{ paddingLeft: '32px', width: '32%' }}>Discount Name</th>
+                        <th style={{ width: '16%' }}>Value</th>
+                        <th style={{ width: '14%' }}>Type</th>
+                        <th style={{ width: '14%' }}>Auth</th>
+                        <th style={{ width: '14%' }}>Status</th>
+                        <th style={{ width: '10%', paddingRight: '32px', textAlign: 'right' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {discounts.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} style={{ padding: '60px 0', textAlign: 'center' }}>
+                            <Tags size={40} style={{ color: '#cbd5e1', margin: '0 auto 12px', display: 'block' }} />
+                            <p className="leh-label" style={{ textAlign: 'center', fontStyle: 'italic' }}>No discount protocols configured yet. Click "NEW DISCOUNT" to add one.</p>
+                          </td>
+                        </tr>
+                      ) : discounts.map(d => (
+                        <tr key={d.id}>
+                          <td style={{ paddingLeft: '32px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span className="leh-table-bold" style={{ fontSize: '14px' }}>{d.name}</span>
+                            </div>
+                          </td>
+                          <td>
+                            <span style={{ fontWeight: '900', fontSize: '15px', color: 'var(--leh-primary)', fontFamily: 'monospace' }}>
+                              {d.type === 'fixed' ? '₦' : ''}{Number(d.value).toLocaleString()}{d.type === 'percentage' ? '%' : ''}
+                            </span>
+                          </td>
+                          <td>
+                            <span style={{
+                              display: 'inline-block', padding: '3px 10px', borderRadius: '6px', fontSize: '10px', fontWeight: '800', textTransform: 'uppercase',
+                              background: d.type === 'percentage' ? 'var(--leh-forest-tint)' : '#f0fdf4',
+                              color: d.type === 'percentage' ? 'var(--leh-forest)' : '#16a34a',
+                              border: d.type === 'percentage' ? '1px solid var(--leh-border)' : '1px solid #bbf7d0'
+                            }}>
+                              {d.type === 'percentage' ? 'Percentage' : 'Fixed ₦'}
+                            </span>
+                          </td>
+                          <td>
+                            {d.requires_auth ? (
+                              <span className="leh-badge-amber" style={{ fontSize: '10px' }}>AUTH REQ</span>
+                            ) : (
+                              <span className="leh-badge-green" style={{ fontSize: '10px' }}>OPEN</span>
+                            )}
+                          </td>
+                          <td>
+                            {/* Inline toggle active/inactive */}
+                            <button
+                              type="button"
+                              title={d.is_active ? 'Click to deactivate' : 'Click to activate'}
+                              onClick={async () => {
+                                const updated = { ...d, is_active: d.is_active ? 0 : 1 };
+                                setDiscounts(prev => prev.map(item => item.id === d.id ? updated : item));
+                                try {
+                                  await api.updateDiscount(d.id, updated);
+                                  notify('success', `Discount "${d.name}" ${updated.is_active ? 'activated' : 'deactivated'}`);
+                                } catch (err: any) {
+                                  setDiscounts(prev => prev.map(item => item.id === d.id ? d : item));
+                                  notify('error', 'Failed to update discount status');
+                                }
+                              }}
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                                padding: '4px 10px', border: 'none', borderRadius: '20px', cursor: 'pointer',
+                                fontSize: '11px', fontWeight: '800', transition: 'all 0.2s',
+                                background: d.is_active ? 'var(--leh-green-light, #dcfce7)' : '#f1f5f9',
+                                color: d.is_active ? 'var(--leh-green, #16a34a)' : 'var(--leh-text-muted)',
+                              }}
+                            >
+                              <span style={{ fontSize: '9px' }}>{d.is_active ? '●' : '○'}</span>
+                              {d.is_active ? 'ACTIVE' : 'OFF'}
+                            </button>
+                          </td>
+                          <td style={{ paddingRight: '32px' }}>
+                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenMgmt('discount', d)}
+                                className="leh-refresh-btn"
+                                title="Edit discount"
+                              >
+                                <Edit3 size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteMgmt('discount', d.id)}
+                                className="leh-refresh-btn"
+                                style={{ color: 'var(--leh-red)' }}
+                                title="Delete discount"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Role-Gated Maximum Discount Ceilings (Revenue Leakage Protection) */}
+              <div className="leh-table-card" style={{ padding: '28px 32px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--leh-forest-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Shield size={20} style={{ color: 'var(--leh-forest)' }} />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: 'var(--leh-text-dark)' }}>Role-Gated Maximum Discount Limits & Ceilings</h4>
+                      <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--leh-text-muted)' }}>
+                        Hard revenue leakage protection. Cashiers cannot apply discounts above their role limit without verified supervisor approval.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSaveDiscountCaps}
+                    disabled={isSavingCaps}
+                    className="leh-btn-primary"
+                    style={{ height: '38px', padding: '0 18px', fontSize: '12px' }}
+                  >
+                    <Save size={14} />
+                    {isSavingCaps ? 'SAVING...' : 'SAVE ROLE LIMITS'}
+                  </button>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '18px' }}>
+                  {/* Receptionist / Cashier */}
+                  <div style={{ padding: '16px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: '700', color: '#1e293b' }}>Receptionist / Cashier</span>
+                      <span className="leh-badge-blue" style={{ fontSize: '10px' }}>FRONT DESK</span>
+                    </div>
+                    <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 10px' }}>Direct cashier limit without supervisor override.</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        className="leh-input"
+                        style={{ width: '90px', fontWeight: '800', fontSize: '14px', textAlign: 'center' }}
+                        value={settings.discount_cap_receptionist ?? 10}
+                        onChange={(e) => setSettings({ ...settings, discount_cap_receptionist: e.target.value })}
+                      />
+                      <span style={{ fontWeight: '800', color: '#475569' }}>% Max</span>
+                    </div>
+                  </div>
+
+                  {/* Nurse */}
+                  <div style={{ padding: '16px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: '700', color: '#1e293b' }}>Nurse</span>
+                      <span className="leh-badge-purple" style={{ fontSize: '10px' }}>CLINICAL</span>
+                    </div>
+                    <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 10px' }}>Nurse point-of-care billing allowance.</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        className="leh-input"
+                        style={{ width: '90px', fontWeight: '800', fontSize: '14px', textAlign: 'center' }}
+                        value={settings.discount_cap_nurse ?? 10}
+                        onChange={(e) => setSettings({ ...settings, discount_cap_nurse: e.target.value })}
+                      />
+                      <span style={{ fontWeight: '800', color: '#475569' }}>% Max</span>
+                    </div>
+                  </div>
+
+                  {/* Optometrist */}
+                  <div style={{ padding: '16px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: '700', color: '#1e293b' }}>Optometrist</span>
+                      <span className="leh-badge-green" style={{ fontSize: '10px' }}>EXAMINER</span>
+                    </div>
+                    <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 10px' }}>Optical diagnosis & lenses discount cap.</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        className="leh-input"
+                        style={{ width: '90px', fontWeight: '800', fontSize: '14px', textAlign: 'center' }}
+                        value={settings.discount_cap_optometrist ?? 15}
+                        onChange={(e) => setSettings({ ...settings, discount_cap_optometrist: e.target.value })}
+                      />
+                      <span style={{ fontWeight: '800', color: '#475569' }}>% Max</span>
+                    </div>
+                  </div>
+
+                  {/* Doctor & Consultant */}
+                  <div style={{ padding: '16px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: '700', color: '#1e293b' }}>Doctor / Consultant</span>
+                      <span className="leh-badge-amber" style={{ fontSize: '10px' }}>SENIOR CLINICIAN</span>
+                    </div>
+                    <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 10px' }}>Doctor discretion and procedure discount limit.</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        className="leh-input"
+                        style={{ width: '90px', fontWeight: '800', fontSize: '14px', textAlign: 'center' }}
+                        value={settings.discount_cap_doctor ?? 25}
+                        onChange={(e) => setSettings({ ...settings, discount_cap_doctor: e.target.value, discount_cap_consultant: e.target.value })}
+                      />
+                      <span style={{ fontWeight: '800', color: '#475569' }}>% Max</span>
+                    </div>
+                  </div>
+
+                  {/* Supervisor Ceiling */}
+                  <div style={{ padding: '16px', borderRadius: '10px', border: '2px solid #fed7aa', background: '#fffbeb' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: '800', color: '#9a3412' }}>Supervisor Override Ceiling</span>
+                      <span style={{ fontSize: '10px', fontWeight: '800', padding: '2px 8px', borderRadius: '6px', background: '#ffedd5', color: '#c2410c' }}>HARD CEILING</span>
+                    </div>
+                    <p style={{ fontSize: '11px', color: '#7c2d12', margin: '0 0 10px' }}>Absolute ceiling. Non-admin staff cannot exceed this even with supervisor pin.</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        className="leh-input"
+                        style={{ width: '90px', fontWeight: '900', fontSize: '14px', textAlign: 'center', borderColor: '#f97316' }}
+                        value={settings.discount_cap_supervisor_ceiling ?? 50}
+                        onChange={(e) => setSettings({ ...settings, discount_cap_supervisor_ceiling: e.target.value })}
+                      />
+                      <span style={{ fontWeight: '800', color: '#9a3412' }}>% Ceiling</span>
+                    </div>
+                  </div>
+
+                  {/* Administrator */}
+                  <div style={{ padding: '16px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: '700', color: '#1e293b' }}>Administrator</span>
+                      <span className="leh-badge-red" style={{ fontSize: '10px' }}>SUPERUSER</span>
+                    </div>
+                    <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 10px' }}>Full authority over all waivers and executive exemptions.</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontWeight: '900', fontSize: '16px', color: 'var(--leh-primary)', fontFamily: 'monospace' }}>100%</span>
+                      <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '700' }}>(Unrestricted)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Info Card */}
+              <div style={{
+                padding: '16px 20px', borderRadius: '12px',
+                background: 'var(--leh-forest-tint)',
+                border: '1px solid var(--leh-border)',
+                display: 'flex', gap: '12px', alignItems: 'flex-start'
+              }}>
+                <Shield size={16} style={{ color: 'var(--leh-forest)', marginTop: '2px', flexShrink: 0 }} />
+                <div>
+                  <p style={{ margin: '0 0 4px', fontSize: '12px', fontWeight: '800', color: 'var(--leh-forest)' }}>PROTOCOL NOTES</p>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#475569', lineHeight: 1.5 }}>
+                    Protocols marked <strong>AUTH REQ</strong> require supervisor credentials before a cashier can apply them at billing.
+                    Deactivated discounts remain in history but are not shown to cashiers.
+                    <strong> Fixed</strong> discounts deduct a flat amount (₦); <strong>Percentage</strong> discounts deduct a % of the total bill.
+                    Both are dynamically checked against the role percentage caps and the maximum ceiling.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'database' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <div className="leh-table-card" style={{ padding: '32px' }}>
@@ -762,7 +1339,7 @@ export const Settings: React.FC = () => {
               </div>
 
               <div style={{ padding: '32px', background: 'white', borderRadius: 'var(--leh-radius-card)', border: '1px solid var(--leh-border-light)', display: 'flex', alignItems: 'center', gap: '24px' }}>
-                <div style={{ width: '64px', height: '64px', background: 'rgba(37, 99, 235, 0.1)', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--leh-primary)' }}>
+                <div style={{ width: '64px', height: '64px', background: 'rgba(46, 90, 38, 0.1)', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--leh-primary)' }}>
                   <Shield size={32} />
                 </div>
                 <div>
@@ -808,7 +1385,7 @@ export const Settings: React.FC = () => {
                               borderRadius: '4px',
                               fontSize: '11px',
                               fontWeight: '800',
-                              background: inv.category?.toLowerCase() === 'test' ? 'rgba(37, 99, 235, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                              
                               color: inv.category?.toLowerCase() === 'test' ? 'var(--leh-primary)' : 'var(--leh-green)'
                             }}>
                               {inv.category}
@@ -876,6 +1453,154 @@ export const Settings: React.FC = () => {
 
           {activeTab === 'voice_ai' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+              {/* ===== ADMIN MASTER AI TOGGLE ===== */}
+              {(() => {
+                const isAiActive = voiceSettings?.ai_enabled !== false;
+                return (
+                  <div style={{
+                    borderRadius: '16px',
+                    padding: '24px 28px',
+                    background: isAiActive
+                      ? 'linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%)'
+                      : 'linear-gradient(135deg, #fff1f2 0%, #fef2f2 100%)',
+                    border: `2px solid ${isAiActive ? '#86efac' : '#fca5a5'}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '24px',
+                    flexWrap: 'wrap',
+                    boxShadow: isAiActive
+                      ? '0 4px 24px rgba(16,185,129,0.12)'
+                      : '0 4px 24px rgba(220,38,38,0.12)',
+                  }}>
+                    {/* Left: status info */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '18px', flex: 1, minWidth: '280px' }}>
+                      <div style={{
+                        width: '56px', height: '56px', borderRadius: '14px', flexShrink: 0,
+                        background: isAiActive ? '#dcfce7' : '#fee2e2',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        border: `2px solid ${isAiActive ? '#86efac' : '#fca5a5'}`,
+                        transition: 'all 0.3s ease'
+                      }}>
+                        {isAiActive
+                          ? <Mic size={28} style={{ color: '#16a34a' }} />
+                          : <MicOff size={28} style={{ color: '#dc2626' }} />
+                        }
+                      </div>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '900', color: isAiActive ? '#14532d' : '#7f1d1d' }}>
+                            AI Voice Dictation — Admin Master Control
+                          </h3>
+                          <span style={{
+                            padding: '4px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: '800',
+                            background: isAiActive ? '#16a34a' : '#dc2626',
+                            color: '#fff', letterSpacing: '0.06em', display: 'inline-flex', alignItems: 'center', gap: '5px'
+                          }}>
+                            {isAiActive ? '● ON / ACTIVE' : '● OFF / PAUSED'}
+                          </span>
+                        </div>
+                        <p style={{ margin: 0, fontSize: '13px', color: isAiActive ? '#166534' : '#991b1b', lineHeight: 1.5 }}>
+                          {isAiActive
+                            ? 'AI Voice Dictation is currently ACTIVE across all doctor workstations. Dictation recording and transcription are enabled.'
+                            : 'AI Voice Dictation is currently PAUSED system-wide. Recording buttons and voice shortcuts are hidden and disabled for doctors.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Right: Master Toggle & Action Button */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
+                      {/* Interactive Switch Track */}
+                      <div
+                        onClick={() => !isTogglingAi && handleToggleAi(!isAiActive)}
+                        role="button"
+                        tabIndex={0}
+                        title={`Click to turn AI Voice Dictation ${isAiActive ? 'OFF' : 'ON'}`}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          cursor: isTogglingAi ? 'not-allowed' : 'pointer',
+                          userSelect: 'none',
+                          opacity: isTogglingAi ? 0.6 : 1,
+                        }}
+                      >
+                        <div style={{
+                          width: '64px',
+                          height: '34px',
+                          borderRadius: '20px',
+                          background: isAiActive ? '#16a34a' : '#cbd5e1',
+                          padding: '3px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          transition: 'background 0.25s ease',
+                          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.15)',
+                          position: 'relative'
+                        }}>
+                          <div style={{
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '50%',
+                            background: '#ffffff',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                            transform: isAiActive ? 'translateX(30px)' : 'translateX(0px)',
+                            transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}>
+                            <Power size={14} style={{ color: isAiActive ? '#16a34a' : '#94a3b8' }} />
+                          </div>
+                        </div>
+                        <span style={{
+                          fontSize: '13px',
+                          fontWeight: '800',
+                          color: isAiActive ? '#16a34a' : '#64748b',
+                          minWidth: '55px'
+                        }}>
+                          {isAiActive ? 'ONLINE' : 'OFFLINE'}
+                        </span>
+                      </div>
+
+                      {/* Explicit Action Button */}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAi(!isAiActive)}
+                        disabled={isTogglingAi}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '12px 24px',
+                          borderRadius: '12px',
+                          border: 'none',
+                          cursor: isTogglingAi ? 'not-allowed' : 'pointer',
+                          fontWeight: '800',
+                          fontSize: '13px',
+                          letterSpacing: '0.04em',
+                          transition: 'all 0.2s ease',
+                          background: isAiActive
+                            ? 'linear-gradient(135deg, #dc2626, #b91c1c)'
+                            : 'linear-gradient(135deg, #16a34a, #15803d)',
+                          color: '#ffffff',
+                          boxShadow: isAiActive
+                            ? '0 4px 14px rgba(220,38,38,0.3)'
+                            : '0 4px 14px rgba(22,163,74,0.3)',
+                          opacity: isTogglingAi ? 0.6 : 1,
+                        }}
+                      >
+                        <Power size={15} />
+                        {isTogglingAi
+                          ? 'Updating...'
+                          : isAiActive
+                            ? 'PAUSE AI (Turn OFF)'
+                            : 'ENABLE AI (Turn ON)'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Header card with status overview */}
               <div className="leh-table-card" style={{ padding: '32px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
@@ -1552,8 +2277,9 @@ export const Settings: React.FC = () => {
                  mgmtTarget === 'discount' ? <Tags style={{ color: 'var(--leh-amber)' }} /> : 
                  mgmtTarget === 'template' ? <FileText style={{ color: 'var(--leh-primary)' }} /> :
                  mgmtTarget === 'investigation' ? <ClipboardList style={{ color: 'var(--leh-primary)' }} /> :
+                 mgmtTarget === 'service' ? <Stethoscope style={{ color: 'var(--leh-primary)' }} /> :
                  <Folders style={{ color: 'var(--leh-green)' }} />}
-                <span>{isEdit ? `Edit ${(mgmtTarget === 'investigation' ? 'Investigation' : mgmtTarget)?.toUpperCase()}` : `Register New ${(mgmtTarget === 'investigation' ? 'Investigation' : mgmtTarget)?.toUpperCase()}`}</span>
+                <span>{isEdit ? `Edit ${(mgmtTarget === 'investigation' ? 'Investigation' : (mgmtTarget === 'service' ? 'Service' : mgmtTarget))?.toUpperCase()}` : `Register New ${(mgmtTarget === 'investigation' ? 'Investigation' : (mgmtTarget === 'service' ? 'Service' : mgmtTarget))?.toUpperCase()}`}</span>
               </div>
               <button type="button" className="leh-modal-close" onClick={() => setShowMgmtModal(false)}>
                 <RefreshCw size={20} className={isSaving ? "animate-spin" : ""} />
@@ -1569,7 +2295,8 @@ export const Settings: React.FC = () => {
                   <div className="leh-form-grid">
                     <div className="leh-form-group full-width">
                       <label className="leh-label">
-                        {mgmtTarget === 'template' || mgmtTarget === 'investigation' ? 'INVESTIGATION / TEST NAME' : 'PROTOCOL DESIGNATION'}
+                        {mgmtTarget === 'template' || mgmtTarget === 'investigation' ? 'INVESTIGATION / TEST NAME' : 
+                         mgmtTarget === 'service' ? 'HOSPITAL SERVICE NAME' : 'PROTOCOL DESIGNATION'}
                       </label>
                       <input 
                         className="leh-input"
@@ -1577,11 +2304,57 @@ export const Settings: React.FC = () => {
                         autoFocus
                         value={mgmtForm.name || mgmtForm.test_name || ''} 
                         onChange={e => setMgmtForm({...mgmtForm, name: e.target.value, test_name: e.target.value})}
-                        placeholder={mgmtTarget === 'template' || mgmtTarget === 'investigation' ? "e.g. Random Blood Sugar, RBS..." : `Enter unique ${mgmtTarget} name...`}
+                        placeholder={
+                          mgmtTarget === 'template' || mgmtTarget === 'investigation' ? "e.g. Random Blood Sugar, RBS..." : 
+                          mgmtTarget === 'service' ? "e.g. Consultation, Family Card, Cataract Surgery..." :
+                          `Enter unique ${mgmtTarget} name...`
+                        }
                       />
                     </div>
 
-                    {mgmtTarget === 'investigation' ? (
+                    {mgmtTarget === 'service' ? (
+                      <>
+                        <div className="leh-form-group">
+                          <label className="leh-label">STANDARD TARIFF / PRICE (₦)</label>
+                          <input 
+                            className="leh-input"
+                            type="number" 
+                            step="0.01"
+                            min="0"
+                            required 
+                            value={mgmtForm.price !== undefined ? mgmtForm.price : ''} 
+                            onChange={e => setMgmtForm({...mgmtForm, price: parseFloat(e.target.value) || 0})}
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div className="leh-form-group">
+                          <label className="leh-label">SERVICE CATEGORY</label>
+                          <select 
+                            className="leh-select"
+                            value={mgmtForm.category || 'Service'} 
+                            onChange={e => setMgmtForm({...mgmtForm, category: e.target.value})}
+                          >
+                            <option value="Registration">Registration (Cards & Intake)</option>
+                            <option value="Service">General Clinical Service</option>
+                            <option value="Consultation">Consultation</option>
+                            <option value="Diagnostic">Diagnostic & Tests</option>
+                            <option value="Procedure">Clinical Procedure</option>
+                            <option value="Surgery">Surgery</option>
+                            <option value="Other">Other Hospital Service</option>
+                          </select>
+                        </div>
+                        <div className="leh-form-group full-width">
+                          <label className="leh-label">SERVICE DESCRIPTION (OPTIONAL)</label>
+                          <textarea 
+                            className="leh-textarea"
+                            value={mgmtForm.description || ''} 
+                            onChange={e => setMgmtForm({...mgmtForm, description: e.target.value})}
+                            placeholder="Operational notes, scope, or clinical details about this service..."
+                            rows={3}
+                          />
+                        </div>
+                      </>
+                    ) : mgmtTarget === 'investigation' ? (
                       <>
                         <div className="leh-form-group">
                           <label className="leh-label">BILLING PRICE (₦)</label>

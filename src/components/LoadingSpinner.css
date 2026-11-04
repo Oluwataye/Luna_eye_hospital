@@ -24,12 +24,12 @@
   width: 100%;
   height: 100%;
   animation: leh-spin-clockwise 1.6s linear infinite;
-  filter: drop-shadow(0 0 6px rgba(37, 99, 235, 0.25));
+  filter: drop-shadow(0 0 6px rgba(46, 90, 38, 0.30));
 }
 
 /* Double drop shadow glow for larger widgets */
 .leh-spinner-container.large .leh-spinner-svg {
-  filter: drop-shadow(0 0 10px rgba(37, 99, 235, 0.35));
+  filter: drop-shadow(0 0 10px rgba(46, 90, 38, 0.40));
 }
 
 .leh-spinner-inner {

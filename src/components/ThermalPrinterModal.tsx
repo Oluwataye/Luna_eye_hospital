@@ -189,7 +189,7 @@ export const ThermalPrinterModal: React.FC<Props> = ({ onClose, onSaved, embedde
                 style={{
                   padding: '12px 10px',
                   borderRadius: '10px',
-                  border: `2px solid ${settings.mode === 'network' ? '#3b82f6' : '#e2e8f0'}`,
+                  border: `2px solid ${settings.mode === 'network' ? 'var(--leh-forest)' : '#e2e8f0'}`,
                   background: settings.mode === 'network' ? '#eff6ff' : '#ffffff',
                   cursor: 'pointer',
                   display: 'flex',
@@ -198,7 +198,7 @@ export const ThermalPrinterModal: React.FC<Props> = ({ onClose, onSaved, embedde
                   gap: '6px'
                 }}
               >
-                <Wifi size={20} color={settings.mode === 'network' ? '#2563eb' : '#64748b'} />
+                <Wifi size={20} color={settings.mode === 'network' ? 'var(--leh-forest)' : '#64748b'} />
                 <span style={{ fontSize: '12px', fontWeight: 700, color: settings.mode === 'network' ? '#1d4ed8' : '#334155' }}>
                   Network (TCP)
                 </span>
@@ -211,7 +211,7 @@ export const ThermalPrinterModal: React.FC<Props> = ({ onClose, onSaved, embedde
                 style={{
                   padding: '12px 10px',
                   borderRadius: '10px',
-                  border: `2px solid ${settings.mode === 'webusb' ? '#3b82f6' : '#e2e8f0'}`,
+                  border: `2px solid ${settings.mode === 'webusb' ? 'var(--leh-forest)' : '#e2e8f0'}`,
                   background: settings.mode === 'webusb' ? '#eff6ff' : '#ffffff',
                   cursor: 'pointer',
                   display: 'flex',
@@ -220,7 +220,7 @@ export const ThermalPrinterModal: React.FC<Props> = ({ onClose, onSaved, embedde
                   gap: '6px'
                 }}
               >
-                <Usb size={20} color={settings.mode === 'webusb' ? '#2563eb' : '#64748b'} />
+                <Usb size={20} color={settings.mode === 'webusb' ? 'var(--leh-forest)' : '#64748b'} />
                 <span style={{ fontSize: '12px', fontWeight: 700, color: settings.mode === 'webusb' ? '#1d4ed8' : '#334155' }}>
                   Direct USB
                 </span>
@@ -233,7 +233,7 @@ export const ThermalPrinterModal: React.FC<Props> = ({ onClose, onSaved, embedde
                 style={{
                   padding: '12px 10px',
                   borderRadius: '10px',
-                  border: `2px solid ${settings.mode === 'browser' ? '#3b82f6' : '#e2e8f0'}`,
+                  border: `2px solid ${settings.mode === 'browser' ? 'var(--leh-forest)' : '#e2e8f0'}`,
                   background: settings.mode === 'browser' ? '#eff6ff' : '#ffffff',
                   cursor: 'pointer',
                   display: 'flex',
@@ -242,7 +242,7 @@ export const ThermalPrinterModal: React.FC<Props> = ({ onClose, onSaved, embedde
                   gap: '6px'
                 }}
               >
-                <Sliders size={20} color={settings.mode === 'browser' ? '#2563eb' : '#64748b'} />
+                <Sliders size={20} color={settings.mode === 'browser' ? 'var(--leh-forest)' : '#64748b'} />
                 <span style={{ fontSize: '12px', fontWeight: 700, color: settings.mode === 'browser' ? '#1d4ed8' : '#334155' }}>
                   Browser Dialog
                 </span>
@@ -334,7 +334,7 @@ export const ThermalPrinterModal: React.FC<Props> = ({ onClose, onSaved, embedde
                   style={{
                     padding: '6px 14px',
                     borderRadius: '8px',
-                    background: '#2563eb',
+                    background: 'var(--leh-forest)',
                     color: '#ffffff',
                     border: 'none',
                     fontSize: '12px',
@@ -369,7 +369,7 @@ export const ThermalPrinterModal: React.FC<Props> = ({ onClose, onSaved, embedde
                     flex: 1,
                     padding: '8px',
                     borderRadius: '8px',
-                    border: `1.5px solid ${settings.paperWidth === '80mm' ? '#3b82f6' : '#e2e8f0'}`,
+                    border: `1.5px solid ${settings.paperWidth === '80mm' ? 'var(--leh-forest)' : '#e2e8f0'}`,
                     background: settings.paperWidth === '80mm' ? '#eff6ff' : '#ffffff',
                     fontSize: '12px',
                     fontWeight: 700,
@@ -386,7 +386,7 @@ export const ThermalPrinterModal: React.FC<Props> = ({ onClose, onSaved, embedde
                     flex: 1,
                     padding: '8px',
                     borderRadius: '8px',
-                    border: `1.5px solid ${settings.paperWidth === '58mm' ? '#3b82f6' : '#e2e8f0'}`,
+                    border: `1.5px solid ${settings.paperWidth === '58mm' ? 'var(--leh-forest)' : '#e2e8f0'}`,
                     background: settings.paperWidth === '58mm' ? '#eff6ff' : '#ffffff',
                     fontSize: '12px',
                     fontWeight: 700,
@@ -405,7 +405,7 @@ export const ThermalPrinterModal: React.FC<Props> = ({ onClose, onSaved, embedde
                   type="checkbox"
                   checked={settings.autoPrintOnPayment}
                   onChange={e => setSettings(s => ({ ...s, autoPrintOnPayment: e.target.checked }))}
-                  style={{ width: '16px', height: '16px', accentColor: '#2563eb' }}
+                  style={{ width: '16px', height: '16px', accentColor: 'var(--leh-forest)' }}
                 />
                 Auto-print immediately on payment
               </label>
@@ -415,7 +415,7 @@ export const ThermalPrinterModal: React.FC<Props> = ({ onClose, onSaved, embedde
                   type="checkbox"
                   checked={settings.cutPaper}
                   onChange={e => setSettings(s => ({ ...s, cutPaper: e.target.checked }))}
-                  style={{ width: '16px', height: '16px', accentColor: '#2563eb' }}
+                  style={{ width: '16px', height: '16px', accentColor: 'var(--leh-forest)' }}
                 />
                 Auto-cut paper at end (GS V)
               </label>
@@ -503,7 +503,7 @@ export const ThermalPrinterModal: React.FC<Props> = ({ onClose, onSaved, embedde
                 padding: '8px 20px',
                 borderRadius: '8px',
                 border: 'none',
-                background: '#2563eb',
+                background: 'var(--leh-forest)',
                 color: '#ffffff',
                 fontSize: '13px',
                 fontWeight: 700,

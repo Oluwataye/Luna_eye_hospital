@@ -44,8 +44,8 @@
 
 .vital-input-redesign:focus {
   background: white;
-  border-color: var(--leh-primary);
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08), inset 0 2px 4px rgba(0, 0, 0, 0.01);
+  border-color: var(--leh-forest);
+  box-shadow: 0 0 0 4px rgba(46, 90, 38, 0.15), inset 0 2px 4px rgba(0, 0, 0, 0.01);
   outline: none;
 }
 
@@ -80,9 +80,9 @@
 }
 
 .va-input-redesign:focus {
-  border-color: var(--leh-primary);
+  border-color: var(--leh-forest);
   background: #ffffff;
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+  box-shadow: 0 0 0 4px rgba(46, 90, 38, 0.15);
   outline: none;
   transform: translateY(-1px);
 }

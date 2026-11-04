@@ -32,15 +32,15 @@
   border-radius: 5px 0 0 5px;
 }
 
-.stat-card.accent-blue::before { background: #3b82f6; }
-.stat-card.accent-amber::before { background: #f59e0b; }
-.stat-card.accent-green::before { background: #10b981; }
+.stat-card.accent-blue::before { background: var(--leh-forest); }
+.stat-card.accent-amber::before { background: var(--leh-warning); }
+.stat-card.accent-green::before { background: var(--leh-success); }
 .stat-card.accent-purple::before { background: #8b5cf6; }
 
 .stat-card-label {
   font-size: 10px;
   font-weight: 900;
-  color: #94a3b8;
+  color: var(--leh-muted);
   text-transform: uppercase;
   letter-spacing: 0.2em;
 }
@@ -48,9 +48,9 @@
 .stat-card-value {
   font-size: 2.5rem;
   font-weight: 900;
-  color: #0f172a;
+  color: var(--leh-ink);
   letter-spacing: -0.04em;
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--leh-font);
 }
 
 /* Table Refinement */

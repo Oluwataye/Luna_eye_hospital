@@ -127,76 +127,78 @@ export const buildEscposReceipt = (
     return `N${formatted}`;
   };
 
-  const formatDate = (date: any) => {
-    try {
-      return new Date(date).toLocaleString('en-GB', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch {
-      return String(date || '');
-    }
-  };
-
   const subtotal = data.total_amount || 0;
   const discount = data.discount || 0;
   const netTotal = Math.max(0, subtotal - discount);
   const paid = data.amount_paid || 0;
   const balance = data.balance ?? (netTotal - paid);
   const divider = '-'.repeat(cols);
-  const doubleDivider = '='.repeat(cols);
+
+  const getRevFund = (item: any) => {
+    if (item.category && String(item.category).trim()) return String(item.category).trim();
+    if (item.rev_fund && String(item.rev_fund).trim()) return String(item.rev_fund).trim();
+    if (item.department && String(item.department).trim()) return String(item.department).trim();
+    const desc = (item.description || item.name || '').toLowerCase();
+    if (desc.includes('wound') || desc.includes('dress') || desc.includes('inject') || desc.includes('nurs') || desc.includes('stitch')) return 'Nursing Services';
+    if (desc.includes('consult') || desc.includes('registration') || desc.includes('card') || desc.includes('review') || desc.includes('triage')) return 'Consultation';
+    if (desc.includes('lens') || desc.includes('frame') || desc.includes('glass') || desc.includes('opt') || desc.includes('spectacle')) return 'Optical';
+    if (desc.includes('drop') || desc.includes('tab') || desc.includes('cap') || desc.includes('syrup') || desc.includes('cream') || desc.includes('ointment')) return 'Pharmacy';
+    if (desc.includes('scan') || desc.includes('test') || desc.includes('lab') || desc.includes('fundus') || desc.includes('visual') || desc.includes('pachymetry') || desc.includes('biometry')) return 'Laboratory';
+    return 'Services';
+  };
+
+  const formatAuditDate = (date: any) => {
+    try {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return String(date || '');
+      const month = d.getMonth() + 1;
+      const day = d.getDate();
+      const year = d.getFullYear();
+      let hours = d.getHours();
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const seconds = String(d.getSeconds()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      return `${month}/${day}/${year} ${hours}:${minutes}:${seconds} ${ampm}`;
+    } catch {
+      return String(date || '');
+    }
+  };
+
+  const clinicName = String(data.clinic?.name || 'LUNA EYE HOSPITAL').toUpperCase();
+  const receiptNo = String(data.receipt_no || '384591');
+  const patientName = String(data.patient_name || 'PATIENT').toUpperCase();
+  const patientId = String(data.patient_id || data.file_no || '11025');
 
   // 1. Initialize Printer
   addBytes(ESCPOS.INIT);
 
-  // 2. Hospital Header (Centered, bold, double height)
+  // 2. Hospital Header
   addBytes(ESCPOS.ALIGN_CENTER);
   addBytes(ESCPOS.BOLD_ON);
-  if (cols >= 48) {
-    addBytes(ESCPOS.DOUBLE_SIZE);
-    addLine('LUNA EYE HOSPITAL');
-    addBytes(ESCPOS.NORMAL_SIZE);
-  } else {
-    addBytes(ESCPOS.DOUBLE_HEIGHT);
-    addLine('LUNA EYE HOSPITAL');
-    addBytes(ESCPOS.NORMAL_SIZE);
-  }
-  addBytes(ESCPOS.BOLD_OFF);
-
-  // Subtitle / Address Info
-  addLine('Behind Bomas Supermarket,');
-  addLine('Old Airport Road, Minna');
-  addLine('Tel: 09044689558 | WhatsApp: 09114111418');
-  addLine('lunaeyehospital@gmail.com');
-
-  // Title Box
+  addLine(clinicName);
   addLine(divider);
-  addBytes(ESCPOS.BOLD_ON);
-  addLine(isReprint ? '*** DUPLICATE REPRINT ***' : 'OFFICIAL PAYMENT RECEIPT');
-  addBytes(ESCPOS.BOLD_OFF);
+  addLine(`BAT. NO.: ${receiptNo}`);
   addLine(divider);
 
-  // 3. Metadata (Left-aligned)
+  // 3. Patient Line
   addBytes(ESCPOS.ALIGN_LEFT);
-  addLine(justifyBetween('Receipt No:', String(data.receipt_no || 'N/A'), cols));
-  addLine(justifyBetween('Date/Time:', formatDate(data.created_at || new Date()), cols));
-  addLine(justifyBetween('Patient ID:', `#${data.patient_id || 'Walk-In'}`, cols));
-  addLine(justifyBetween('Patient Name:', String(data.patient_name || 'Walk-In Patient').toUpperCase(), cols));
-  if (data.cashier || user?.full_name) {
-    addLine(justifyBetween('Cashier:', String(data.cashier || user?.full_name), cols));
-  }
+  addLine(`${patientName}(${patientId})`);
   addLine(divider);
+
+  if (isReprint) {
+    addBytes(ESCPOS.ALIGN_CENTER);
+    addLine('*** OFFICIAL REPRINT (DUPLICATE) ***');
+    addLine(divider);
+    addBytes(ESCPOS.ALIGN_LEFT);
+  }
 
   // 4. Items Table Header
   if (cols >= 48) {
-    // 80mm table: Desc (22), Qty (4), Rate (10), Total (12)
-    addLine('Item                   Qty      Rate       Total');
+    addLine('RevFund   Name            Qty Freq        price');
   } else {
-    // 58mm table: Desc (13), Qty (3), Rate (7), Total (9)
-    addLine('Item          Qty   Rate   Total');
+    addLine('RevFund  Name        Qty  price');
   }
   addLine(divider);
 
@@ -206,24 +208,25 @@ export const buildEscposReceipt = (
     addLine(centerText('No items listed', cols));
   } else {
     for (const item of items) {
-      const desc = String(item.description || 'Service/Item');
+      const rev = getRevFund(item);
+      const name = String(item.description || item.name || 'Item');
       const qty = String(item.qty || 1);
-      const rate = fmtCurrency(item.unit_price || 0);
-      const rowTotal = fmtCurrency((item.unit_price || 0) * (item.qty || 1));
+      const freq = String(item.freq || item.frequency || '');
+      const lineTotal = fmtCurrency((item.unit_price || 0) * (item.qty || 1)).replace('₦', '');
 
       if (cols >= 48) {
-        // Truncate desc if needed
-        const descCol = desc.length > 21 ? desc.slice(0, 21) : desc.padEnd(21, ' ');
-        const qtyCol = qty.padStart(4, ' ');
-        const rateCol = rate.padStart(10, ' ');
-        const totalCol = rowTotal.padStart(12, ' ');
-        addLine(`${descCol} ${qtyCol} ${rateCol} ${totalCol}`);
-      } else {
-        const descCol = desc.length > 13 ? desc.slice(0, 13) : desc.padEnd(13, ' ');
+        const revCol = rev.length > 9 ? rev.slice(0, 9) : rev.padEnd(9, ' ');
+        const nameCol = name.length > 15 ? name.slice(0, 15) : name.padEnd(15, ' ');
         const qtyCol = qty.padStart(3, ' ');
-        const rateCol = rate.padStart(7, ' ');
-        const totalCol = rowTotal.padStart(8, ' ');
-        addLine(`${descCol} ${qtyCol} ${rateCol} ${totalCol}`);
+        const freqCol = freq.padStart(4, ' ');
+        const priceCol = lineTotal.padStart(12, ' ');
+        addLine(`${revCol} ${nameCol} ${qtyCol} ${freqCol} ${priceCol}`);
+      } else {
+        const revCol = rev.length > 8 ? rev.slice(0, 8) : rev.padEnd(8, ' ');
+        const nameCol = name.length > 11 ? name.slice(0, 11) : name.padEnd(11, ' ');
+        const qtyCol = qty.padStart(3, ' ');
+        const priceCol = lineTotal.padStart(8, ' ');
+        addLine(`${revCol} ${nameCol} ${qtyCol} ${priceCol}`);
       }
     }
   }
@@ -231,54 +234,38 @@ export const buildEscposReceipt = (
   addLine(divider);
 
   // 5. Financial Totals
-  addLine(justifyBetween('Subtotal:', fmtCurrency(subtotal), cols));
+  addLine(justifyBetween('Sub Total:', fmtCurrency(subtotal).replace('₦', ''), cols));
   if (discount > 0) {
-    addLine(justifyBetween('Discount Applied:', `-${fmtCurrency(discount)}`, cols));
+    addLine(justifyBetween('Discount:', `-${fmtCurrency(discount).replace('₦', '')}`, cols));
+    addLine(justifyBetween('Net Total:', fmtCurrency(netTotal).replace('₦', ''), cols));
   }
-
-  addLine(doubleDivider);
-  addBytes(ESCPOS.BOLD_ON);
-  if (cols >= 48) {
-    addBytes(ESCPOS.DOUBLE_HEIGHT);
+  if (paid !== undefined && paid !== netTotal) {
+    addLine(justifyBetween('Amount Paid:', fmtCurrency(paid).replace('₦', ''), cols));
   }
-  addLine(justifyBetween('TOTAL PAYABLE:', fmtCurrency(netTotal), cols));
-  addBytes(ESCPOS.NORMAL_SIZE);
-  addBytes(ESCPOS.BOLD_OFF);
-  addLine(doubleDivider);
-
-  // Payment Breakdown
-  addBytes(ESCPOS.BOLD_ON);
-  addLine(justifyBetween('AMOUNT PAID:', fmtCurrency(paid), cols));
-  addBytes(ESCPOS.BOLD_OFF);
-  addLine(justifyBetween('Payment Mode:', String(data.payment_method || 'Cash'), cols));
-
-  if (data.payment_method === 'Mixed' && data.payment_details) {
-    try {
-      const details = typeof data.payment_details === 'string'
-        ? JSON.parse(data.payment_details)
-        : data.payment_details;
-      if (details.cash) addLine(justifyBetween('  - Cash:', fmtCurrency(details.cash), cols));
-      if (details.bank) addLine(justifyBetween('  - Bank/POS:', fmtCurrency(details.bank), cols));
-    } catch {
-      // Ignore JSON parse errors for details
-    }
+  if (balance > 0) {
+    addLine(justifyBetween('Balance Due:', fmtCurrency(balance).replace('₦', ''), cols));
   }
-
-  addBytes(ESCPOS.BOLD_ON);
-  addLine(justifyBetween('BALANCE DUE:', fmtCurrency(balance), cols));
-  addBytes(ESCPOS.BOLD_OFF);
   addLine(divider);
 
-  // 6. Footer (Centered)
-  addBytes(ESCPOS.ALIGN_CENTER);
-  addLine('THANK YOU FOR YOUR PATRONAGE!');
-  addLine('Your Vision, Our Priority.');
+  // 6. Audit Trail
+  const cashierName = String(data.cashier || user?.full_name || 'cashier cashier');
+  const cashierEmail = String(data.cashier_email || user?.email || 'cashier@healthrevolve.com');
+  const printedByName = String(user?.full_name || data.cashier || 'cashier cashier');
+  const printedByEmail = String(user?.email || data.cashier_email || 'cashier@healthrevolve.com');
+  const timestampStr = formatAuditDate(new Date());
 
-  if (isReprint) {
-    const printTime = formatDate(new Date());
-    addLine(`Reprinted on ${printTime}`);
-    addLine(`Operator: ${user?.full_name || 'Admin'}`);
-  }
+  addBytes(ESCPOS.ALIGN_LEFT);
+  addLine(`BilledBy: ${cashierName} (${cashierEmail})`);
+  addLine(`Processed/Printed By: ${printedByName}(${printedByEmail})`);
+  addLine(`on the ${timestampStr}`);
+  addLine(divider);
+
+  // 7. Footer Branding
+  addBytes(ESCPOS.ALIGN_CENTER);
+  addBytes(ESCPOS.BOLD_ON);
+  addLine('--POWERED');
+  addLine('BY T-TECH SOLUTION--');
+  addBytes(ESCPOS.BOLD_OFF);
 
   // 7. Feed lines & Cut
   addBytes(ESCPOS.FEED_LINES(cols >= 48 ? 4 : 3));

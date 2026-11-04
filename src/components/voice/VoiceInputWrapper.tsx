@@ -25,7 +25,7 @@ export const VoiceInputWrapper: React.FC<VoiceInputWrapperProps> = ({
   children
 }) => {
   const { user } = useAuth();
-  const { activeField, startSession, endSession } = useVoiceSession();
+  const { activeField, startSession, endSession, isAiAvailable } = useVoiceSession();
 
   const [mode, setMode] = useState<VoiceMode>('TYPE');
   const [showNoticeModal, setShowNoticeModal] = useState<boolean>(false);
@@ -56,9 +56,10 @@ export const VoiceInputWrapper: React.FC<VoiceInputWrapperProps> = ({
     }
   }, [showUndoBanner]);
 
-  // Role Guard: Nurses do not use clinical voice dictation in consultation
+  // Role Guard & Admin Master Switch Guard:
+  // Nurses do not use clinical voice dictation, and Admin can pause/disable AI hospital-wide
   const userRole = (user?.role || '').toLowerCase();
-  const canUseVoice = userRole !== 'nurse';
+  const canUseVoice = isAiAvailable && userRole !== 'nurse';
 
   // ── Global Dictation Hotkey listener ─────────────────────────────────────
   // We listen for the custom 'voice:hotkey-trigger' event fired by

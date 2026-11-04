@@ -18,6 +18,7 @@ export const UserManagement: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
+    email: '',
     password: '',
     full_name: '',
     role: 'Receptionist',
@@ -66,6 +67,7 @@ export const UserManagement: React.FC = () => {
   const filteredUsers = users.filter(u => 
     u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.role?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -76,6 +78,7 @@ export const UserManagement: React.FC = () => {
       setEditingUser(user);
       setFormData({
         username: user.username,
+        email: user.email || '',
         password: '', // Don't show password
         full_name: user.full_name,
         role: user.role,
@@ -86,6 +89,7 @@ export const UserManagement: React.FC = () => {
       setEditingUser(null);
       setFormData({
         username: '',
+        email: '',
         password: '',
         full_name: '',
         role: 'Receptionist',
@@ -195,6 +199,7 @@ export const UserManagement: React.FC = () => {
             <tr>
               <th>STAFF IDENTITY</th>
               <th>SYSTEM USERNAME</th>
+              <th>OFFICIAL EMAIL</th>
               <th>AUTHORIZATION ROLE</th>
               <th>DEPARTMENT</th>
               <th>ACCOUNT STATUS</th>
@@ -204,13 +209,13 @@ export const UserManagement: React.FC = () => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', padding: '80px' }}>
+                <td colSpan={7} style={{ textAlign: 'center', padding: '80px' }}>
                   <LoadingSpinner size="large" label="Synchronizing Staff Registry..." />
                 </td>
               </tr>
             ) : filteredUsers.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', padding: '80px' }}>
+                <td colSpan={7} style={{ textAlign: 'center', padding: '80px' }}>
                   <div style={{ opacity: 0.3, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
                     <Users size={64} />
                     <p style={{ fontWeight: '800', textTransform: 'uppercase', fontSize: '14px' }}>No user records discovered</p>
@@ -230,6 +235,13 @@ export const UserManagement: React.FC = () => {
                     <code style={{ fontSize: '13px', fontWeight: '900', color: 'var(--leh-primary)', background: 'var(--leh-primary-light)', padding: '2px 8px', borderRadius: '4px' }}>
                       {userAccount.username}
                     </code>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--leh-text-dark)' }}>
+                        {userAccount.email || `${userAccount.username.toLowerCase()}@lunaeye.com`}
+                      </span>
+                    </div>
                   </td>
                   <td>
                     <span className="leh-status-badge blue" style={{ fontSize: '10px' }}>{userAccount.role}</span>
@@ -312,7 +324,7 @@ export const UserManagement: React.FC = () => {
                     padding: '16px', 
                     background: 'var(--leh-primary-light)', 
                     borderRadius: '12px', 
-                    border: '1.5px solid rgba(37, 99, 235, 0.15)' 
+                    border: '1.5px solid rgba(46, 90, 38, 0.18)' 
                   }}>
                     <p style={{ fontSize: '13px', color: 'var(--leh-text-dark)', fontWeight: '600', margin: 0 }}>
                       Resetting access credentials for:
@@ -377,6 +389,20 @@ export const UserManagement: React.FC = () => {
                           </select>
                         </div>
                       )}
+                      <div className="leh-form-group full-width">
+                        <label className="leh-label">OFFICIAL EMAIL ADDRESS</label>
+                        <input
+                          type="email"
+                          className="leh-input"
+                          required
+                          placeholder="e.g. staff@lunaeye.com"
+                          value={formData.email}
+                          onChange={e => setFormData({...formData, email: e.target.value})}
+                        />
+                        <p style={{ fontSize: '11px', color: 'var(--leh-text-muted)', marginTop: '4px', fontWeight: '500' }}>
+                          Used for POS receipt transaction attribution and audit traces.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -395,7 +421,20 @@ export const UserManagement: React.FC = () => {
                           autoComplete="off"
                           placeholder="e.g. abello.clinical"
                           value={formData.username}
-                          onChange={e => setFormData({...formData, username: e.target.value})}
+                          onChange={e => {
+                            const newUsername = e.target.value;
+                            // If creating a new user and email is empty or mirrors username, auto-populate email preview
+                            if (!editingUser && (!formData.email || formData.email.endsWith('@lunaeye.com'))) {
+                              const slug = newUsername.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
+                              setFormData({
+                                ...formData, 
+                                username: newUsername,
+                                email: slug ? `${slug}@lunaeye.com` : ''
+                              });
+                            } else {
+                              setFormData({...formData, username: newUsername});
+                            }
+                          }}
                         />
                       </div>
                     )}

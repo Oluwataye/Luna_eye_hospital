@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   Search, Trash2, ShoppingCart, 
   Plus, Minus,
@@ -11,7 +11,10 @@ import {
   ShieldCheck,
   AlertTriangle,
   Layers,
-  Sliders
+  Sliders,
+  Lock,
+  CheckCircle2,
+  Users
 } from 'lucide-react';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -20,6 +23,7 @@ import { formatDateStandard } from '../utils/date';
 import { dispatchReceiptPrint } from '../utils/thermalPrinter';
 import { getPrinterSettings } from '../utils/printerConfig';
 import ThermalPrinterModal from '../components/ThermalPrinterModal';
+import { InnerNavTabs } from '../components/InnerNavTabs';
 import './Billing.css';
 
 export interface BillingSession {
@@ -57,6 +61,7 @@ export const Billing: React.FC = () => {
   const { user } = useAuth();
   const { notify } = useNotification();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   
   // Tabs State
   const [activeTab, setActiveTab] = useState<'inventory' | 'pending' | 'history'>('inventory');
@@ -101,6 +106,7 @@ export const Billing: React.FC = () => {
   const [isRestoredFromDraft, setIsRestoredFromDraft] = useState(false);
   const isDraftHydratedRef = useRef(false);
   const handleProcessPaymentRef = useRef<() => void>(() => {});
+  const autoPopulatedKeyRef = useRef<string | null>(null);
   
   // History State
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -108,8 +114,33 @@ export const Billing: React.FC = () => {
   // Modal State
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showPrinterConfig, setShowPrinterConfig] = useState(false);
+  const [familyPaymentSuccess, setFamilyPaymentSuccess] = useState<{
+    familyId: string | number;
+    familyName: string;
+    receiptNo: string;
+    balance?: number;
+    amountPaid?: number;
+  } | null>(null);
+
+  // Settings & Supervisor Authorization States
+  const [clinicSettings, setClinicSettings] = useState<any>({});
+  const [showSupervisorModal, setShowSupervisorModal] = useState(false);
+  const [supervisorUsername, setSupervisorUsername] = useState('');
+  const [supervisorPassword, setSupervisorPassword] = useState('');
+  const [isVerifyingSupervisor, setIsVerifyingSupervisor] = useState(false);
+  const [supervisorAuth, setSupervisorAuth] = useState<{
+    id?: number;
+    username: string;
+    password?: string;
+    full_name: string;
+    role: string;
+  } | null>(null);
+  const [discountReason, setDiscountReason] = useState('');
+  const [discountNote, setDiscountNote] = useState('');
 
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const itemSearchRef = useRef<HTMLDivElement>(null);
+  const patientSearchRef = useRef<HTMLDivElement>(null);
 
   // Global Keyboard Shortcuts (F2: Search, F9 / Ctrl+Enter: Quick Checkout)
   useEffect(() => {
@@ -122,15 +153,43 @@ export const Billing: React.FC = () => {
         e.preventDefault();
         handleProcessPaymentRef.current();
       }
+      if (e.key === 'Escape') {
+        setCatalogResults([]);
+        setPatientResults([]);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Close search popovers when clicking outside the search widgets
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (itemSearchRef.current && !itemSearchRef.current.contains(e.target as Node)) {
+        setCatalogResults([]);
+      }
+      if (patientSearchRef.current && !patientSearchRef.current.contains(e.target as Node)) {
+        setPatientResults([]);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   useEffect(() => {
     fetchPatients();
     fetchCatalog();
+    fetchSettings();
   }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const data = await api.getSettings();
+      setClinicSettings(data || {});
+    } catch (e) {
+      console.warn('Failed to load clinic settings in Billing:', e);
+    }
+  };
 
   const fetchPatients = async () => {
     try {
@@ -339,7 +398,9 @@ export const Billing: React.FC = () => {
           id: urlPatientId,
           full_name: urlPatientName ? decodeURIComponent(urlPatientName) : `Patient #${urlPatientId}`,
           current_visit_id: urlVisitId || null,
-          payment_category: 'Standard'
+          payment_category: 'Standard',
+          family_id: searchParams.get('family_id') || null,
+          is_family: searchParams.get('is_family') === '1'
         };
         handlePatientSelect(fallback, urlVisitId);
       }
@@ -352,29 +413,74 @@ export const Billing: React.FC = () => {
     };
   }, [searchParams, patients]);
 
-  // Auto-select catalog item from URL query parameter (e.g. auto_select=Registration)
+  // Auto-select and populate registration card / service item into active cart
   useEffect(() => {
     const autoSelect = searchParams.get('auto_select') || searchParams.get('autoSelect');
-    if (!autoSelect || catalog.length === 0) return;
+    const urlPatientId = searchParams.get('patient_id') || searchParams.get('patientId');
+    const urlCardFee = searchParams.get('card_fee') || searchParams.get('cardFee');
 
-    const itemToSelect = catalog.find(
-      (item: any) => item.name?.toLowerCase() === autoSelect.toLowerCase()
-    );
-    if (itemToSelect) {
-      setCart(prevCart => {
-        const alreadyInCart = prevCart.some(
-          c => (c.identifier === itemToSelect.identifier && c.type === itemToSelect.type) ||
-               c.name?.toLowerCase() === itemToSelect.name?.toLowerCase()
-        );
-        if (alreadyInCart) return prevCart;
-        return [...prevCart, { 
-          ...itemToSelect, 
-          qty: 1, 
-          unit_price: itemToSelect.price,
-          description: itemToSelect.name
-        }];
+    if (!autoSelect) return;
+
+    // Build unique key to avoid duplicate population during benign re-renders
+    const populateKey = `${urlPatientId || 'unknown'}-${autoSelect}`;
+    if (autoPopulatedKeyRef.current === populateKey) return;
+
+    // Flexible matching: check exact match, or 'individual' / 'family' / 'registration'
+    const targetQuery = autoSelect.toLowerCase().trim();
+    let itemToSelect: any = null;
+
+    if (catalog.length > 0) {
+      itemToSelect = catalog.find((item: any) => {
+        const n = (item.name || '').toLowerCase().trim();
+        return n === targetQuery || 
+          (targetQuery.includes('individual') && n.includes('individual')) ||
+          (targetQuery.includes('family') && n.includes('family')) ||
+          (targetQuery === 'registration' && (n.includes('individual') || n === 'registration'));
       });
     }
+
+    // Determine price: from catalog item, URL param, or card defaults
+    let fallbackPrice = 3000;
+    if (urlCardFee) {
+      fallbackPrice = parseFloat(urlCardFee) || 3000;
+    } else if (targetQuery.includes('family')) {
+      fallbackPrice = 10000;
+    }
+
+    const itemName = itemToSelect ? itemToSelect.name : (
+      targetQuery.includes('family') ? 'Family Card' : 
+      (targetQuery.includes('individual') ? 'Individual Card' : autoSelect)
+    );
+    const itemPrice = itemToSelect ? (Number(itemToSelect.price) || fallbackPrice) : fallbackPrice;
+
+    const cartItemToAdd = {
+      ...(itemToSelect || {}),
+      id: itemToSelect ? itemToSelect.id : (targetQuery.includes('family') ? 'srv-family-card' : 'srv-individual-card'),
+      identifier: itemToSelect ? itemToSelect.identifier : (targetQuery.includes('family') ? 'SRV-FAMILY-CARD' : 'SRV-INDIVIDUAL-CARD'),
+      name: itemName,
+      type: 'service' as const,
+      price: itemPrice,
+      unit_price: itemPrice,
+      qty: 1,
+      description: itemToSelect?.description || `${itemName} Registration Fee`,
+      category: itemToSelect?.category || 'Registration'
+    };
+
+    setCart(prevCart => {
+      const alreadyInCart = prevCart.some(
+        c => (cartItemToAdd.identifier && c.identifier === cartItemToAdd.identifier) ||
+             (c.name && c.name.toLowerCase() === itemName.toLowerCase())
+      );
+      if (alreadyInCart) return prevCart;
+
+      return [...prevCart, cartItemToAdd];
+    });
+
+    // Automatically set amount tendered to cover registration fee so cashier can immediately complete
+    setAmountTendred(prev => prev > 0 ? prev : itemPrice);
+
+    autoPopulatedKeyRef.current = populateKey;
+    notify('info', `${itemName} (₦${itemPrice.toLocaleString()}) populated into cart for registration`);
   }, [searchParams, catalog]);
 
 
@@ -525,6 +631,7 @@ export const Billing: React.FC = () => {
           payment_method: reconcilePaymentMethod,
           payment_details: reconcilePaymentMethod === 'Mixed' ? reconcileMixedBreakdown : {},
           cashier: user?.full_name || 'System',
+          cashier_email: user?.email || '',
           items: items
         };
 
@@ -584,8 +691,22 @@ export const Billing: React.FC = () => {
 
   const subtotal = cart.reduce((acc, item) => acc + (item.unit_price * item.qty), 0);
   const discountAmount = ((subtotal * discountPercent) / 100) + manualDiscount;
+  const effectiveDiscountPct = subtotal > 0 ? (discountAmount / subtotal) * 100 : 0;
   const totalPayable = Math.max(0, subtotal - discountAmount);
   const balance = Math.max(0, totalPayable - amountTendred);
+
+  // Role discount limit calculations
+  const userRole = (user?.role || 'Receptionist').toLowerCase();
+  const roleCap = userRole === 'admin' ? 100 : parseFloat(
+    userRole === 'doctor' || userRole === 'consultant' ? (clinicSettings?.discount_cap_doctor || clinicSettings?.discount_cap_consultant || '25') :
+    userRole === 'optometrist' ? (clinicSettings?.discount_cap_optometrist || '15') :
+    userRole === 'nurse' ? (clinicSettings?.discount_cap_nurse || '10') :
+    (clinicSettings?.discount_cap_receptionist || '10')
+  );
+  const supervisorCeiling = parseFloat(clinicSettings?.discount_cap_supervisor_ceiling || '50');
+
+  const isExceedingCeiling = userRole !== 'admin' && effectiveDiscountPct > supervisorCeiling;
+  const isExceedingRoleCap = userRole !== 'admin' && effectiveDiscountPct > roleCap;
 
   // Sync amount tendred when total payable changes, unless it was manually edited
   useEffect(() => {
@@ -594,21 +715,89 @@ export const Billing: React.FC = () => {
     }
   }, [totalPayable]);
 
+  const handleVerifySupervisor = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!supervisorUsername.trim() || !supervisorPassword) {
+      return notify('error', 'Supervisor username and password are required');
+    }
+    setIsVerifyingSupervisor(true);
+    try {
+      const res = await api.verifySupervisor({
+        username: supervisorUsername.trim(),
+        password: supervisorPassword
+      });
+      if (!discountReason) {
+        notify('error', 'Please select a discount justification reason before authorizing.');
+        setIsVerifyingSupervisor(false);
+        return;
+      }
+      setSupervisorAuth({ ...res.supervisor, password: supervisorPassword });
+      setIsManualDiscountUnlocked(true);
+      setShowSupervisorModal(false);
+      setSupervisorPassword('');
+      notify('success', `Override authorized by ${res.supervisor.full_name} (${res.supervisor.role})`);
+    } catch (err: any) {
+      notify('error', err.message || 'Supervisor authorization failed');
+    } finally {
+      setIsVerifyingSupervisor(false);
+    }
+  };
+
   const handleProcessPayment = async () => {
     if (!selectedPatient) return notify('error', 'Select a patient first');
     if (cart.length === 0) return notify('error', 'Cart is empty');
     if (amountTendred < 0) return notify('error', 'Invalid payment amount');
 
+    // Revenue leakage & role cap checks
+    if (isExceedingCeiling) {
+      return notify(
+        'error',
+        `Discount of ${effectiveDiscountPct.toFixed(1)}% exceeds the maximum hospital ceiling (${supervisorCeiling}%). Cannot proceed.`
+      );
+    }
+
+    if (isExceedingRoleCap && !supervisorAuth) {
+      setShowSupervisorModal(true);
+      return notify(
+        'warning',
+        `Discount of ${effectiveDiscountPct.toFixed(1)}% exceeds your ${user?.role || 'user'} allowance (${roleCap}%). Supervisor authorization required.`
+      );
+    }
+
     setIsProcessing(true);
     try {
+      const isFamilyCard = searchParams.get('is_family') === '1' || searchParams.get('family_id') || selectedPatient?.is_family;
+      const targetFamilyId = searchParams.get('family_id') || selectedPatient?.family_id;
+      const billingType = isFamilyCard ? 'family' : (selectedPatient?.id ? 'patient' : 'walk_in');
+
       const transactionData = {
         patient_id: selectedPatient.id,
+        billing_type: billingType,
+        family_id: targetFamilyId ? parseInt(String(targetFamilyId)) : null,
         visit_id: selectedVisitId,
         total_amount: subtotal,
         amount_paid: amountTendred,
         discount: discountAmount,
         payment_method: paymentMethod,
-        payment_details: paymentMethod === 'Mixed' ? mixedBreakdown : {},
+        payment_details: {
+          ...(paymentMethod === 'Mixed' ? mixedBreakdown : {}),
+          ...(supervisorAuth ? {
+            supervisor_override_applied: {
+              authorized_by: supervisorAuth.username,
+              role: supervisorAuth.role,
+              full_name: supervisorAuth.full_name,
+              timestamp: new Date().toISOString()
+            }
+          } : {})
+        },
+        supervisor_username: supervisorAuth?.username,
+        supervisor_password: supervisorAuth?.password,
+        discount_reason: discountReason || undefined,
+        discount_note: discountNote || undefined,
+        is_insurance_bill: ['HMO', 'NHIS', 'INSURANCE'].includes(selectedPatient?.payment_category) || !!selectedPatient?.is_insurance,
+        payer_id: selectedPatient?.payer_id || undefined,
+        patient_portion: amountTendred,
+        payer_portion: Math.max(0, totalPayable - amountTendred),
         items: cart.map(item => ({
           inventory_id: item.type === 'product' ? item.identifier : null,
           description: item.name,
@@ -619,6 +808,9 @@ export const Billing: React.FC = () => {
       };
 
       const res = await api.createTransaction(transactionData);
+      setSupervisorAuth(null);
+      setDiscountReason('');
+      setDiscountNote('');
       
       // Clinical Gate: Only update visit status if payment is FULL
       if (transactionData.visit_id && balance === 0) {
@@ -627,6 +819,17 @@ export const Billing: React.FC = () => {
 
       notify('success', balance === 0 ? 'Payment Settled' : 'Partial Payment Recorded');
       
+      // Family Card Post-Payment Check: show direct link to Family Profile
+      if (isFamilyCard && targetFamilyId) {
+        setFamilyPaymentSuccess({
+          familyId: targetFamilyId,
+          familyName: selectedPatient.full_name || 'Family Household',
+          receiptNo: res.receipt_no || 'REC',
+          balance: balance,
+          amountPaid: amountTendred
+        });
+      }
+      
       // Print Receipt
       const printerConfig = getPrinterSettings();
       const receiptPayload = { 
@@ -634,6 +837,7 @@ export const Billing: React.FC = () => {
         receipt_no: res.receipt_no, 
         created_at: new Date(),
         patient_name: selectedPatient.full_name,
+        cashier_email: user?.email || '',
         balance: balance
       };
 
@@ -675,6 +879,76 @@ export const Billing: React.FC = () => {
 
   return (
     <div className="billing-page-container animate-fade-in">
+      {/* Post-Payment Family Profile Modal */}
+      {familyPaymentSuccess && (
+        <div className="leh-modal-overlay" style={{ zIndex: 1200 }}>
+          <div className="leh-modal-content" style={{ maxWidth: '520px', textAlign: 'center' }}>
+            <div style={{ padding: '36px 28px 28px' }}>
+              <div style={{
+                width: '68px', height: '68px', borderRadius: '50%',
+                background: '#dcfce7', color: '#16a34a',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 18px'
+              }}>
+                <CheckCircle2 size={38} />
+              </div>
+
+              <h2 style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', margin: '0 0 8px' }}>
+                {(familyPaymentSuccess.balance ?? 0) === 0 ? 'Family Card Payment Settled!' : 'Family Card Partial Payment Recorded!'}
+              </h2>
+              <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 20px', lineHeight: '1.5' }}>
+                {(familyPaymentSuccess.balance ?? 0) === 0 ? (
+                  <>The household registration fee for <strong>{familyPaymentSuccess.familyName}</strong> has been confirmed in full (Receipt #{familyPaymentSuccess.receiptNo}).</>
+                ) : (
+                  <>Partial payment of <strong>₦{(familyPaymentSuccess.amountPaid ?? 0).toLocaleString()}</strong> for <strong>{familyPaymentSuccess.familyName}</strong> has been recorded (Receipt #{familyPaymentSuccess.receiptNo}). Balance remaining: <strong style={{ color: 'var(--leh-red)' }}>₦{(familyPaymentSuccess.balance ?? 0).toLocaleString()}</strong>.</>
+                )}
+              </p>
+
+              <div style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                padding: '16px',
+                marginBottom: '28px',
+                fontSize: '13px',
+                color: '#475569',
+                lineHeight: '1.5'
+              }}>
+                {(familyPaymentSuccess.balance ?? 0) === 0 ? (
+                  'The household card is now active. You can open the Family Profile immediately to add household members with their own patient folders.'
+                ) : (
+                  'The household card is active and the outstanding debt is tracked under Pending Bills. You can open the Family Profile immediately to add household members.'
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => setFamilyPaymentSuccess(null)}
+                  className="leh-btn-outline"
+                  style={{ height: '42px', padding: '0 20px' }}
+                >
+                  Stay on Billing
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const fId = familyPaymentSuccess.familyId;
+                    setFamilyPaymentSuccess(null);
+                    navigate(`/patients/family/${fId}`);
+                  }}
+                  className="leh-btn-primary"
+                  style={{ height: '42px', padding: '0 24px', display: 'flex', alignItems: 'center', gap: '8px' }}
+                >
+                  <Users size={18} />
+                  <span>Open Family Profile & Add Members →</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showCancelModal && (
         <div className="leh-modal-overlay">
           <div className="leh-modal-content" style={{ maxWidth: '480px' }}>
@@ -773,7 +1047,7 @@ export const Billing: React.FC = () => {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                   <span style={{ fontSize: '12px', fontWeight: '700', color: '#64748b' }}>RECEIPT NUMBER</span>
-                  <span style={{ fontSize: '13px', fontWeight: '800', color: '#3b82f6', fontFamily: 'monospace' }}>{reconcileTx.receipt_no || `TX-${reconcileTx.transaction_id}`}</span>
+                  <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--leh-forest)', fontFamily: 'monospace' }}>{reconcileTx.receipt_no || `TX-${reconcileTx.transaction_id}`}</span>
                 </div>
                 <div style={{ borderTop: '1px dashed #cbd5e1', margin: '12px 0' }}></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
@@ -937,22 +1211,21 @@ export const Billing: React.FC = () => {
             title="Configure Direct ESC/POS Thermal Receipt Printer"
             style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#1e293b', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}
           >
-            <Sliders size={16} color="#2563eb" /> Thermal Setup
+            <Sliders size={16} color="var(--leh-forest)" /> Thermal Setup
           </button>
         </div>
       </header>
 
-      <div className="billing-tabs-container">
-        <button className={`billing-tab ${activeTab === 'inventory' ? 'active' : ''}`} onClick={() => setActiveTab('inventory')}>
-          STANDARD BILLING
-        </button>
-        <button className={`billing-tab ${activeTab === 'pending' ? 'active' : ''}`} onClick={() => setActiveTab('pending')}>
-          PENDING BILLS / DEBTS
-        </button>
-        <button className={`billing-tab ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
-          BILLING HISTORY
-        </button>
-      </div>
+      <InnerNavTabs<'inventory' | 'pending' | 'history'>
+        tabs={[
+          { id: 'inventory', label: 'STANDARD BILLING' },
+          { id: 'pending', label: 'PENDING BILLS / DEBTS' },
+          { id: 'history', label: 'BILLING HISTORY' }
+        ]}
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        style={{ marginBottom: '28px' }}
+      />
 
       {/* CONCURRENT SESSIONS BAR */}
       {activeTab === 'inventory' && (
@@ -1077,14 +1350,26 @@ export const Billing: React.FC = () => {
                     <h3 className="panel-title"><Search size={18} /> Item & Service Search</h3>
                     <span className="panel-badge">F2 TO FOCUS</span>
                  </div>
-                 <div className="leh-search-box" style={{ marginBottom: '16px' }}>
-                    <Search size={18} className="leh-search-icon" />
-                    <input 
-                      ref={searchInputRef}
-                      placeholder="Search services, drugs, lens..." 
-                      value={catalogSearch} 
-                      onChange={(e) => setCatalogSearch(e.target.value)} 
-                    />
+                 <div ref={itemSearchRef} className="search-input-wrapper" style={{ marginBottom: '16px' }}>
+                    <div className="leh-search-box">
+                       <Search size={18} className="leh-search-icon" />
+                       <input 
+                         ref={searchInputRef}
+                         placeholder="Search services, drugs, lens..." 
+                         value={catalogSearch} 
+                         onChange={(e) => setCatalogSearch(e.target.value)} 
+                       />
+                       {catalogSearch && (
+                         <button 
+                           type="button" 
+                           onClick={() => { setCatalogSearch(''); setCatalogResults([]); }}
+                           className="leh-search-clear"
+                           title="Clear search"
+                         >
+                           <X size={16} />
+                         </button>
+                       )}
+                    </div>
                     {catalogResults.length > 0 && (
                       <div className="search-results-popover">
                          {catalogResults.map(item => (
@@ -1093,7 +1378,7 @@ export const Billing: React.FC = () => {
                                  <span style={{ fontWeight: '800', fontSize: '13px' }}>{item.name}</span>
                                  <span style={{ fontSize: '10px', color: '#94a3b8' }}>{item.category}</span>
                               </div>
-                              <span style={{ fontWeight: '900', color: '#3b82f6' }}>₦{item.price?.toLocaleString()}</span>
+                              <span style={{ fontWeight: '900', color: 'var(--leh-forest)' }}>₦{item.price?.toLocaleString()}</span>
                            </div>
                          ))}
                       </div>
@@ -1110,7 +1395,7 @@ export const Billing: React.FC = () => {
                        Patient Details
                     </h3>
                  </div>
-                 <div className="search-input-wrapper" style={{ marginBottom: '16px', position: 'relative' }}>
+                 <div ref={patientSearchRef} className="search-input-wrapper" style={{ marginBottom: '16px', position: 'relative' }}>
                     <input 
                       className="billing-search-input" 
                       style={{ paddingLeft: '16px', paddingRight: isSearchingPatients ? '36px' : '16px' }}
@@ -1131,7 +1416,7 @@ export const Billing: React.FC = () => {
                                  <span style={{ fontWeight: '800' }}>{p.full_name}</span>
                                  {p.phone && <span style={{ color: '#64748b', fontSize: '10px', marginTop: '2px' }}>Tel: {p.phone}</span>}
                               </div>
-                              <span style={{ color: '#3b82f6', fontSize: '11px', fontWeight: '800', whiteSpace: 'nowrap' }}>#{p.id}</span>
+                              <span style={{ color: 'var(--leh-forest)', fontSize: '11px', fontWeight: '800', whiteSpace: 'nowrap' }}>#{p.id}</span>
                            </div>
                          ))}
                       </div>
@@ -1317,12 +1602,10 @@ export const Billing: React.FC = () => {
                              MANUAL DISCOUNT (₦) 
                              <button onClick={() => {
                                 if(isManualDiscountUnlocked) return;
-                                const pin = window.prompt("Enter Admin PIN to unlock manual discount:");
-                                if (pin === "1234" || pin === "ADMIN") {
+                                setShowSupervisorModal(true);
+                                if (user?.role === 'Admin') {
                                   setIsManualDiscountUnlocked(true);
-                                  notify('success', 'Manual discount unlocked');
-                                } else if (pin) {
-                                  notify('error', 'Invalid Admin PIN');
+                                  notify('success', 'Manual discount unlocked (Admin)');
                                 }
                              }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}>
                                <ShieldCheck size={10} color={isManualDiscountUnlocked ? '#10b981' : '#94a3b8'} />
@@ -1343,6 +1626,43 @@ export const Billing: React.FC = () => {
                           </div>
                        </div>
                     </div>
+
+                    {/* Role-Gated Discount Cap Indicators */}
+                    {effectiveDiscountPct > 0.01 && (
+                      <div style={{ marginTop: '10px' }}>
+                        {isExceedingCeiling ? (
+                          <div style={{ padding: '8px 12px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '11px', color: '#991b1b', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <AlertTriangle size={14} />
+                            <span>EXCEEDS CEILING ({supervisorCeiling}%). Maximum discount allowed for this transaction is {supervisorCeiling}%.</span>
+                          </div>
+                        ) : isExceedingRoleCap ? (
+                          <div style={{ padding: '8px 12px', background: supervisorAuth ? '#ecfdf5' : '#fffbeb', border: `1px solid ${supervisorAuth ? '#a7f3d0' : '#fed7aa'}`, borderRadius: '8px', fontSize: '11px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: supervisorAuth ? '#065f46' : '#9a3412', fontWeight: '700' }}>
+                              <ShieldCheck size={14} color={supervisorAuth ? '#10b981' : '#f59e0b'} />
+                              <span>
+                                {supervisorAuth 
+                                  ? `Supervisor Override Approved: ${supervisorAuth.full_name} (${supervisorAuth.role})`
+                                  : `Exceeds ${user?.role || 'Cashier'} limit (${roleCap}%). Effective: ${effectiveDiscountPct.toFixed(1)}%`}
+                              </span>
+                            </div>
+                            {!supervisorAuth && (
+                              <button
+                                type="button"
+                                onClick={() => setShowSupervisorModal(true)}
+                                style={{ background: '#f59e0b', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 8px', fontSize: '10px', fontWeight: '800', cursor: 'pointer' }}
+                              >
+                                AUTHORIZE
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <CheckCircle2 size={13} color="#10b981" />
+                            <span>Effective discount: {effectiveDiscountPct.toFixed(1)}% (within your {roleCap}% limit)</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Preserved Settlement logic */}
                     <div className="settlement-card-light">
@@ -1496,7 +1816,7 @@ export const Billing: React.FC = () => {
                            })
                            .map(tx => (
                              <tr key={tx.transaction_id}>
-                                <td style={{ fontWeight: '800', color: '#3b82f6' }}>{tx.receipt_no || `TX-${tx.transaction_id}`}</td>
+                                <td style={{ fontWeight: '800', color: 'var(--leh-forest)' }}>{tx.receipt_no || `TX-${tx.transaction_id}`}</td>
                                 <td>
                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
                                      <span style={{ fontWeight: '800' }}>{tx.patient_name}</span>
@@ -1557,7 +1877,7 @@ export const Billing: React.FC = () => {
                  <tbody>
                     {transactions.map(tx => (
                       <tr key={tx.id}>
-                         <td style={{ fontWeight: '800', color: '#3b82f6' }}>{tx.receipt_no}</td>
+                         <td style={{ fontWeight: '800', color: 'var(--leh-forest)' }}>{tx.receipt_no}</td>
                          <td>{tx.patient_name}</td>
                          <td>
                             <div className="leh-date-display" style={{ alignItems: 'center' }}>
@@ -1584,7 +1904,7 @@ export const Billing: React.FC = () => {
                               }}
                               title="Reprint Receipt"
                             >
-                               <Printer size={14} color="#3b82f6" />
+                               <Printer size={14} color="var(--leh-forest)" />
                             </button>
                          </td>
                       </tr>
@@ -1601,6 +1921,139 @@ export const Billing: React.FC = () => {
           onClose={() => setShowPrinterConfig(false)} 
           onSaved={() => notify('success', 'Thermal printer configuration saved.')}
         />
+      )}
+
+      {/* Supervisor Discount Authorization Modal */}
+      {showSupervisorModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
+        }}>
+          <div style={{
+            background: '#ffffff', borderRadius: '16px', width: '100%', maxWidth: '420px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#ffedd5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Lock size={18} color="#ea580c" />
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>Supervisor Authorization</h4>
+                  <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>Revenue leakage protection gate</p>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => { setShowSupervisorModal(false); setSupervisorPassword(''); setDiscountReason(''); setDiscountNote(''); }} 
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleVerifySupervisor} style={{ padding: '24px' }}>
+              <div style={{ marginBottom: '16px', padding: '12px 14px', borderRadius: '10px', background: '#fff7ed', border: '1px solid #fed7aa', fontSize: '12px', color: '#9a3412', lineHeight: 1.5 }}>
+                <p style={{ margin: '0 0 4px', fontWeight: '800' }}>Discount Approval Required</p>
+                <span>
+                  The applied discount of <strong>{effectiveDiscountPct.toFixed(1)}% (₦{discountAmount.toLocaleString()})</strong> exceeds the {user?.role || 'cashier'} limit of <strong>{roleCap}%</strong>. An authorized Doctor, Consultant, or Admin must verify this transaction.
+                </span>
+              </div>
+
+              {/* Discount Reason — required when exceeding cap */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#334155', marginBottom: '6px' }}>
+                  Discount Justification <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <select
+                  required
+                  className="leh-input"
+                  style={{ width: '100%', height: '40px', fontSize: '13px', cursor: 'pointer' }}
+                  value={discountReason}
+                  onChange={(e) => setDiscountReason(e.target.value)}
+                >
+                  <option value="">— Select a justification reason —</option>
+                  <option value="Staff/Family Waiver">Staff / Family Waiver</option>
+                  <option value="Clinical Complication Courtesy">Clinical Complication Courtesy</option>
+                  <option value="Indigent Patient Scheme">Indigent Patient Scheme</option>
+                  <option value="Damaged Frame/Lens Good Faith">Damaged Frame / Lens Good Faith</option>
+                  <option value="NGO/Partner Subsidy">NGO / Partner Subsidy</option>
+                  <option value="Management Directive">Management Directive</option>
+                  <option value="Referral Discount">Referral Discount</option>
+                  <option value="Other (see note)">Other (see note below)</option>
+                </select>
+              </div>
+
+              {/* Optional note */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#334155', marginBottom: '6px' }}>
+                  Additional Note <span style={{ color: '#94a3b8', fontWeight: '400' }}>(optional)</span>
+                </label>
+                <textarea
+                  placeholder="Brief explanation for audit trail..."
+                  className="leh-input"
+                  rows={2}
+                  style={{ width: '100%', fontSize: '12px', resize: 'vertical', padding: '10px 12px', lineHeight: 1.5 }}
+                  value={discountNote}
+                  onChange={(e) => setDiscountNote(e.target.value)}
+                />
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#334155', marginBottom: '6px' }}>
+                  Supervisor Username
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. dr_smith, admin"
+                  className="leh-input"
+                  style={{ width: '100%', height: '40px', fontSize: '13px' }}
+                  value={supervisorUsername}
+                  onChange={(e) => setSupervisorUsername(e.target.value)}
+                  autoFocus
+                />
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#334155', marginBottom: '6px' }}>
+                  Supervisor Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Enter supervisor password"
+                  className="leh-input"
+                  style={{ width: '100%', height: '40px', fontSize: '13px' }}
+                  value={supervisorPassword}
+                  onChange={(e) => setSupervisorPassword(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => { setShowSupervisorModal(false); setSupervisorPassword(''); setDiscountReason(''); setDiscountNote(''); }}
+                  style={{ height: '38px', padding: '0 16px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isVerifyingSupervisor}
+                  className="leh-btn-primary"
+                  style={{ height: '38px', padding: '0 18px', fontSize: '12px', background: '#ea580c', borderColor: '#ea580c' }}
+                >
+                  <ShieldCheck size={15} />
+                  {isVerifyingSupervisor ? 'VERIFYING...' : 'AUTHORIZE & UNLOCK'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* POS Footer */}

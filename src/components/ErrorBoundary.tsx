@@ -105,7 +105,7 @@ export class ErrorBoundary extends Component<Props, State> {
               style={{
                 width: '100%', height: '52px', border: 'none',
                 borderRadius: '12px', cursor: 'pointer',
-                background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                background: 'linear-gradient(135deg, var(--leh-forest), var(--leh-forest-hover))',
                 color: '#fff', fontSize: '14px', fontWeight: '800',
                 letterSpacing: '0.04em',
                 boxShadow: '0 4px 20px rgba(59,130,246,0.4)',
